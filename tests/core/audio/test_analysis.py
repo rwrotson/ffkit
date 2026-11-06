@@ -227,6 +227,41 @@ def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
     assert 0.9 < start < 1.1
     assert end is not None
     assert 3.9 < end < 4.1
+    duration = probe(Track(path=str(source))).duration
+    assert duration is not None
+    assert detect_trim_bounds(source, duration) == (start, end)
+
+
+def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
+    source = tmp_path / "short-tail.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "aevalsrc=0.1:s=44100:d=0.05",
+            "-filter_complex",
+            "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    duration = probe(Track(path=str(source))).duration
+    assert duration is not None
+    assert detect_trim_bounds(source) == (0.0, None)
+    assert detect_trim_bounds(source, duration) == (0.0, None)
 
 
 def test_tempo_estimates_known_pulse_train() -> None:

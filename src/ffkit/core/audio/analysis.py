@@ -16,6 +16,7 @@ from ffkit.core.audio.models import TempoSegment, Track
 
 PROCESS_TIMEOUT = 900
 TRIM_EDGE_TOLERANCE = 0.1
+TRIM_END_TOLERANCE = 0.001
 TEMPO_MAX_CHANGE = 8
 TEMPO_MIN_CHANGE = 12
 TEMPO_WINDOW = 300
@@ -75,6 +76,18 @@ def probe(track: Track) -> Track:
     return track
 
 
+def _trailing_trim_end(stderr: str, starts: list[float], ends: list[float]) -> float | None:
+    if not starts:
+        return None
+    if len(starts) > len(ends):
+        return starts[-1]
+    decoded_times = re.findall(r"^out_time_us=(\d+)$", stderr, re.MULTILINE)
+    if not decoded_times:
+        raise RuntimeError("FFmpeg did not report decoded duration")
+    decoded_end = int(decoded_times[-1]) / 1_000_000
+    return starts[-1] if ends[-1] >= decoded_end - TRIM_END_TOLERANCE else None
+
+
 def detect_trim_bounds(
     path: Path, duration: float | None = None, threshold_db: float = -50, min_duration: float = 0.1
 ) -> tuple[float, float | None]:
@@ -91,6 +104,8 @@ def detect_trim_bounds(
             str(path),
             "-af",
             f"silencedetect=noise={threshold_db}dB:d={min_duration}",
+            "-progress",
+            "pipe:2",
             "-f",
             "null",
             "-",
@@ -103,12 +118,7 @@ def detect_trim_bounds(
     starts = [float(value) for value in re.findall(r"silence_start: ([-\d.]+)", result.stderr)]
     ends = [float(value) for value in re.findall(r"silence_end: ([-\d.]+)", result.stderr)]
     start = ends[0] if starts and starts[0] <= TRIM_EDGE_TOLERANCE and ends else 0.0
-    end = (
-        starts[-1]
-        if starts
-        and (len(starts) > len(ends) or (ends and ends[-1] >= duration - TRIM_EDGE_TOLERANCE))
-        else None
-    )
+    end = _trailing_trim_end(result.stderr, starts, ends)
     if end is not None and end <= start:
         raise ValueError("Track contains no audible audio")
     return round(start, 3), round(end, 3) if end is not None else None

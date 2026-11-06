@@ -57,6 +57,7 @@ explicit overrides, including after a JSON round trip. The serialized `probed_so
 `tag_overrides` fields retain tag provenance. With `trim_silence` enabled, rendering and
 normalization scan for trailing silence before processing with bounded memory.
 An audible tail after an internal pause remains in the output.
+`detect_trim_bounds()` keeps the same tail when reporting audible bounds.
 Older Track JSON without these fields cannot distinguish source tags from explicit overrides.
 
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
