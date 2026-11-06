@@ -78,6 +78,10 @@ chunks = stream_mp3(track, start=0.5)
 cover = extract_cover(track, Path("cover.jpg"))
 ```
 
+`analyze_peak_waveform()` reads the source duration when the track has not been probed.
+`Effects` validates trim bounds when they are changed as well as when the model is created.
+FFmpeg analysis and cover extraction have a 15-minute processing deadline.
+
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
 
 ```python

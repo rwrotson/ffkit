@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TempoSegment(BaseModel):
@@ -14,12 +14,25 @@ class TempoSegment(BaseModel):
 class Effects(BaseModel):
     """Non-destructive audio processing options."""
 
+    model_config = ConfigDict(validate_assignment=True)
+
     gain_db: float = 0
     normalize_lufs: float | None = None
     trim_start: float = Field(default=0, ge=0)
     trim_end: float | None = Field(default=None, gt=0)
     trim_silence: bool = False
     limiter_ceiling_db: float | None = Field(default=None, ge=-20, le=-0.1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def valid_trim(cls, values: object) -> object:
+        """Reject trim bounds that would produce an empty interval."""
+        if isinstance(values, dict):
+            start = values.get("trim_start", 0)
+            end = values.get("trim_end")
+            if isinstance(start, (int, float)) and isinstance(end, (int, float)) and end <= start:
+                raise ValueError("Trim end must be later than start")
+        return values
 
 
 class Track(BaseModel):
@@ -43,9 +56,7 @@ class Track(BaseModel):
 
     @model_validator(mode="after")
     def valid_edits(self) -> Track:
-        """Check trim bounds and tempo ordering."""
-        if self.effects.trim_end is not None and self.effects.trim_end <= self.effects.trim_start:
-            raise ValueError("Trim end must be later than start")
+        """Check tempo ordering."""
         starts = [segment.start for segment in self.tempo]
         if starts != sorted(set(starts)):
             raise ValueError("Tempo segments must have unique, increasing start times")

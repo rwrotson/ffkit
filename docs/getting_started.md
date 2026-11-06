@@ -44,6 +44,9 @@ track = Track(path="song.flac", effects=Effects(gain_db=3))
 filters = audio_filters(track)
 ```
 
+`Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
+duration has not yet been populated by `probe()`.
+
 Configure logging in the application, or use the bundled helper:
 
 ```python

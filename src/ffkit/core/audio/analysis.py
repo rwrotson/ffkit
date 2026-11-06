@@ -2,9 +2,13 @@ import array
 import json
 import math
 import mmap
+import os
 import re
+import selectors
 import subprocess
 import tempfile
+import time
+from collections.abc import Iterator
 from pathlib import Path
 from statistics import median
 
@@ -17,6 +21,25 @@ TEMPO_MIN_CHANGE = 12
 TEMPO_WINDOW = 300
 TEMPO_MIN_WINDOW = 160
 TEMPO_MIN_CONFIDENCE = 0.1
+
+
+def _decoded_chunks(process: subprocess.Popen[bytes]) -> Iterator[bytes]:
+    deadline = time.monotonic() + PROCESS_TIMEOUT
+    if process.stdout is None:
+        raise RuntimeError("FFmpeg stdout is unavailable")
+    with selectors.DefaultSelector() as selector:
+        selector.register(process.stdout, selectors.EVENT_READ)
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not selector.select(remaining):
+                raise subprocess.TimeoutExpired(process.args, PROCESS_TIMEOUT)
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
+                break
+            yield chunk
+    remaining = max(0, deadline - time.monotonic())
+    if process.wait(timeout=remaining):
+        raise subprocess.CalledProcessError(process.returncode, process.args)
 
 
 def probe(track: Track) -> Track:
@@ -86,6 +109,11 @@ def detect_trim_bounds(
 
 def analyze_peak_waveform(track: Track) -> list[float]:
     """Measure a full-scale peak envelope from four-times oversampled audio."""
+    duration = track.duration
+    if duration is None:
+        duration = probe(Track(path=track.path)).duration
+    if duration is None or not math.isfinite(duration) or duration <= 0:
+        raise ValueError("Track duration is unavailable")
     info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [  # noqa: S607 - FFprobe is resolved from PATH; each argument is separate.
             "ffprobe",
@@ -107,7 +135,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     stream = json.loads(info.stdout)["streams"][0]
     channels = int(stream["channels"])
     rate = int(stream["sample_rate"]) * 4
-    frames_per_bin = max(1, math.ceil((track.duration or 0) * rate / 400))
+    frames_per_bin = max(1, math.ceil(duration * rate / 400))
     peaks = [0.0] * 400
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
@@ -132,21 +160,20 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     )
     frame_bytes = channels * 4
     frame_index = 0
+    pending = b""
     try:
-        if process.stdout is None:
-            raise RuntimeError("FFmpeg stdout is unavailable")
-        while True:
-            boundary = frames_per_bin - frame_index % frames_per_bin
-            data = process.stdout.read(min(boundary, 4096) * frame_bytes)
-            if not data:
-                break
-            values = array.array("f")
-            values.frombytes(data)
-            bin_index = min(399, frame_index // frames_per_bin)
-            peaks[bin_index] = max(peaks[bin_index], *(abs(value) for value in values))
-            frame_index += len(values) // channels
-        if process.wait(timeout=PROCESS_TIMEOUT):
-            raise subprocess.CalledProcessError(process.returncode, process.args)
+        for chunk in _decoded_chunks(process):
+            pending += chunk
+            while len(pending) >= frame_bytes:
+                boundary = frames_per_bin - frame_index % frames_per_bin
+                count = min(boundary, len(pending) // frame_bytes)
+                size = count * frame_bytes
+                values = array.array("f")
+                values.frombytes(pending[:size])
+                pending = pending[size:]
+                bin_index = min(399, frame_index // frames_per_bin)
+                peaks[bin_index] = max(peaks[bin_index], *(abs(value) for value in values))
+                frame_index += count
     finally:
         if process.poll() is None:
             process.kill()
@@ -171,7 +198,7 @@ def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR09
         try:
             if process.stdout is None:
                 raise RuntimeError("FFmpeg stdout is unavailable")
-            while chunk := process.stdout.read(65536):
+            for chunk in _decoded_chunks(process):
                 data = remaining_bytes + chunk
                 complete = len(data) // (hop * 2) * (hop * 2)
                 for offset in range(0, complete, hop * 2):
@@ -189,8 +216,6 @@ def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR09
                 energy_file.write(array.array("d", [value]).tobytes())
                 energy_count += 1
                 peak = max(peak, value)
-            if process.wait(timeout=PROCESS_TIMEOUT):
-                raise subprocess.CalledProcessError(process.returncode, process.args)
         finally:
             if process.poll() is None:
                 process.kill()

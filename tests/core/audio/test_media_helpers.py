@@ -121,6 +121,24 @@ def test_extract_cover_custom_missing_and_removed(tmp_path: Path) -> None:
     assert extract_cover(track, target) is None
 
 
+def test_extract_cover_timeout_removes_partial_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "cover.jpg"
+
+    def time_out(command: list[str], **kwargs: object) -> None:
+        timeout = kwargs["timeout"]
+        assert isinstance(timeout, (int, float))
+        assert timeout > 0
+        target.write_bytes(b"partial")
+        raise subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr("ffkit.core.audio.cover.subprocess.run", time_out)
+    with pytest.raises(subprocess.TimeoutExpired):
+        extract_cover(Track(path="source.mp3"), target)
+    assert not target.exists()
+
+
 def test_extract_embedded_cover(tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     tone(source)

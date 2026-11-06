@@ -1,6 +1,7 @@
 import array
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from ffkit import (
     probe,
     tempo_estimates,
 )
+from ffkit.core.audio import analysis
 
 
 def make_tone(path: Path) -> None:
@@ -54,6 +56,44 @@ def test_probe_and_analysis_on_real_audio(tmp_path: Path) -> None:
     assert louder is not None
     assert 5 < louder - lufs < 7
     assert detect_trim_bounds(source, track.duration) == (0.0, None)
+
+
+def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
+    source = tmp_path / "delayed.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=duration=1",
+            "-af",
+            "adelay=500|500",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    peaks = analyze_peak_waveform(Track(path=str(source)))
+    assert len(peaks) == 400
+    assert 100 < next(index for index, peak in enumerate(peaks) if peak > 0) < 150
+
+
+def test_decoded_chunks_timeout_includes_stdout_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(analysis, "PROCESS_TIMEOUT", 0.01)
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(10)"], stdout=subprocess.PIPE
+    )
+    try:
+        with pytest.raises(subprocess.TimeoutExpired):
+            list(analysis._decoded_chunks(process))
+    finally:
+        process.kill()
+        process.wait()
+        if process.stdout is not None:
+            process.stdout.close()
 
 
 def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:

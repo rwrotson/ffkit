@@ -39,6 +39,16 @@ def test_audio_models_preserve_mixtable_defaults_and_validation() -> None:
         )
 
 
+def test_effects_reject_invalid_trim_assignment_without_mutation() -> None:
+    effects = Effects(trim_end=4)
+    with pytest.raises(ValidationError, match="Trim end must be later"):
+        effects.trim_start = 5
+    assert effects.trim_start == 0
+    with pytest.raises(ValidationError, match="Trim end must be later"):
+        effects.trim_end = 0
+    assert effects.trim_end == 4
+
+
 def test_filters_keep_mixtable_order_and_stream_rule() -> None:
     track = Track(path="song.flac")
     assert audio_filters(track) == []
