@@ -44,29 +44,6 @@ The `commit-msg` hook checks Conventional Commit format.
 
 ## Publishing
 
-In a project created from this template, the release workflow publishes version tags to PyPI with [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). On PyPI, add a trusted publisher with the repository owner and name, workflow `release.yml`, and environment `pypi`; for a project that does not exist on PyPI yet, add it as a pending publisher. Create the `pypi` environment in the GitHub repository settings, optionally with required reviewers.
+The release workflow runs CI, builds the distribution, and publishes version tags to PyPI using [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). Manual runs build the package and deploy documentation without publishing.
 
-The `publish` job is skipped when the workflow runs in `rwrotson/ffkit`, so release tags of the template deploy documentation only. The condition compares the repository name and needs no change after copying.
-
-## Renaming the Template
-
-Choose three names before editing: a distribution name (for example, `my-package`), an import
-package (`my_package`), and an environment prefix (`MY_PACKAGE_`). Check that the distribution
-name is free on PyPI.
-
-1. Rename `src/ffkit/` to `src/my_package/`. Replace `ffkit` in imports throughout `src/`,
-   `tests/`, and `docs/`, including logger names in tests. Update `module-name` under
-   `[tool.uv.build-backend]`, `[tool.coverage.run].source`,
-   `[tool.ruff.lint.isort].known-first-party`, and `[tool.importlinter]` in `pyproject.toml`.
-2. Set `[project].name`, the description, authors, keywords, and `[project.urls]` in
-   `pyproject.toml`. Rename `FFKitError` if the name should match the package.
-3. Change `env_prefix` and the `env_fields()` default prefix in
-   `src/my_package/config/settings.py`, and `PREFIX` in `docs/gen_config_page.py`. Adjust the
-   default log file name in `LogSettings`. Update `.env.example`, README examples, and tests
-   using `FFKIT_` variables.
-4. Update `properdocs.yml` (`site_name`, repository links, and the source watch path) and
-   `docs/gen_ref_pages.py`, which scans the import package for API pages. Update names and
-   links in README, docs, `AGENTS.md`, and the PyPI URL in `.github/workflows/release.yml`.
-5. Configure the PyPI trusted publisher and GitHub Pages as described above.
-6. Regenerate the lockfile with `uv lock`, then run `uv sync --all-groups --locked`,
-   `uv run poe check`, `uv build`, and `uv run --group docs properdocs build --strict`.
+Configure the `rwrotson/ffkit` trusted publisher on PyPI with workflow `release.yml` and environment `pypi`. Create the `pypi` GitHub environment. GitHub Pages uses the `github-pages` environment and GitHub Actions as its source.

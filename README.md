@@ -104,7 +104,7 @@ Source is in `docs/`. ProperDocs generates the API reference from public docstri
 
 ## Versioning & Changelog
 
-This template uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by a `commit-msg` pre-commit hook.
+The repository uses [Conventional Commits](https://www.conventionalcommits.org/) enforced by a `commit-msg` pre-commit hook.
 
 ```bash
 uv run cz bump
@@ -174,10 +174,10 @@ Dependabot opens weekly grouped PRs for uv dependencies, GitHub Actions, and pre
 | Job | What it does |
 |-----|-------------|
 | `build` | builds the sdist and wheel |
-| `publish` | publishes to PyPI with Trusted Publishing (tags only; skipped in the template repository) |
+| `publish` | publishes version tags to PyPI with Trusted Publishing |
 | `docs` | builds the docs with ProperDocs and deploys it to GitHub Pages via GitHub Actions |
 
-In a project created from this template, configure a trusted publisher on PyPI with workflow `release.yml` and environment `pypi`. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
+For publishing, configure a trusted publisher for `rwrotson/ffkit` on PyPI with workflow `release.yml` and environment `pypi`. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
 
 ## Author
 

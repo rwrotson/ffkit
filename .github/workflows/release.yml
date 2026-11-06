@@ -26,10 +26,9 @@ jobs:
           if-no-files-found: error
 
   # Manual runs deploy docs only; packages are published from version tags.
-  # The template repository itself never publishes; copies of it do.
   publish:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') && github.repository != 'rwrotson/ffkit'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       id-token: write

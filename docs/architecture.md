@@ -37,7 +37,7 @@ Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on 
 | `FFKitError` | `Exception` | Base for every expected library failure |
 | `InvalidInputError` | `FFKitError`, `ValueError` | The input cannot be processed |
 
-Callers can catch `FFKitError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure. Unexpected exceptions are not wrapped.
+Ported Mixtable audio helpers retain their original built-in and subprocess exceptions. New APIs may use `FFKitError` subclasses for expected failures. Unexpected exceptions are not wrapped.
 
 ## Adding functionality
 

@@ -4,9 +4,9 @@ This file describes repository conventions for coding agents.
 
 ## Project Overview
 
-A template for building typed Python libraries with a small public API, optional structlog-based logging setup for applications, and Pydantic Settings-based configuration.
+A typed Python library of FFmpeg audio helpers, with room for future video helpers, optional structlog-based application logging, and Pydantic Settings-based configuration.
 
-Distribution name: `my-lib` | Python package: `my_lib` | Environment prefix: `MY_LIB_`
+Distribution name: `ffkit` | Python package: `ffkit` | Environment prefix: `FFKIT_`
 
 ## Commands
 
@@ -69,7 +69,7 @@ uv run --group docs properdocs build --strict
 - Do not lower coverage thresholds, disable checks, relax import-linter contracts, or add lint and type suppressions solely to pass CI. Explain necessary suppressions at the affected line.
 - Use non-rewriting checks (`poe fmt-check`, `poe lint`) for verification; run formatters or `--fix` only when intentionally editing files. Pre-commit's Ruff hooks rewrite files.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite: it skips coverage, and CI also runs tests on macOS, the lowest-dependency job, package and docs builds, and security scans.
-- Treat everything exported from `my_lib/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
+- Treat everything exported from `ffkit/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
 - When changing settings or public API, update `.env.example`, README, and the docs. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
 - Keep the user's `.env` and secrets untracked.
 
@@ -91,15 +91,14 @@ It runs CI first, then:
 
 - **`build`** — `uv build`; uploads `dist/` as an artifact.
 - **`publish`** — tags only; publishes `dist/` to **PyPI** with Trusted Publishing (OIDC, the
-  `pypi` environment, `id-token: write`). No API token is stored. Skipped in the
-  `rwrotson/python-lib-template` repository itself, so tagging the template only deploys docs.
+  `pypi` environment, `id-token: write`). No API token is stored.
 - **`docs`** — builds the site with `properdocs build --strict` and deploys it to **GitHub Pages** via
   `actions/upload-pages-artifact` + `actions/deploy-pages` (the `github-pages` environment).
 
-In a project created from the template, PyPI needs a trusted publisher for the repository with workflow `release.yml` and environment
+PyPI needs a trusted publisher for `rwrotson/ffkit` with workflow `release.yml` and environment
 `pypi`. Pages Source must be set to **"GitHub Actions"** (Settings → Pages), and the
 `github-pages` environment must allow the `v*` tag. Site:
-https://rwrotson.github.io/python-lib-template/
+https://rwrotson.github.io/ffkit/
 
 Dependabot opens weekly grouped PRs for uv dependencies (`uv.lock`), GitHub Actions, and pre-commit
 hooks (`.github/dependabot.yml`).
@@ -108,45 +107,45 @@ hooks (`.github/dependabot.yml`).
 
 ### Package Layout & Build
 
-Source lives in `src/my_lib/` — the standard `src/` layout. The uv build backend is configured in `pyproject.toml`:
+Source lives in `src/ffkit/` — the standard `src/` layout. The uv build backend is configured in `pyproject.toml`:
 
 ```toml
 [tool.uv.build-backend]
-module-name = "my_lib"
+module-name = "ffkit"
 module-root = "src"
 ```
 
-`src/my_lib/py.typed` marks the package as typed (PEP 561); keep it in the wheel.
+`src/ffkit/py.typed` marks the package as typed (PEP 561); keep it in the wheel.
 
-Internal imports use the `my_lib.` prefix. Ruff bans relative imports except in package `__init__.py`, which may re-export from sibling modules (`from .module import ...`, never `..`):
+Internal imports use the `ffkit.` prefix. Ruff bans relative imports except in package `__init__.py`, which may re-export from sibling modules (`from .module import ...`, never `..`):
 
 ```python
-from my_lib.core.errors import InvalidInputError
-from my_lib.config import LogSettings
+from ffkit.core.errors import InvalidInputError
+from ffkit.config import LogSettings
 ```
 
 ### Layers & Public API
 
 ```
-src/my_lib/__init__.py  — Public API re-exported with __all__; NullHandler on the "my_lib" logger
-src/my_lib/core/        — Library functionality and the MyLibError hierarchy
-src/my_lib/config/      — Settings (Pydantic Settings) for applications that configure the library
-src/my_lib/utils/       — Optional helpers: setup_logging(), find_project_root()
+src/ffkit/__init__.py  — Public API re-exported with __all__; NullHandler on the "ffkit" logger
+src/ffkit/core/        — Audio helpers under core/audio/ and the FFKitError hierarchy
+src/ffkit/config/      — Settings (Pydantic Settings) for applications that configure the library
+src/ffkit/utils/       — Optional helpers: setup_logging(), find_project_root()
 ```
 
-Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic; `config` never imports `core` or `utils`; `utils` never imports `core`. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic Settings; audio models use Pydantic; `config` never imports `core` or `utils`; `utils` never imports `core`. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
 
-Expected failures raise a `MyLibError` subclass. Subclass a built-in exception as well when callers would reasonably catch it (`InvalidInputError` is also a `ValueError`).
+The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
 
-To add functionality: put it in `src/my_lib/core/`, export it from `core/__init__.py` and `my_lib/__init__.py` (`__all__`), test it in `tests/core/`, and list it in `docs/reference/index.md`.
+To add functionality: put audio code in `src/ffkit/core/audio/`, export supported names from the package and top-level `__init__.py` files, test it in `tests/core/audio/`, and list it in `docs/reference/index.md`.
 
 ### Import-Time Behaviour
 
-Importing `my_lib` must not read the environment or `.env`, configure logging or structlog, add handlers outside the `my_lib` logger, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
+Importing `ffkit` must not read the environment or `.env`, configure logging or structlog, add handlers outside the `ffkit` logger, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
 
 ### Configuration via Environment Variables
 
-`src/my_lib/config/settings.py` defines `Settings` (Pydantic `BaseSettings`, prefix `MY_LIB_`, nested delimiter `__`) with defaults in code and the section `LogSettings` (`MY_LIB_LOG__*`). Only `load_settings()` reads the environment and `.env`; empty values use defaults. Library code takes settings objects as arguments instead of loading them.
+`src/ffkit/config/settings.py` defines `Settings` (Pydantic `BaseSettings`, prefix `FFKIT_`, nested delimiter `__`) with defaults in code and the section `LogSettings` (`FFKIT_LOG__*`). Only `load_settings()` reads the environment and `.env`; empty values use defaults. Library code takes settings objects as arguments instead of loading them.
 
 Every setting needs a `Field(description=...)` and a line in `.env.example`; tests in `tests/config/` enforce both. The docs configuration page is generated from `Settings` by `docs/gen_config_page.py`; do not edit it by hand.
 
@@ -154,7 +153,7 @@ Every setting needs a `Field(description=...)` and a line in `.env.example`; tes
 
 Library code logs through stdlib `logging.getLogger(__name__)` so records follow the application's configuration; the package logger has a `NullHandler`. Do not call `structlog.configure()` or `logging.basicConfig()` from library code.
 
-`setup_logging()` in `my_lib.utils.log` is an opt-in helper for applications. It configures structlog bridged through stdlib via `ProcessorFormatter`: a stderr handler (`ConsoleRenderer`, or JSON with `MY_LIB_LOG__FORMAT=json`) and, when `MY_LIB_LOG__DIR` is set, a rotating JSON file handler. Calling it again replaces only its own handlers.
+`setup_logging()` in `ffkit.utils.log` is an opt-in helper for applications. It configures structlog bridged through stdlib via `ProcessorFormatter`: a stderr handler (`ConsoleRenderer`, or JSON with `FFKIT_LOG__FORMAT=json`) and, when `FFKIT_LOG__DIR` is set, a rotating JSON file handler. Calling it again replaces only its own handlers.
 
 ### Documentation Generation
 
@@ -164,7 +163,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 `tests/` mirrors the package (`core/`, `config/`, `utils/`); `tests/test_package.py` covers the public API and import-time behaviour.
 
-Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `MY_LIB_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
+Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `FFKIT_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 
 ### Type Checking
 
