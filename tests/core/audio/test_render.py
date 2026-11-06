@@ -8,7 +8,7 @@ import pytest
 
 from ffkit import Group, Track, measure_loudness, probe, render
 
-render_module = importlib.import_module("ffkit.core.render")
+render_module = importlib.import_module("ffkit.core.audio.render")
 
 
 def make_tone(path: Path, *, gain: int = 0) -> None:

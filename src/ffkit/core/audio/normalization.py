@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from ffkit.core.analysis import measure_loudness
-from ffkit.core.audio import audio_filters, normalization_gain
-from ffkit.core.models import Track
+from ffkit.core.audio.analysis import measure_loudness
+from ffkit.core.audio.filters import audio_filters, normalization_gain
+from ffkit.core.audio.models import Track
 
 
 def calculate_normalization_gain(

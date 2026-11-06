@@ -9,9 +9,9 @@ from collections.abc import Callable
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.analysis import PROCESS_TIMEOUT, measure_loudness
-from ffkit.core.audio import audio_filters
-from ffkit.core.models import Track
+from ffkit.core.audio.analysis import PROCESS_TIMEOUT, measure_loudness
+from ffkit.core.audio.filters import audio_filters
+from ffkit.core.audio.models import Track
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5

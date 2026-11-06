@@ -45,8 +45,14 @@ uv run pre-commit install
 from pathlib import Path
 
 from ffkit import (
-    Effects, Track, audio_filters, calculate_normalization_gain,
-    extract_cover, probe, render, stream_mp3,
+    Effects,
+    Track,
+    audio_filters,
+    calculate_normalization_gain,
+    extract_cover,
+    probe,
+    render,
+    stream_mp3,
 )
 
 track = probe(Track(path="song.flac", effects=Effects(gain_db=3)))
@@ -133,14 +139,15 @@ src/
     ├── py.typed             # PEP 561 marker
     ├── core/
     │   ├── errors.py        # FFKitError, InvalidInputError
-    │   ├── audio.py         # FFmpeg filters and gain calculations
-    │   ├── analysis.py      # probing and audio analysis
-    │   ├── formats.py       # supported audio input discovery
-    │   ├── render.py        # non-destructive MP3 rendering
-    │   ├── stream.py        # MP3 playback stream
-    │   ├── cover.py         # embedded cover extraction
-    │   ├── normalization.py # processed-track gain calculation
-    │   └── models.py        # track, effects, and group models
+    │   └── audio/
+    │       ├── analysis.py      # probing and audio analysis
+    │       ├── cover.py         # embedded cover extraction
+    │       ├── filters.py       # FFmpeg filters and gain calculations
+    │       ├── formats.py       # supported audio input discovery
+    │       ├── models.py        # track, effects, and group models
+    │       ├── normalization.py # processed-track gain calculation
+    │       ├── render.py        # non-destructive MP3 rendering
+    │       └── stream.py        # MP3 playback stream
     ├── config/
     │   └── settings.py      # Settings with the log section
     └── utils/

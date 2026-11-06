@@ -46,4 +46,4 @@ Callers can catch `FFKitError` for all library failures or the built-in base for
 - Export public names from `core/__init__.py` and `ffkit/__init__.py`, and add them to `__all__`.
 - Test the behaviour in `tests/core/`.
 
-`core/audio.py` contains the first audio helpers.
+`core/audio/` groups the audio models and helpers. Future media domains can use sibling packages under `core/`.

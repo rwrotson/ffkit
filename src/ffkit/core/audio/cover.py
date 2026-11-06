@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-from ffkit.core.models import Track
+from ffkit.core.audio.models import Track
 
 
 def extract_cover(track: Track, destination: Path) -> Path | None:

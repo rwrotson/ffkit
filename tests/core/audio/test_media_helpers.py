@@ -14,7 +14,7 @@ from ffkit import (
     stream_mp3,
 )
 
-normalization_module = importlib.import_module("ffkit.core.normalization")
+normalization_module = importlib.import_module("ffkit.core.audio.normalization")
 
 
 def tone(path: Path) -> None:

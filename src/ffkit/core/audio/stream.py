@@ -6,8 +6,8 @@ import selectors
 import subprocess
 from collections.abc import Generator
 
-from ffkit.core.audio import audio_filters
-from ffkit.core.models import Track
+from ffkit.core.audio.filters import audio_filters
+from ffkit.core.audio.models import Track
 
 STREAM_IDLE_TIMEOUT = 30
 log = logging.getLogger(__name__)

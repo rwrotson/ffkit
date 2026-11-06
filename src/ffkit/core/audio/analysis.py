@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from statistics import median
 
-from ffkit.core.models import TempoSegment, Track
+from ffkit.core.audio.models import TempoSegment, Track
 
 PROCESS_TIMEOUT = 900
 TRIM_EDGE_TOLERANCE = 0.1

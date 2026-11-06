@@ -110,7 +110,7 @@ def test_probe_rejects_missing_audio_stream(
     result = subprocess.CompletedProcess(
         [], 0, stdout=json.dumps({"streams": [{"codec_type": "video"}], "format": {}})
     )
-    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
     with pytest.raises(ValueError, match="no decodable audio"):
         probe(Track(path=str(source)))
 
@@ -123,7 +123,7 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
         0,
         stdout=json.dumps({"streams": [{"codec_type": "audio"}], "format": {"duration": "0"}}),
     )
-    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
     with pytest.raises(ValueError, match="measurable audio duration"):
         probe(Track(path=str(source)))
 
@@ -132,7 +132,7 @@ def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     result = subprocess.CompletedProcess(
         [], 0, stderr="silence_start: 0\nsilence_end: 2\nsilence_start: 2"
     )
-    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
     with pytest.raises(ValueError, match="no audible audio"):
         detect_trim_bounds(Path("silent.wav"), duration=2)
 
@@ -141,7 +141,7 @@ def test_measure_loudness_handles_missing_and_nonfinite_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     result = subprocess.CompletedProcess([], 0, stderr="no loudnorm report")
-    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
     assert measure_loudness(Path("song.wav")) == (None, None)
     result.stderr = '{"input_i": "inf", "input_tp": "not a number"}'
     assert measure_loudness(Path("song.wav")) == (None, None)
@@ -188,7 +188,7 @@ def test_tempo_segment_transitions(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     source = tmp_path / "tone.wav"
     make_tone(source)
     estimates = [(0.0, 120.0, 0.5), (30.0, 60.0, 0.5), (60.0, 140.0, 0.5), (90.0, 140.0, 0.5)]
-    monkeypatch.setattr("ffkit.core.analysis.tempo_estimates", lambda energy: estimates)
+    monkeypatch.setattr("ffkit.core.audio.analysis.tempo_estimates", lambda energy: estimates)
     track = analyze_waveform_tempo(probe(Track(path=str(source))))
     assert [(segment.start, segment.bpm) for segment in track.tempo] == [
         (0.0, 90.0),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from ffkit.core.models import Track
+from ffkit.core.audio.models import Track
 
 
 def audio_filters(
