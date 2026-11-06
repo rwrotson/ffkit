@@ -6,6 +6,7 @@ import pytest
 
 from ffkit import (
     Track,
+    audio_filters,
     calculate_normalization_gain,
     extract_cover,
     measure_loudness,
@@ -15,6 +16,7 @@ from ffkit import (
 )
 
 normalization_module = importlib.import_module("ffkit.core.audio.normalization")
+stream_module = importlib.import_module("ffkit.core.audio.stream")
 
 
 def tone(path: Path) -> None:
@@ -71,6 +73,35 @@ def test_stream_renders_and_seeks(tmp_path: Path) -> None:
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
     assert track.effects.trim_start == 0.2
     assert track.effects.trim_end == 1.5
+
+
+def test_stream_stops_at_trim_end(tmp_path: Path) -> None:
+    source = tmp_path / "source.wav"
+    tone(source)
+    track = Track(path=str(source))
+    track.effects.trim_start = 0.2
+    track.effects.trim_end = 0.5
+    assert b"".join(stream_mp3(track, start=0.3)) == b""
+    assert b"".join(stream_mp3(track, start=0.8)) == b""
+
+
+def test_stream_uses_streaming_filters(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "source.wav"
+    tone(source)
+    track = Track(path=str(source))
+    track.effects.trim_silence = True
+    original = audio_filters
+
+    def check_filters(
+        current: Track, gain: float, *, streaming: bool, limiter_db: float | None
+    ) -> list[str]:
+        assert streaming is True
+        filters = original(current, gain, streaming=streaming, limiter_db=limiter_db)
+        assert "areverse" not in filters
+        return filters
+
+    monkeypatch.setattr(stream_module, "audio_filters", check_filters)
+    assert b"".join(stream_mp3(track))
 
 
 def test_extract_cover_custom_missing_and_removed(tmp_path: Path) -> None:

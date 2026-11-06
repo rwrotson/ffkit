@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import os
 import selectors
@@ -13,15 +11,25 @@ STREAM_IDLE_TIMEOUT = 30
 log = logging.getLogger(__name__)
 
 
+def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
+    snapshot = track.model_copy(deep=True)
+    source_offset = start + snapshot.effects.trim_start
+    if snapshot.effects.trim_end is not None:
+        if source_offset >= snapshot.effects.trim_end:
+            return None
+        snapshot.effects.trim_end -= source_offset
+    snapshot.effects.trim_start = 0
+    return snapshot, source_offset
+
+
 def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
     track: Track, gain: float = 0, start: float = 0, limiter_db: float | None = None
 ) -> Generator[bytes]:
     """Stream a rendered MP3 from a playback position."""
-    snapshot = track.model_copy(deep=True)
-    source_offset = start + snapshot.effects.trim_start
-    if snapshot.effects.trim_end is not None:
-        snapshot.effects.trim_end = max(0.1, snapshot.effects.trim_end - source_offset)
-    snapshot.effects.trim_start = 0
+    seeked = _seeked_track(track, start)
+    if seeked is None:
+        return
+    snapshot, source_offset = seeked
     command = [
         "ffmpeg",
         "-hide_banner",
@@ -35,7 +43,7 @@ def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
         "-map",
         "0:a:0",
     ]
-    filters = audio_filters(snapshot, gain, limiter_db=limiter_db)
+    filters = audio_filters(snapshot, gain, streaming=True, limiter_db=limiter_db)
     if filters:
         command += ["-af", ",".join(filters)]
     command += ["-codec:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", "pipe:1"]
