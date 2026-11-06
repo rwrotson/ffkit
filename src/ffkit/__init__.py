@@ -15,6 +15,7 @@ from .core import (
     measure_loudness,
     normalization_gain,
     probe,
+    render,
     safe_name,
     tempo_estimates,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "measure_loudness",
     "normalization_gain",
     "probe",
+    "render",
     "safe_name",
     "tempo_estimates",
 ]

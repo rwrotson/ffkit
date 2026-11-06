@@ -39,6 +39,10 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: true
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - if: runner.os == 'macOS'
+        run: brew list ffmpeg || brew install ffmpeg
       - run: uv sync --locked --all-groups
       - run: uv run --no-sync poe test
 
@@ -48,6 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: uv venv
       - run: uv pip install --resolution lowest-direct --group dev -e .
       - run: .venv/bin/pytest -W default::DeprecationWarning

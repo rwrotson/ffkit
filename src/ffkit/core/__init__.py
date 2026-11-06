@@ -12,6 +12,7 @@ from .audio import audio_filters, normalization_gain, safe_name
 from .errors import FFKitError, InvalidInputError
 from .formats import audio_files
 from .models import Effects, Group, TempoSegment, Track
+from .render import render
 
 __all__ = [
     "Effects",
@@ -28,6 +29,7 @@ __all__ = [
     "measure_loudness",
     "normalization_gain",
     "probe",
+    "render",
     "safe_name",
     "tempo_estimates",
 ]
