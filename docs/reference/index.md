@@ -6,6 +6,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 |--------|---------|
 | `ffkit.core.errors` | Define the library error hierarchy |
 | `ffkit.core.audio` | Build audio filters, gains, and export names |
+| `ffkit.core.analysis` | Probe audio and measure silence, waveform, tempo, and loudness |
 | `ffkit.core.formats` | Discover supported audio inputs |
 | `ffkit.core.models` | Define audio track, effects, and group data |
 | `ffkit.config.settings` | Define and load library settings |

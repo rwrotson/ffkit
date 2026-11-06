@@ -4,7 +4,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 ## What Is Included
 
-- Audio models and pure helpers for input discovery, FFmpeg filters, normalization gain, and export names; `py.typed` for type checkers
+- Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, filters, normalization gain, and export names; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `setup_logging()` for applications: structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
@@ -41,9 +41,9 @@ uv run pre-commit install
 ## Usage
 
 ```python
-from ffkit import Effects, Track, audio_filters, normalization_gain
+from ffkit import Effects, Track, audio_filters, normalization_gain, probe
 
-track = Track(path="song.flac", effects=Effects(gain_db=3))
+track = probe(Track(path="song.flac", effects=Effects(gain_db=3)))
 filters = audio_filters(track)
 gain = normalization_gain(lufs=-18, peak=-5)
 ```
@@ -125,6 +125,7 @@ src/
     ├── core/
     │   ├── errors.py        # FFKitError, InvalidInputError
     │   ├── audio.py         # FFmpeg filters and gain calculations
+    │   ├── analysis.py      # probing and audio analysis
     │   ├── formats.py       # supported audio input discovery
     │   └── models.py        # track, effects, and group models
     ├── config/

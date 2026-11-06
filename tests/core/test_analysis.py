@@ -1,0 +1,196 @@
+import array
+import json
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from ffkit import (
+    Track,
+    analyze_peak_waveform,
+    analyze_waveform_tempo,
+    detect_trim_bounds,
+    measure_loudness,
+    probe,
+    tempo_estimates,
+)
+
+
+def make_tone(path: Path) -> None:
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=2",
+            "-y",
+            str(path),
+        ],
+        check=True,
+    )
+
+
+def test_probe_and_analysis_on_real_audio(tmp_path: Path) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source)
+    track = probe(Track(path=str(source), tags={"title": "Custom"}))
+    assert track.duration is not None
+    assert 1.9 < track.duration < 2.1
+    assert track.tags["title"] == "Custom"
+    assert track.error is None
+    assert len(analyze_peak_waveform(track)) == 400
+    analyzed = analyze_waveform_tempo(track)
+    assert analyzed is track
+    assert analyzed.waveform
+    assert len(analyzed.waveform_peak) == 400
+    assert analyzed.waveform_peak[0] > 0
+    lufs, peak = measure_loudness(source)
+    assert lufs is not None
+    assert peak is not None
+    louder, _ = measure_loudness(source, ["volume=6dB"])
+    assert louder is not None
+    assert 5 < louder - lufs < 7
+    assert detect_trim_bounds(source, track.duration) == (0.0, None)
+
+
+def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:
+    missing = probe(Track(path=str(tmp_path / "missing.wav")))
+    assert missing.error == "Source file is missing"
+    broken = tmp_path / "broken.wav"
+    broken.write_bytes(b"invalid")
+    with pytest.raises(subprocess.CalledProcessError):
+        probe(Track(path=str(broken)))
+    with pytest.raises(ValueError, match="duration"):
+        detect_trim_bounds(broken, duration=0)
+
+
+def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
+    source = tmp_path / "edges.flac"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-filter_complex",
+            "[0:a][1:a][0:a][1:a][0:a]concat=n=5:v=0:a=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    start, end = detect_trim_bounds(source)
+    assert 0.9 < start < 1.1
+    assert end is not None
+    assert 3.9 < end < 4.1
+
+
+def test_tempo_estimates_known_pulse_train() -> None:
+    values = array.array("d", [1.0 if i % 5 == 0 else 0.0 for i in range(600)])
+    estimates = tempo_estimates(memoryview(values))
+    assert estimates
+    assert estimates[0][1] == 120
+
+
+def test_probe_rejects_missing_audio_stream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "video.mp4"
+    source.write_bytes(b"x")
+    result = subprocess.CompletedProcess(
+        [], 0, stdout=json.dumps({"streams": [{"codec_type": "video"}], "format": {}})
+    )
+    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    with pytest.raises(ValueError, match="no decodable audio"):
+        probe(Track(path=str(source)))
+
+
+def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "zero.wav"
+    source.write_bytes(b"x")
+    result = subprocess.CompletedProcess(
+        [],
+        0,
+        stdout=json.dumps({"streams": [{"codec_type": "audio"}], "format": {"duration": "0"}}),
+    )
+    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    with pytest.raises(ValueError, match="measurable audio duration"):
+        probe(Track(path=str(source)))
+
+
+def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = subprocess.CompletedProcess(
+        [], 0, stderr="silence_start: 0\nsilence_end: 2\nsilence_start: 2"
+    )
+    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    with pytest.raises(ValueError, match="no audible audio"):
+        detect_trim_bounds(Path("silent.wav"), duration=2)
+
+
+def test_measure_loudness_handles_missing_and_nonfinite_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = subprocess.CompletedProcess([], 0, stderr="no loudnorm report")
+    monkeypatch.setattr("ffkit.core.analysis.subprocess.run", lambda *args, **kwargs: result)
+    assert measure_loudness(Path("song.wav")) == (None, None)
+    result.stderr = '{"input_i": "inf", "input_tp": "not a number"}'
+    assert measure_loudness(Path("song.wav")) == (None, None)
+
+
+def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
+    short = tmp_path / "short.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=duration=0.13",
+            "-y",
+            str(short),
+        ],
+        check=True,
+    )
+    assert analyze_waveform_tempo(probe(Track(path=str(short)))).waveform
+    silent = tmp_path / "silent.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=0.3",
+            "-y",
+            str(silent),
+        ],
+        check=True,
+    )
+    analyzed = analyze_waveform_tempo(probe(Track(path=str(silent))))
+    assert analyzed.waveform
+    assert max(analyzed.waveform) == 0
+
+
+def test_tempo_segment_transitions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source)
+    estimates = [(0.0, 120.0, 0.5), (30.0, 60.0, 0.5), (60.0, 140.0, 0.5), (90.0, 140.0, 0.5)]
+    monkeypatch.setattr("ffkit.core.analysis.tempo_estimates", lambda energy: estimates)
+    track = analyze_waveform_tempo(probe(Track(path=str(source))))
+    assert [(segment.start, segment.bpm) for segment in track.tempo] == [
+        (0.0, 90.0),
+        (60.0, 140.0),
+    ]

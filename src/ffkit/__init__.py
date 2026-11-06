@@ -7,10 +7,16 @@ from .core import (
     InvalidInputError,
     TempoSegment,
     Track,
+    analyze_peak_waveform,
+    analyze_waveform_tempo,
     audio_files,
     audio_filters,
+    detect_trim_bounds,
+    measure_loudness,
     normalization_gain,
+    probe,
     safe_name,
+    tempo_estimates,
 )
 
 # Records stay silent unless the application configures logging.
@@ -23,8 +29,14 @@ __all__ = [
     "InvalidInputError",
     "TempoSegment",
     "Track",
+    "analyze_peak_waveform",
+    "analyze_waveform_tempo",
     "audio_files",
     "audio_filters",
+    "detect_trim_bounds",
+    "measure_loudness",
     "normalization_gain",
+    "probe",
     "safe_name",
+    "tempo_estimates",
 ]
