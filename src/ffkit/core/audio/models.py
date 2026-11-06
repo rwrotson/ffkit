@@ -1,3 +1,4 @@
+from typing import Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -73,7 +74,7 @@ class Track(BaseModel):
         self.tags = {**source_tags, **overrides}
 
     @model_validator(mode="after")
-    def valid_edits(self) -> Track:
+    def valid_edits(self) -> Self:
         """Check tempo ordering."""
         starts = [segment.start for segment in self.tempo]
         if starts != sorted(set(starts)):
