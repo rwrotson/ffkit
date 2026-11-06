@@ -3,13 +3,22 @@
 ## Requirements
 
 - Python 3.14+
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Git for installation from the repository
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for development
 - `ffmpeg` and `ffprobe` on `PATH` for audio operations
 
 ## Installation
 
+Install a release tag directly from GitHub (replace `vX.Y.Z` with a release tag):
+
 ```bash
-git clone <repo-url>
+pip install "ffkit @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
+```
+
+For development in a clone of the repository:
+
+```bash
+git clone https://github.com/rwrotson/ffkit.git
 cd ffkit
 uv sync --all-groups --locked
 uv run pre-commit install
@@ -25,7 +34,7 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 
 ## Optional CLI
 
-Install with `pip install 'ffkit[cli]'`, then run `ffkit audio --help`.
+Install with `pip install "ffkit[cli] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"`, then run `ffkit audio --help`.
 The `audio` group includes `probe`, `loudness`, `trim-bounds`, `render`, and `extract-cover`.
 Use `--output-format json` before `audio` for machine-readable output. Output files are protected
 against replacement unless `--force` is passed.
@@ -116,7 +125,7 @@ uv run cz changelog       # update CHANGELOG without bumping
 uv run cz changelog --dry-run
 ```
 
-Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `feat!:` / `BREAKING CHANGE:` → major (minor while the version is `0.x`). Pushing the tag runs the release workflow, which publishes to PyPI and deploys the docs.
+Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `feat!:` / `BREAKING CHANGE:` → major (minor while the version is `0.x`). Pushing the tag runs the release workflow, which builds distribution artifacts and deploys the docs. Install the tagged source directly from GitHub.
 
 ## Adding Functionality
 

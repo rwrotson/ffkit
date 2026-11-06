@@ -42,8 +42,8 @@ major_version_zero = true
 
 The `commit-msg` hook checks Conventional Commit format.
 
-## Publishing
+## Releases
 
-The release workflow runs CI, builds the distribution, and publishes version tags to PyPI using [Trusted Publishing](https://docs.pypi.org/trusted-publishers/). Manual runs build the package and deploy documentation without publishing.
+The release workflow runs CI, builds the distribution, and deploys documentation for version tags. Manual runs also build the package and deploy documentation. The build job remains available if package registry publishing is added later.
 
-Configure the `rwrotson/ffkit` trusted publisher on PyPI with workflow `release.yml` and environment `pypi`. Create the `pypi` GitHub environment. GitHub Pages uses the `github-pages` environment and GitHub Actions as its source.
+Install a tagged version from GitHub. GitHub Pages uses the `github-pages` environment and GitHub Actions as its source.

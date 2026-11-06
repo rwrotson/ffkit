@@ -90,13 +90,12 @@ Parallel jobs:
 It runs CI first, then:
 
 - **`build`** — `uv build`; uploads `dist/` as an artifact.
-- **`publish`** — tags only; publishes `dist/` to **PyPI** with Trusted Publishing (OIDC, the
-  `pypi` environment, `id-token: write`). No API token is stored.
 - **`docs`** — builds the site with `properdocs build --strict` and deploys it to **GitHub Pages** via
   `actions/upload-pages-artifact` + `actions/deploy-pages` (the `github-pages` environment).
 
-PyPI needs a trusted publisher for `rwrotson/ffkit` with workflow `release.yml` and environment
-`pypi`. Pages Source must be set to **"GitHub Actions"** (Settings → Pages), and the
+Tagged versions are installed directly from GitHub. The build job and its distribution artifacts
+remain available if package registry publishing is added later. Pages Source must be set to
+**"GitHub Actions"** (Settings → Pages), and the
 `github-pages` environment must allow the `v*` tag. Site:
 https://rwrotson.github.io/ffkit/
 

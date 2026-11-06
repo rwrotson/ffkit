@@ -10,7 +10,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 - One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
 - import-linter contracts that keep the core API independent of configuration and logging setup
 - Strict MyPy with the Pydantic plugin, Ruff, pytest in parallel and random order with a 95% branch coverage gate, poethepoet tasks, pre-commit hooks, Commitizen
-- CI on Ubuntu and macOS with a lowest-dependency test job, package and strict docs builds, pip-audit, and trivy; actions pinned to commit SHAs; PyPI Trusted Publishing and ProperDocs on GitHub Pages after CI passes on a release tag
+- CI on Ubuntu and macOS with a lowest-dependency test job, package and strict docs builds, pip-audit, and trivy; actions pinned to commit SHAs; release artifacts and ProperDocs on GitHub Pages after CI passes on a release tag
 
 ## Stack
 
@@ -28,10 +28,18 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 ## Requirements
 
 - Python 3.14+
-- uv
+- Git for installation from the repository; uv for development
 - `ffmpeg` and `ffprobe` on `PATH` for audio operations
 
 ## Getting Started
+
+Install a tagged version directly from GitHub (replace `vX.Y.Z` with a release tag):
+
+```bash
+pip install "ffkit @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
+```
+
+For development in a clone of the repository:
 
 ```bash
 uv sync --all-groups --locked
@@ -41,7 +49,7 @@ uv run pre-commit install
 
 ## Usage
 
-Install the optional CLI with `pip install 'ffkit[cli]'` (or `uv sync --extra cli`).
+Install the optional CLI with `pip install "ffkit[cli] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"` (or `uv sync --extra cli` in a clone).
 Run `ffkit --help` and `ffkit audio --help` to see the commands:
 
 ```bash
@@ -220,10 +228,9 @@ Dependabot opens weekly grouped PRs for uv dependencies, GitHub Actions, and pre
 | Job | What it does |
 |-----|-------------|
 | `build` | builds the sdist and wheel |
-| `publish` | publishes version tags to PyPI with Trusted Publishing |
 | `docs` | builds the docs with ProperDocs and deploys it to GitHub Pages via GitHub Actions |
 
-For publishing, configure a trusted publisher for `rwrotson/ffkit` on PyPI with workflow `release.yml` and environment `pypi`. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
+Release tags are installable directly from GitHub. The build job and distribution artifacts are retained so package registry publishing can be added later. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
 
 ## Author
 
