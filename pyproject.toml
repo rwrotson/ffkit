@@ -80,7 +80,12 @@ build-backend = "uv_build"
 
 [tool.uv]
 # Security floors for transitive dependencies.
-constraint-dependencies = ["urllib3>=2.8.0", "virtualenv>=21.7.13"]
+constraint-dependencies = [
+    "certifi>=2026.10.18",
+    "filelock>=4.2.1",
+    "urllib3>=2.8.0",
+    "virtualenv>=21.14.9",
+]
 
 [tool.uv.build-backend]
 module-name = "ffkit"
