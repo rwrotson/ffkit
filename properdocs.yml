@@ -1,0 +1,89 @@
+site_name: python-lib-template
+site_description: A template for building typed Python libraries with optional structured logging setup
+repo_url: https://github.com/rwrotson/python-lib-template
+repo_name: rwrotson/python-lib-template
+
+watch:
+  - src/my_lib/
+  - .env.example
+  - README.md
+
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Notes: notes.md
+  - API Reference: reference/
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.indexes
+    - navigation.footer
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - tags
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      cache_safe: true
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+        - docs/gen_config_page.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            separate_signature: true
+            merge_init_into_class: true
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: [.]
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - toc:
+      permalink: true
