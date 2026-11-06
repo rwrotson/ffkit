@@ -25,7 +25,7 @@ def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
 def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
     track: Track, gain: float = 0, start: float = 0, limiter_db: float | None = None
 ) -> Generator[bytes]:
-    """Stream a rendered MP3 from a playback position."""
+    """Stream original source audio from a position after its trim start."""
     seeked = _seeked_track(track, start)
     if seeked is None:
         return

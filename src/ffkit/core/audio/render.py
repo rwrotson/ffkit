@@ -24,7 +24,7 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
     limiter_db: float | None = None,
     cancelled: Callable[[], bool] | None = None,
 ) -> None:
-    """Render a track to an MP3 file without replacing its source."""
+    """Apply effects to the original source and render a separate MP3 file."""
     source = Path(track.path)
     if not source.is_file():
         raise FileNotFoundError(source)

@@ -16,6 +16,10 @@ import-linter checks these boundaries with `uv run poe lint-imports`; the contra
 
 Everything listed in `ffkit.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.config` and `ffkit.utils.log`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
 
+Audio effects are non-destructive: `Track.path` remains the original source, and each render or
+stream applies the current effects to that source. Changing an effect must never use a previous
+render as input. Effect trim positions are relative to the original file.
+
 ## Import-time behaviour
 
 `import ffkit` does not read the environment or `.env`, configure logging or structlog, add handlers outside the `ffkit` logger, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.

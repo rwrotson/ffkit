@@ -56,14 +56,21 @@ def probe(track: Track) -> Track:
         timeout=PROCESS_TIMEOUT,
     )
     report = json.loads(result.stdout)
-    if not any(stream.get("codec_type") == "audio" for stream in report.get("streams", [])):
+    audio_stream = next(
+        (stream for stream in report.get("streams", []) if stream.get("codec_type") == "audio"),
+        None,
+    )
+    if audio_stream is None:
         raise ValueError("File has no decodable audio stream")
     info = report["format"]
     track.duration = float(info.get("duration", 0))
     if not math.isfinite(track.duration) or track.duration <= 0:
         raise ValueError("File has no measurable audio duration")
-    detected = {str(key).lower(): str(value) for key, value in info.get("tags", {}).items()}
-    track.tags = {**detected, **track.tags}
+    format_tags = {str(key).lower(): str(value) for key, value in info.get("tags", {}).items()}
+    stream_tags = {
+        str(key).lower(): str(value) for key, value in audio_stream.get("tags", {}).items()
+    }
+    track.tags = {**format_tags, **stream_tags, **track.tags}
     track.error = None
     return track
 

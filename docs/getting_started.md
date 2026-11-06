@@ -44,6 +44,15 @@ track = Track(path="song.flac", effects=Effects(gain_db=3))
 filters = audio_filters(track)
 ```
 
+`Track.path` must always refer to the original audio file. To change processing, update
+`track.effects` and render or stream from that same original source. Never feed an earlier render
+back into the track: doing so applies effects again to processed audio. Trim bounds refer to the
+original file, and `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
+the remaining effects.
+
+`probe()` reads container tags and tags from the first audio stream. Stream tags override container
+tags; explicitly provided `Track.tags` override both.
+
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.
 

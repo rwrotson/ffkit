@@ -58,6 +58,42 @@ def test_probe_and_analysis_on_real_audio(tmp_path: Path) -> None:
     assert detect_trim_bounds(source, track.duration) == (0.0, None)
 
 
+def test_probe_reads_audio_stream_tags(tmp_path: Path) -> None:
+    source = tmp_path / "stream-tags.mka"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=duration=1",
+            "-c:a",
+            "flac",
+            "-metadata:s:a:0",
+            "title=Stream title",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    assert probe(Track(path=str(source))).tags["title"] == "Stream title"
+
+
+def test_probe_tag_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "source.wav"
+    source.touch()
+    report = {
+        "streams": [{"codec_type": "audio", "tags": {"TITLE": "Stream", "ARTIST": "Singer"}}],
+        "format": {"duration": "1", "tags": {"title": "Container", "album": "Album"}},
+    }
+    result = subprocess.CompletedProcess([], 0, stdout=json.dumps(report))
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
+    tags = probe(Track(path=str(source), tags={"artist": "Custom"})).tags
+    assert tags == {"title": "Stream", "artist": "Custom", "album": "Album"}
+
+
 def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
     source = tmp_path / "delayed.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.

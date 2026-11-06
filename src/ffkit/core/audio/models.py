@@ -12,7 +12,7 @@ class TempoSegment(BaseModel):
 
 
 class Effects(BaseModel):
-    """Non-destructive audio processing options."""
+    """Audio processing options applied to the original source."""
 
     model_config = ConfigDict(validate_assignment=True)
 
@@ -36,7 +36,7 @@ class Effects(BaseModel):
 
 
 class Track(BaseModel):
-    """Audio source, metadata, and analysis results."""
+    """Original audio source, metadata, and analysis results."""
 
     id: str = Field(default_factory=lambda: uuid4().hex)
     path: str

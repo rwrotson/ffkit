@@ -76,7 +76,19 @@ gain = calculate_normalization_gain(track)
 render(track, Path("song.mp3"))
 chunks = stream_mp3(track, start=0.5)
 cover = extract_cover(track, Path("cover.jpg"))
+
+track.effects.gain_db = 6
+render(track, Path("song-updated.mp3"))
 ```
+
+Keep `Track.path` pointed at the original audio file. Change `Effects` on that track and render or
+stream from the original again. Never use a rendered output as the input for another effect change:
+that would apply effects a second time to already processed audio. Effect trim bounds are positions
+in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
+the remaining effects.
+
+`probe()` combines container tags with tags from the first audio stream. Stream tags take precedence
+over container tags, and tags explicitly set on `Track` take precedence over both.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
