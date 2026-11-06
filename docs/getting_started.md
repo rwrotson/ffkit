@@ -83,7 +83,7 @@ Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `fe
 
 ## Adding Functionality
 
-Add audio operations under `ffkit.core`, export supported names from `ffkit`, and cover them in `tests/core`. Keep the core independent of environment loading and logging setup.
+Add audio operations under `ffkit.core.audio`, export supported names from `ffkit`, and cover them in `tests/core/audio`. Keep the core independent of environment loading and logging setup.
 
 ## Configuration
 
