@@ -51,7 +51,8 @@ original file, and `stream_mp3(start=...)` seeks from `trim_start` in that file 
 the remaining effects.
 
 `probe()` reads container tags and tags from the first audio stream. Stream tags override container
-tags; explicitly provided `Track.tags` override both.
+tags; explicitly provided `Track.tags` override both. Re-probing refreshes source tags and preserves
+explicit overrides.
 
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.

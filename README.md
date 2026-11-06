@@ -88,7 +88,8 @@ in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that fi
 the remaining effects.
 
 `probe()` combines container tags with tags from the first audio stream. Stream tags take precedence
-over container tags, and tags explicitly set on `Track` take precedence over both.
+over container tags, and tags explicitly set on `Track` take precedence over both. Re-probing a track
+refreshes source tags while preserving explicit tag overrides.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.

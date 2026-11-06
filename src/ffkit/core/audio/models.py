@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 
 class TempoSegment(BaseModel):
@@ -53,6 +53,24 @@ class Track(BaseModel):
     waveform_peak: list[float] = Field(default_factory=list)
     effects: Effects = Field(default_factory=Effects)
     error: str | None = None
+    _source_tags: dict[str, str] | None = PrivateAttr(default=None)
+    _tag_overrides: dict[str, str] = PrivateAttr(default_factory=dict)
+
+    def _update_probed_tags(self, source_tags: dict[str, str]) -> None:
+        if self._source_tags is None:
+            overrides = self.tags.copy()
+        else:
+            overrides = {
+                key: value for key, value in self.tags.items() if key in self._tag_overrides
+            }
+            overrides.update(
+                (key, value)
+                for key, value in self.tags.items()
+                if key not in self._tag_overrides and self._source_tags.get(key) != value
+            )
+        self._source_tags = source_tags.copy()
+        self._tag_overrides = overrides
+        self.tags = {**source_tags, **overrides}
 
     @model_validator(mode="after")
     def valid_edits(self) -> Track:

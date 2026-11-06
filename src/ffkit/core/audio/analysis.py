@@ -70,7 +70,7 @@ def probe(track: Track) -> Track:
     stream_tags = {
         str(key).lower(): str(value) for key, value in audio_stream.get("tags", {}).items()
     }
-    track.tags = {**format_tags, **stream_tags, **track.tags}
+    track._update_probed_tags({**format_tags, **stream_tags})
     track.error = None
     return track
 

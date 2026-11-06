@@ -94,6 +94,43 @@ def test_probe_tag_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert tags == {"title": "Stream", "artist": "Custom", "album": "Album"}
 
 
+def test_reprobe_refreshes_source_tags_and_keeps_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.wav"
+    source.touch()
+    reports = iter(
+        [
+            {"title": "Old", "artist": "Artist", "album": "Old album"},
+            {"title": "New", "artist": "New artist", "genre": "Rock"},
+            {"title": "Latest", "artist": "Final artist"},
+        ]
+    )
+
+    def fake_probe(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        report = {
+            "streams": [{"codec_type": "audio"}],
+            "format": {"duration": "1", "tags": next(reports)},
+        }
+        return subprocess.CompletedProcess([], 0, stdout=json.dumps(report))
+
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", fake_probe)
+    track = Track(path=str(source), tags={"artist": "Artist"})
+    probe(track)
+    assert track.tags == {"title": "Old", "artist": "Artist", "album": "Old album"}
+    track.tags["genre"] = "Custom genre"
+    probe(track)
+    assert track.tags == {"title": "New", "artist": "Artist", "genre": "Custom genre"}
+    del track.tags["artist"]
+    track.tags["title"] = "Edited title"
+    probe(track)
+    assert track.tags == {
+        "title": "Edited title",
+        "artist": "Final artist",
+        "genre": "Custom genre",
+    }
+
+
 def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
     source = tmp_path / "delayed.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
