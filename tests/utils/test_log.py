@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit.config import LogSettings
-from ffkit.utils.log import _AppConsoleHandler, _AppFileHandler, setup_logging
+from ffkit.utils.log import _AppConsoleHandler, _AppFileHandler, _AppNullHandler, setup_logging
 
 _EXPECTED_HANDLER_COUNT = 2
 
@@ -20,6 +20,39 @@ def test_setup_logging_without_dir_logs_only_to_console(
 ) -> None:
     setup_logging(LogSettings())
     assert [type(h) for h in _app_handlers(clean_root_logger)] == [_AppConsoleHandler]
+
+
+def test_setup_logging_without_console_keeps_file_logs(
+    tmp_path: Path, clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+) -> None:
+    setup_logging(LogSettings(dir=tmp_path), console=False)
+    clean_root_logger.error("file only")
+    assert capsys.readouterr().err == ""
+    assert json.loads((tmp_path / "ffkit.log").read_text())["event"] == "file only"
+    assert any(isinstance(handler, _AppNullHandler) for handler in clean_root_logger.handlers)
+
+
+def test_setup_logging_without_console_or_file_is_silent(
+    clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+) -> None:
+    setup_logging(LogSettings(), console=False)
+    clean_root_logger.error("no stderr fallback")
+    assert capsys.readouterr().err == ""
+
+
+def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
+    tmp_path: Path, clean_root_logger: logging.Logger
+) -> None:
+    setup_logging(LogSettings(dir=tmp_path / "working", level="WARNING"))
+    original_handlers = _app_handlers(clean_root_logger)
+    occupied = tmp_path / "occupied"
+    occupied.write_text("file")
+    with pytest.raises(FileExistsError):
+        setup_logging(LogSettings(dir=occupied, level="DEBUG"))
+    assert _app_handlers(clean_root_logger) == original_handlers
+    assert clean_root_logger.level == logging.WARNING
+    clean_root_logger.error("still active")
+    assert json.loads((tmp_path / "working" / "ffkit.log").read_text())["event"] == "still active"
 
 
 def test_setup_logging_reads_settings_when_called_without_arguments(

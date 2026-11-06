@@ -217,19 +217,26 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
                 current.extend(["-af", ",".join(filters)])
             current.extend([*command[filter_position:], str(temporary)])
             if cancelled is None:
-                try:
-                    subprocess.run(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
-                        current, check=True, capture_output=True, timeout=PROCESS_TIMEOUT
-                    )
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-                    stderr = getattr(error, "stderr", None)
-                    detail = (
-                        stderr[-1000:].decode(errors="replace")
-                        if isinstance(stderr, bytes)
-                        else str(error)[:1000]
-                    )
-                    log.error("audio_render_failed track=%s error=%s", track.id, detail)
-                    raise
+                with tempfile.TemporaryFile() as errors:
+                    try:
+                        result = subprocess.run(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
+                            current,
+                            check=False,
+                            stdout=subprocess.DEVNULL,
+                            stderr=errors,
+                            timeout=PROCESS_TIMEOUT,
+                        )
+                    except subprocess.TimeoutExpired:
+                        log.error("audio_render_failed track=%s error=FFmpeg timed out", track.id)
+                        raise
+                    if result.returncode:
+                        errors.seek(0, os.SEEK_END)
+                        errors.seek(max(0, errors.tell() - SCAN_ERROR_LIMIT))
+                        detail = errors.read().decode(errors="replace")
+                        log.error("audio_render_failed track=%s error=%s", track.id, detail)
+                        raise subprocess.CalledProcessError(
+                            result.returncode, current, stderr=detail
+                        )
             else:
                 with tempfile.TemporaryFile() as errors:
                     process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
@@ -276,6 +283,8 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
             )
             if effective_ceiling <= MIN_CEILING_DB:
                 raise RuntimeError("True peak ceiling could not be reached")
+        if cancelled and cancelled():
+            raise RuntimeError("Export cancelled")
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)

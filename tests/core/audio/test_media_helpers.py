@@ -165,6 +165,13 @@ def test_extract_embedded_cover(tmp_path: Path) -> None:
     encoded = tmp_path / "with-cover.mp3"
     render(track, encoded)
     embedded = Track(path=str(encoded))
+    original_mp3 = encoded.read_bytes()
+    alias = tmp_path / "alias.mp3"
+    alias.symlink_to(encoded)
+    for destination in (encoded, alias):
+        with pytest.raises(ValueError, match="Output path must differ"):
+            extract_cover(embedded, destination)
+    assert encoded.read_bytes() == original_mp3
     target = tmp_path / "embedded.jpg"
     assert extract_cover(embedded, target) == target
     assert target.is_file()

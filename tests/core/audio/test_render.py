@@ -225,10 +225,10 @@ def test_render_retries_from_source(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     commands: list[list[str]] = []
 
     def record(
-        command: list[str], *, check: bool, capture_output: bool, timeout: int
+        command: list[str], *, check: bool, stdout: int, stderr: BinaryIO, timeout: int
     ) -> subprocess.CompletedProcess[bytes]:
         commands.append(command)
-        return original_run(command, check=check, capture_output=capture_output, timeout=timeout)
+        return original_run(command, check=check, stdout=stdout, stderr=stderr, timeout=timeout)
 
     monkeypatch.setattr(subprocess, "run", record)
     render(Track(path=str(source)), target, limiter_db=-1)
@@ -261,6 +261,31 @@ def test_render_cancelable_drains_large_error(
     monkeypatch.setattr(subprocess, "Popen", noisy_process)
     with pytest.raises(subprocess.CalledProcessError) as error:
         render(Track(path=str(source)), tmp_path / "out.mp3", cancelled=lambda: False)
+    assert error.value.returncode == 7
+    assert len(error.value.stderr) == 1000
+
+
+def test_render_without_cancel_keeps_only_error_tail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp3"
+    source.write_bytes(b"source")
+    original_run = subprocess.run
+
+    def noisy_run(
+        _command: list[str], *, check: bool, stdout: int, stderr: BinaryIO, timeout: int
+    ) -> subprocess.CompletedProcess[bytes]:
+        return original_run(
+            [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(7)"],
+            check=check,
+            stdout=stdout,
+            stderr=stderr,
+            timeout=timeout,
+        )
+
+    monkeypatch.setattr(subprocess, "run", noisy_run)
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        render(Track(path=str(source)), tmp_path / "out.mp3")
     assert error.value.returncode == 7
     assert len(error.value.stderr) == 1000
 
@@ -359,4 +384,24 @@ def test_render_cancellation_after_encoding(
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
     with pytest.raises(RuntimeError, match="Export cancelled"):
         render(Track(path=str(source)), target, limiter_db=-1, cancelled=lambda: True)
+    assert target.read_bytes() == b"existing"
+
+
+def test_render_cancellation_before_replace_without_limiter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source)
+    target = tmp_path / "out.mp3"
+    target.write_bytes(b"existing")
+
+    class CompletedProcess:
+        returncode = 0
+
+        def poll(self) -> int:
+            return 0
+
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
+    with pytest.raises(RuntimeError, match="Export cancelled"):
+        render(Track(path=str(source)), target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"

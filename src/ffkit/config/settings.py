@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,11 +21,21 @@ class LogSettings(BaseModel):
     dir: Path | None = Field(
         default=None, description="Log directory; file logging is disabled if unset"
     )
-    file_name: str = Field(default="ffkit.log", description="Log file name")
+    file_name: str = Field(
+        default="ffkit.log", description="Log file basename without path separators"
+    )
     file_max_bytes: int = Field(
         default=4 * 1024 * 1024, ge=0, description="File size that triggers rotation"
     )
     file_backup_count: int = Field(default=5, ge=0, description="Rotated files to keep")
+
+    @field_validator("file_name")
+    @classmethod
+    def validate_file_name(cls, value: str) -> str:
+        """Keep the log file inside the configured directory."""
+        if value in {"", ".", ".."} or "/" in value or "\\" in value:
+            raise ValueError("Log file name must be a basename")
+        return value
 
 
 class Settings(BaseSettings):

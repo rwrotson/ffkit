@@ -2,6 +2,7 @@ import builtins
 import json
 import subprocess
 from collections.abc import Mapping, Sequence
+from importlib.metadata import version
 from pathlib import Path
 from types import ModuleType
 
@@ -20,7 +21,7 @@ def test_help_and_version() -> None:
     assert runner.invoke(app, ["audio", "--help"]).exit_code == 0
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "ffkit 0.1.0" in result.stdout
+    assert f"ffkit {version('ffkit')}" in result.stdout
 
 
 def test_missing_input_reports_json_error() -> None:
@@ -28,6 +29,21 @@ def test_missing_input_reports_json_error() -> None:
     assert result.exit_code == 2
     assert result.stdout == ""
     assert json.loads(result.stderr)["error"]["type"] == "FileNotFoundError"
+
+
+def test_json_processing_failure_has_one_error_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "broken.wav"
+    source.write_bytes(b"invalid audio")
+    monkeypatch.setenv("FFKIT_LOG__DIR", str(tmp_path / "logs"))
+    result = runner.invoke(
+        app, ["--output-format", "json", "audio", "render", str(source), str(tmp_path / "out.mp3")]
+    )
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert json.loads(result.stderr)["error"]["type"] == "CalledProcessError"
+    assert "audio_render_failed" in (tmp_path / "logs" / "ffkit.log").read_text()
 
 
 def test_existing_output_requires_force(tmp_path: Path) -> None:

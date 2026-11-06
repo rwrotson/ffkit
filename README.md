@@ -93,10 +93,13 @@ refreshes source tags while preserving explicit tag overrides, including after a
 `Track`. The model includes `probed_source_tags` and `tag_overrides` to retain that distinction.
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
+Calling `audio_filters(track)` directly with `trim_silence=True` and the default
+`streaming=False` still emits `areverse`, which can buffer the full decoded track.
 An audible ending is retained even when it follows a pause close to the end of the selected range.
 `detect_trim_bounds()` likewise keeps short audible tails after an internal pause.
 `extract_cover()` replaces an existing destination only after extracting an image from the current
-source; if no image exists, it returns `None` and preserves the destination.
+source; if no image exists, it returns `None` and preserves the destination. The destination must
+differ from the source audio file.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
@@ -170,6 +173,8 @@ FFKIT_LOG__DIR=./logs
 ```
 
 See `.env.example` and the generated configuration page in the documentation site.
+`FFKIT_LOG__FILE_NAME` must be a filename without directory separators; `FFKIT_LOG__DIR`
+selects its directory.
 
 ## Project Structure
 

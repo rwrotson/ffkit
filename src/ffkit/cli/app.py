@@ -93,7 +93,7 @@ def root(
         raise typer.Exit(2) from error
     if verbose:
         settings.log.level = "DEBUG"
-    setup_logging(settings.log)
+    setup_logging(settings.log, console=output_format != OutputFormat.json)
 
 
 def emit(ctx: typer.Context, data: dict[str, object], lines: list[str]) -> None:

@@ -14,6 +14,11 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
     if track.cover_path:
         cover = Path(track.cover_path)
         return cover if cover.is_file() else None
+    source = Path(track.path)
+    if source.resolve() == destination.resolve() or (
+        source.exists() and destination.exists() and source.samefile(destination)
+    ):
+        raise ValueError("Output path must differ from source audio")
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.jpg")
     try:
@@ -31,7 +36,8 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
                 "-y",
                 str(temporary),
             ],
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             check=False,
             timeout=PROCESS_TIMEOUT,
         )

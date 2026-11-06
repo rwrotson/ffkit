@@ -16,7 +16,53 @@ class _AppConsoleHandler(logging.StreamHandler[TextIO]):
     """Mark console handlers for replacement when logging is reconfigured."""
 
 
-def setup_logging(config: LogSettings | None = None) -> None:
+class _AppNullHandler(logging.NullHandler):
+    """Prevent fallback stderr output when application console logging is disabled."""
+
+
+def _prepare_handlers(
+    config: LogSettings,
+    console: bool,
+    console_formatter: logging.Formatter,
+    shared_processors: list[structlog.types.Processor],
+) -> list[logging.Handler]:
+    prepared: list[logging.Handler] = []
+    try:
+        if console:
+            sh = _AppConsoleHandler(sys.stderr)
+            sh.setLevel(config.console_level)
+            sh.setFormatter(console_formatter)
+            prepared.append(sh)
+        else:
+            prepared.append(_AppNullHandler())
+
+        if config.dir is not None:
+            logs_dir_path = config.dir.resolve()
+            logs_dir_path.mkdir(parents=True, exist_ok=True)
+            fh = _AppFileHandler(
+                filename=logs_dir_path / config.file_name,
+                maxBytes=config.file_max_bytes,
+                backupCount=config.file_backup_count,
+            )
+            fh.setLevel(config.file_level)
+            fh.setFormatter(
+                structlog.stdlib.ProcessorFormatter(
+                    processors=[
+                        structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                        structlog.processors.JSONRenderer(),
+                    ],
+                    foreign_pre_chain=shared_processors,
+                )
+            )
+            prepared.append(fh)
+    except Exception:
+        for handler in prepared:
+            handler.close()
+        raise
+    return prepared
+
+
+def setup_logging(config: LogSettings | None = None, *, console: bool = True) -> None:
     """Configure structlog and stdlib handlers for an application that uses the library."""
     if config is None:
         config = load_settings().log
@@ -43,38 +89,16 @@ def setup_logging(config: LogSettings | None = None) -> None:
         foreign_pre_chain=shared_processors,
     )
 
-    root_logger = logging.getLogger()
-    root_logger.setLevel(config.level)
+    prepared = _prepare_handlers(config, console, console_formatter, shared_processors)
 
+    root_logger = logging.getLogger()
     for handler in root_logger.handlers[:]:
-        if isinstance(handler, (_AppFileHandler, _AppConsoleHandler)):
+        if isinstance(handler, (_AppFileHandler, _AppConsoleHandler, _AppNullHandler)):
             root_logger.removeHandler(handler)
             handler.close()
-
-    sh = _AppConsoleHandler(sys.stderr)
-    sh.setLevel(config.console_level)
-    sh.setFormatter(console_formatter)
-    root_logger.addHandler(sh)
-
-    if config.dir is not None:
-        logs_dir_path = config.dir.resolve()
-        logs_dir_path.mkdir(parents=True, exist_ok=True)
-        fh = _AppFileHandler(
-            filename=logs_dir_path / config.file_name,
-            maxBytes=config.file_max_bytes,
-            backupCount=config.file_backup_count,
-        )
-        fh.setLevel(config.file_level)
-        fh.setFormatter(
-            structlog.stdlib.ProcessorFormatter(
-                processors=[
-                    structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                    structlog.processors.JSONRenderer(),
-                ],
-                foreign_pre_chain=shared_processors,
-            )
-        )
-        root_logger.addHandler(fh)
+    for handler in prepared:
+        root_logger.addHandler(handler)
+    root_logger.setLevel(config.level)
 
     structlog.configure(
         processors=[*shared_processors, structlog.stdlib.ProcessorFormatter.wrap_for_formatter],

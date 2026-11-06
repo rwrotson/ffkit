@@ -31,8 +31,8 @@ Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on 
 `ffkit.utils.log.setup_logging()` is a helper for applications that do not have their own setup:
 
 1. Without arguments it loads `LogSettings` from `FFKIT_LOG__*` and `.env`.
-2. It replaces the handlers it created before and keeps all others.
-3. It adds a stderr handler (console or JSON) and, when a log directory is set, a rotating JSON file handler.
+2. It replaces the handlers it created before only after new handlers are ready and keeps all others.
+3. It adds a stderr handler (console or JSON) unless `console=False`, and, when a log directory is set, a rotating JSON file handler.
 4. It configures structlog to render through the same stdlib handlers, so structlog and stdlib records share one format.
 
 ## Errors
