@@ -43,31 +43,31 @@ Changelog = "https://github.com/rwrotson/python-lib-template/blob/main/CHANGELOG
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.19.2",
+    "commitizen>=4.19.3",
     "import-linter>=2.15",
-    "mypy>=2.4.0",
-    "poethepoet>=0.48.0",
-    "pre-commit>=4.6.2",
-    "pytest>=9.1.1",
+    "mypy>=2.4.1",
+    "poethepoet>=0.49.0",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.8.0",
-    "ruff>=0.16.10",
+    "ruff>=0.17.3",
 ]
 docs = [
     "mkdocs-gen-files>=0.6.1",
     "mkdocs-literate-nav>=0.6.3",
-    "mkdocs-material>=9.7.7",
+    "mkdocs-material>=9.8.0",
     "mkdocs-minify-plugin>=0.8.0",
-    "mkdocstrings[python]>=1.0.6",
+    "mkdocstrings[python]>=1.0.8",
     "properdocs>=1.6.7",
 ]
 
 
 # BUILD BACKEND ----------------------------------------------------------------
 [build-system]
-requires = ["uv_build>=0.12.24,<0.13"]
+requires = ["uv_build>=0.13.7,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv]
