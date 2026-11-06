@@ -229,7 +229,7 @@ name = "Core API stays independent of configuration and logging setup"
 type = "forbidden"
 source_modules = ["ffkit.core"]
 forbidden_modules = [
-    "structlog", "pydantic", "pydantic_settings", "ffkit.config", "ffkit.utils",
+    "structlog", "pydantic_settings", "ffkit.config", "ffkit.utils",
 ]
 
 [[tool.importlinter.contracts]]

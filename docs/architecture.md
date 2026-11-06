@@ -5,7 +5,7 @@ The core API does the library's work and knows nothing about configuration or lo
 | Layer | Location | Responsibility | May import |
 | --- | --- | --- | --- |
 | Public API | `ffkit/__init__.py` | Re-export supported names with `__all__`; attach a `NullHandler` | Core |
-| Core | `ffkit/core/` | Library functionality and the `FFKitError` hierarchy | Core and the standard library |
+| Core | `ffkit/core/` | Library functionality and the `FFKitError` hierarchy | Core, Pydantic models, and the standard library |
 | Configuration | `ffkit/config/` | `Settings` with defaults in code, loaded from `FFKIT_*` and `.env` | Pydantic and the standard library |
 | Utilities | `ffkit/utils/` | Opt-in logging setup and helpers for applications | Configuration and third-party libraries |
 
@@ -46,4 +46,4 @@ Callers can catch `FFKitError` for all library failures or the built-in base for
 - Export public names from `core/__init__.py` and `ffkit/__init__.py`, and add them to `__all__`.
 - Test the behaviour in `tests/core/`.
 
-`core/example.py` shows this pattern.
+`core/audio.py` contains the first audio helpers.

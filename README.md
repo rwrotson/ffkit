@@ -1,10 +1,10 @@
 # ffkit
 
-A Python library template with a typed public API, optional structlog logging setup, and environment-based settings.
+Typed FFmpeg helpers for audio processing, with optional application logging and settings.
 
 ## What Is Included
 
-- A `core/` layer with an example function and a `FFKitError` hierarchy, re-exported from `ffkit` with `__all__`; `py.typed` for type checkers
+- Audio models and pure helpers for input discovery, FFmpeg filters, normalization gain, and export names; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `setup_logging()` for applications: structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
@@ -41,14 +41,11 @@ uv run pre-commit install
 ## Usage
 
 ```python
-from ffkit import InvalidInputError, greet
+from ffkit import Effects, Track, audio_filters, normalization_gain
 
-greet("Ada")  # "Hello, Ada!"
-
-try:
-    greet("")
-except InvalidInputError as error:
-    ...
+track = Track(path="song.flac", effects=Effects(gain_db=3))
+filters = audio_filters(track)
+gain = normalization_gain(lufs=-18, peak=-5)
 ```
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
@@ -127,7 +124,9 @@ src/
     ├── py.typed             # PEP 561 marker
     ├── core/
     │   ├── errors.py        # FFKitError, InvalidInputError
-    │   └── example.py       # greet() example
+    │   ├── audio.py         # FFmpeg filters and gain calculations
+    │   ├── formats.py       # supported audio input discovery
+    │   └── models.py        # track, effects, and group models
     ├── config/
     │   └── settings.py      # Settings with the log section
     └── utils/
@@ -158,20 +157,6 @@ Dependabot opens weekly grouped PRs for uv dependencies, GitHub Actions, and pre
 | `docs` | builds the docs with ProperDocs and deploys it to GitHub Pages via GitHub Actions |
 
 In a project created from this template, configure a trusted publisher on PyPI with workflow `release.yml` and environment `pypi`. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
-
-## Using This Template
-
-The distribution, import package, and environment prefix have separate names. Follow the [renaming checklist](https://rwrotson.github.io/ffkit/notes/#renaming-the-template) when copying this template into a new project.
-
-### Remove the Example
-
-The example function is meant to be copied, then deleted. When your first real API exists, remove:
-
-- `src/ffkit/core/example.py` and `tests/core/test_example.py`
-- `greet` from `src/ffkit/core/__init__.py` and `src/ffkit/__init__.py`
-- the `ffkit.core.example` row in `docs/reference/index.md` and the example in this README
-
-Then run `uv run poe check` and `uv run --group docs properdocs build --strict`.
 
 ## Author
 

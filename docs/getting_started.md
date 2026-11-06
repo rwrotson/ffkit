@@ -25,9 +25,10 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 ## Using the Library
 
 ```python
-from ffkit import InvalidInputError, greet
+from ffkit import Effects, Track, audio_filters
 
-greet("Ada")  # "Hello, Ada!"
+track = Track(path="song.flac", effects=Effects(gain_db=3))
+filters = audio_filters(track)
 ```
 
 Configure logging in the application, or use the bundled helper:
@@ -81,31 +82,7 @@ Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `fe
 
 ## Adding Functionality
 
-See the [architecture guide](architecture.md) for the layers and error handling.
-
-1. Create the code in `src/ffkit/core/slug.py`:
-
-```python
-from ffkit.core.errors import InvalidInputError
-
-
-def slugify(text: str) -> str:
-    """Convert text to a lowercase, hyphen-separated slug."""
-    words = text.lower().split()
-    if not words:
-        raise InvalidInputError("text must not be empty")
-    return "-".join(words)
-```
-
-2. Export it from `src/ffkit/core/__init__.py` and `src/ffkit/__init__.py`:
-
-```python
-from .core import InvalidInputError, FFKitError, greet, slugify
-
-__all__ = ["InvalidInputError", "FFKitError", "greet", "slugify"]
-```
-
-3. Test it in `tests/core/test_slug.py` and add a row to `docs/reference/index.md`.
+Add audio operations under `ffkit.core`, export supported names from `ffkit`, and cover them in `tests/core`. Keep the core independent of environment loading and logging setup.
 
 ## Configuration
 
