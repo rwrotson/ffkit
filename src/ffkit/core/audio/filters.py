@@ -57,5 +57,10 @@ def normalization_gain(
         raise ValueError("Cannot measure track loudness")
     gain = target - lufs
     if peak is not None:
+        if not math.isfinite(peak):
+            raise ValueError("Cannot measure track true peak")
         gain = min(gain, ceiling - peak)
-    return round(gain, 1)
+    rounded = round(gain, 1)
+    if peak is not None and rounded > ceiling - peak:
+        rounded = round(rounded - 0.1, 1)
+    return rounded

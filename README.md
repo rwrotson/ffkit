@@ -94,6 +94,8 @@ refreshes source tags while preserving explicit tag overrides.
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
 FFmpeg analysis and cover extraction have a 15-minute processing deadline.
+Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
+would otherwise be exceeded.
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
 

@@ -56,6 +56,7 @@ explicit overrides.
 
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.
+Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
 
 Configure logging in the application, or use the bundled helper:
 

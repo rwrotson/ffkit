@@ -81,10 +81,15 @@ def test_normalization_gain_limits_peak() -> None:
     assert normalization_gain(-20, -5) == 4.0
     assert normalization_gain(-18, None) == 4.0
     assert normalization_gain(-18, -10, target=-16, ceiling=-3) == 2.0
+    assert normalization_gain(-14, -0.96) == -0.1
+    assert normalization_gain(-18, -5.04) == 4.0
+    assert normalization_gain(-18, -4.96) == 3.9
     with pytest.raises(ValueError, match="Cannot measure"):
         normalization_gain(None, None)
     with pytest.raises(ValueError, match="Cannot measure"):
         normalization_gain(float("nan"), None)
+    with pytest.raises(ValueError, match="true peak"):
+        normalization_gain(-14, float("inf"))
 
 
 def test_safe_name_uses_tags_and_utf8_limit() -> None:
