@@ -5,7 +5,7 @@ from typing import TextIO
 
 import structlog
 
-from my_lib.config import LogSettings, load_settings
+from ffkit.config import LogSettings, load_settings
 
 
 class _AppFileHandler(logging.handlers.RotatingFileHandler):

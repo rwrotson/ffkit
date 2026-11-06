@@ -1,10 +1,10 @@
-site_name: python-lib-template
-site_description: A template for building typed Python libraries with optional structured logging setup
-repo_url: https://github.com/rwrotson/python-lib-template
-repo_name: rwrotson/python-lib-template
+site_name: ffkit
+site_description: Typed FFmpeg helpers for audio and video
+repo_url: https://github.com/rwrotson/ffkit
+repo_name: rwrotson/ffkit
 
 watch:
-  - src/my_lib/
+  - src/ffkit/
   - .env.example
   - README.md
 

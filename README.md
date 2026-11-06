@@ -1,13 +1,13 @@
-# python-lib-template
+# ffkit
 
 A Python library template with a typed public API, optional structlog logging setup, and environment-based settings.
 
 ## What Is Included
 
-- A `core/` layer with an example function and a `MyLibError` hierarchy, re-exported from `my_lib` with `__all__`; `py.typed` for type checkers
+- A `core/` layer with an example function and a `FFKitError` hierarchy, re-exported from `ffkit` with `__all__`; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `setup_logging()` for applications: structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
-- One Pydantic `Settings` with a nested `MY_LIB_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
+- One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
 - import-linter contracts that keep the core API independent of configuration and logging setup
 - Strict MyPy with the Pydantic plugin, Ruff, pytest in parallel and random order with a 95% branch coverage gate, poethepoet tasks, pre-commit hooks, Commitizen
 - CI on Ubuntu and macOS with a lowest-dependency test job, package and strict docs builds, pip-audit, and trivy; actions pinned to commit SHAs; PyPI Trusted Publishing and ProperDocs on GitHub Pages after CI passes on a release tag
@@ -41,7 +41,7 @@ uv run pre-commit install
 ## Usage
 
 ```python
-from my_lib import InvalidInputError, greet
+from ffkit import InvalidInputError, greet
 
 greet("Ada")  # "Hello, Ada!"
 
@@ -51,14 +51,14 @@ except InvalidInputError as error:
     ...
 ```
 
-The library logs through stdlib loggers under `my_lib` and stays silent until the application configures logging. An application can use the bundled helper:
+The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
 
 ```python
-from my_lib.config import LogSettings
-from my_lib.utils.log import setup_logging
+from ffkit.config import LogSettings
+from ffkit.utils.log import setup_logging
 
 setup_logging(LogSettings(level="DEBUG", format="json"))
-setup_logging()  # or read MY_LIB_LOG__* variables and .env
+setup_logging()  # or read FFKIT_LOG__* variables and .env
 ```
 
 ## Development
@@ -104,16 +104,16 @@ Bump type is inferred automatically: `fix:` → patch, `feat:` → minor, `feat!
 
 ## Configuration
 
-`my_lib.config.Settings` defines defaults in code. `load_settings()` and `setup_logging()` without arguments read `MY_LIB_*` environment variables and `.env`; the process environment wins. Sections are nested with `__`:
+`ffkit.config.Settings` defines defaults in code. `load_settings()` and `setup_logging()` without arguments read `FFKIT_*` environment variables and `.env`; the process environment wins. Sections are nested with `__`:
 
 | Prefix | Controls |
 |--------|----------|
-| `MY_LIB_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
+| `FFKIT_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
 
 ```env
-MY_LIB_LOG__LEVEL=DEBUG
-MY_LIB_LOG__FORMAT=json
-MY_LIB_LOG__DIR=./logs
+FFKIT_LOG__LEVEL=DEBUG
+FFKIT_LOG__FORMAT=json
+FFKIT_LOG__DIR=./logs
 ```
 
 See `.env.example` and the generated configuration page in the documentation site.
@@ -122,11 +122,11 @@ See `.env.example` and the generated configuration page in the documentation sit
 
 ```
 src/
-└── my_lib/
+└── ffkit/
     ├── __init__.py          # public API (__all__), NullHandler
     ├── py.typed             # PEP 561 marker
     ├── core/
-    │   ├── errors.py        # MyLibError, InvalidInputError
+    │   ├── errors.py        # FFKitError, InvalidInputError
     │   └── example.py       # greet() example
     ├── config/
     │   └── settings.py      # Settings with the log section
@@ -161,15 +161,15 @@ In a project created from this template, configure a trusted publisher on PyPI w
 
 ## Using This Template
 
-The distribution, import package, and environment prefix have separate names. Follow the [renaming checklist](https://rwrotson.github.io/python-lib-template/notes/#renaming-the-template) when copying this template into a new project.
+The distribution, import package, and environment prefix have separate names. Follow the [renaming checklist](https://rwrotson.github.io/ffkit/notes/#renaming-the-template) when copying this template into a new project.
 
 ### Remove the Example
 
 The example function is meant to be copied, then deleted. When your first real API exists, remove:
 
-- `src/my_lib/core/example.py` and `tests/core/test_example.py`
-- `greet` from `src/my_lib/core/__init__.py` and `src/my_lib/__init__.py`
-- the `my_lib.core.example` row in `docs/reference/index.md` and the example in this README
+- `src/ffkit/core/example.py` and `tests/core/test_example.py`
+- `greet` from `src/ffkit/core/__init__.py` and `src/ffkit/__init__.py`
+- the `ffkit.core.example` row in `docs/reference/index.md` and the example in this README
 
 Then run `uv run poe check` and `uv run --group docs properdocs build --strict`.
 

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from my_lib.config import LogSettings
-from my_lib.utils.log import _AppConsoleHandler, _AppFileHandler, setup_logging
+from ffkit.config import LogSettings
+from ffkit.utils.log import _AppConsoleHandler, _AppFileHandler, setup_logging
 
 _EXPECTED_HANDLER_COUNT = 2
 
@@ -25,11 +25,11 @@ def test_setup_logging_without_dir_logs_only_to_console(
 def test_setup_logging_reads_settings_when_called_without_arguments(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clean_root_logger: logging.Logger
 ) -> None:
-    monkeypatch.setenv("MY_LIB_LOG__DIR", str(tmp_path))
-    monkeypatch.setenv("MY_LIB_LOG__LEVEL", "ERROR")
+    monkeypatch.setenv("FFKIT_LOG__DIR", str(tmp_path))
+    monkeypatch.setenv("FFKIT_LOG__LEVEL", "ERROR")
     setup_logging()
     assert clean_root_logger.level == logging.ERROR
-    assert (tmp_path / "my-lib.log").exists()
+    assert (tmp_path / "ffkit.log").exists()
 
 
 def test_setup_logging_creates_log_dir(tmp_path: Path, clean_root_logger: logging.Logger) -> None:
@@ -124,7 +124,7 @@ def test_library_records_reach_configured_handlers(
 ) -> None:
     _ = clean_root_logger
     setup_logging(LogSettings(format="json", level="DEBUG"))
-    logging.getLogger("my_lib.core.example").debug("from library")
+    logging.getLogger("ffkit.core.example").debug("from library")
     event = json.loads(capsys.readouterr().err)
     assert event["event"] == "from library"
-    assert event["logger"] == "my_lib.core.example"
+    assert event["logger"] == "ffkit.core.example"

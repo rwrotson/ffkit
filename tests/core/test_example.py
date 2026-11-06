@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from my_lib.core import InvalidInputError, MyLibError, greet
+from ffkit.core import FFKitError, InvalidInputError, greet
 
 
 def test_greet_returns_greeting() -> None:
@@ -16,11 +16,11 @@ def test_greet_rejects_blank_name(name: str) -> None:
 
 
 def test_greet_logs_through_package_logger(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.DEBUG, logger="my_lib"):
+    with caplog.at_level(logging.DEBUG, logger="ffkit"):
         greet("Ada")
-    assert [record.name for record in caplog.records] == ["my_lib.core.example"]
+    assert [record.name for record in caplog.records] == ["ffkit.core.example"]
 
 
 def test_invalid_input_error_is_library_and_value_error() -> None:
-    assert issubclass(InvalidInputError, MyLibError)
+    assert issubclass(InvalidInputError, FFKitError)
     assert issubclass(InvalidInputError, ValueError)

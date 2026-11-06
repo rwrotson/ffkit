@@ -1,6 +1,6 @@
 import logging
 
-from my_lib.core.errors import InvalidInputError
+from ffkit.core.errors import InvalidInputError
 
 logger = logging.getLogger(__name__)
 

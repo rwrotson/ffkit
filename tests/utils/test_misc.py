@@ -1,7 +1,7 @@
 from pathlib import Path
 
-import my_lib.utils.misc as _misc_module
-from my_lib.utils.misc import find_project_root
+import ffkit.utils.misc as _misc_module
+from ffkit.utils.misc import find_project_root
 
 
 def test_find_project_root_contains_pyproject_toml() -> None:

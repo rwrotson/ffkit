@@ -1,16 +1,16 @@
 # PROJECT ----------------------------------------------------------------------
 [project]
-name = "my-lib"
+name = "ffkit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Typed FFmpeg helpers for audio and video"
 authors = [
     { name = "Igor Lashkov", email = "rwrotson@yandex.ru" },
 ]
 maintainers = []
 keywords = [
-    "template",
-    "example",
-    "library",
+    "ffmpeg",
+    "audio",
+    "video",
     "structlog",
     "pydantic-settings",
     "uv",
@@ -37,9 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/rwrotson/python-lib-template"
-Documentation = "https://rwrotson.github.io/python-lib-template"
-Changelog = "https://github.com/rwrotson/python-lib-template/blob/main/CHANGELOG.md"
+Repository = "https://github.com/rwrotson/ffkit"
+Documentation = "https://rwrotson.github.io/ffkit"
+Changelog = "https://github.com/rwrotson/ffkit/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
@@ -75,7 +75,7 @@ build-backend = "uv_build"
 constraint-dependencies = ["urllib3>=2.8.0", "virtualenv>=21.7.13"]
 
 [tool.uv.build-backend]
-module-name = "my_lib"
+module-name = "ffkit"
 module-root = "src"
 
 
@@ -88,7 +88,7 @@ filterwarnings = ["error"]
 timeout = 30
 
 [tool.coverage.run]
-source = ["my_lib"]
+source = ["ffkit"]
 omit = ["*/__init__.py"]
 branch = true
 parallel = true
@@ -198,7 +198,7 @@ ban-relative-imports = "all"
 max-complexity = 8
 
 [tool.ruff.lint.isort]
-known-first-party = ["my_lib"]
+known-first-party = ["ffkit"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -221,28 +221,28 @@ major_version_zero = true
 
 # IMPORT-LINTER ----------------------------------------------------------------
 [tool.importlinter]
-root_package = "my_lib"
+root_package = "ffkit"
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Core API stays independent of configuration and logging setup"
 type = "forbidden"
-source_modules = ["my_lib.core"]
+source_modules = ["ffkit.core"]
 forbidden_modules = [
-    "structlog", "pydantic", "pydantic_settings", "my_lib.config", "my_lib.utils",
+    "structlog", "pydantic", "pydantic_settings", "ffkit.config", "ffkit.utils",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Configuration has no library dependencies"
 type = "forbidden"
-source_modules = ["my_lib.config"]
-forbidden_modules = ["structlog", "my_lib.core", "my_lib.utils"]
+source_modules = ["ffkit.config"]
+forbidden_modules = ["structlog", "ffkit.core", "ffkit.utils"]
 
 [[tool.importlinter.contracts]]
 name = "Utilities do not depend on the core API"
 type = "forbidden"
-source_modules = ["my_lib.utils"]
-forbidden_modules = ["my_lib.core"]
+source_modules = ["ffkit.utils"]
+forbidden_modules = ["ffkit.core"]
 
 
 # POETHEPOET -------------------------------------------------------------------

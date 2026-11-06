@@ -5,9 +5,9 @@ from collections.abc import Iterator
 import mkdocs_gen_files
 from pydantic.fields import FieldInfo
 
-from my_lib.config.settings import Settings, env_fields, nested_model
+from ffkit.config.settings import Settings, env_fields, nested_model
 
-PREFIX = "MY_LIB_"
+PREFIX = "FFKIT_"
 
 
 def type_name(field: FieldInfo) -> str:
@@ -40,7 +40,7 @@ def table(rows: Iterator[tuple[str, FieldInfo]]) -> list[str]:
 lines = [
     "# Configuration",
     "",
-    f"This page is generated from `my_lib.config.Settings`. Values are read from `{PREFIX}*` "
+    f"This page is generated from `ffkit.config.Settings`. Values are read from `{PREFIX}*` "
     "environment variables and `.env` in the working directory; the process environment wins. "
     f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`. Empty values use the default.",
 ]
@@ -61,4 +61,4 @@ for name, field in Settings.model_fields.items():
 with mkdocs_gen_files.open("configuration.md", "w") as fd:
     fd.write("\n".join(lines) + "\n")
 
-mkdocs_gen_files.set_edit_path("configuration.md", "../src/my_lib/config/settings.py")
+mkdocs_gen_files.set_edit_path("configuration.md", "../src/ffkit/config/settings.py")

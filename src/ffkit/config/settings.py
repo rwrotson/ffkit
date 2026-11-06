@@ -21,7 +21,7 @@ class LogSettings(BaseModel):
     dir: Path | None = Field(
         default=None, description="Log directory; file logging is disabled if unset"
     )
-    file_name: str = Field(default="my-lib.log", description="Log file name")
+    file_name: str = Field(default="ffkit.log", description="Log file name")
     file_max_bytes: int = Field(
         default=4 * 1024 * 1024, ge=0, description="File size that triggers rotation"
     )
@@ -29,10 +29,10 @@ class LogSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    """Load library settings from MY_LIB_* variables and .env."""
+    """Load library settings from FFKIT_* variables and .env."""
 
     model_config = SettingsConfigDict(
-        env_prefix="MY_LIB_",
+        env_prefix="FFKIT_",
         env_file=".env",
         env_nested_delimiter="__",
         env_ignore_empty=True,
@@ -51,7 +51,7 @@ def nested_model(field: FieldInfo) -> type[BaseModel] | None:
 
 
 def env_fields(
-    model: type[BaseModel] = Settings, prefix: str = "MY_LIB_"
+    model: type[BaseModel] = Settings, prefix: str = "FFKIT_"
 ) -> Iterator[tuple[str, FieldInfo]]:
     """Yield every leaf setting with its environment variable name."""
     for name, field in model.model_fields.items():

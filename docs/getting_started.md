@@ -9,7 +9,7 @@
 
 ```bash
 git clone <repo-url>
-cd python-lib-template
+cd ffkit
 uv sync --all-groups --locked
 uv run pre-commit install
 ```
@@ -25,7 +25,7 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 ## Using the Library
 
 ```python
-from my_lib import InvalidInputError, greet
+from ffkit import InvalidInputError, greet
 
 greet("Ada")  # "Hello, Ada!"
 ```
@@ -33,8 +33,8 @@ greet("Ada")  # "Hello, Ada!"
 Configure logging in the application, or use the bundled helper:
 
 ```python
-from my_lib.config import LogSettings
-from my_lib.utils.log import setup_logging
+from ffkit.config import LogSettings
+from ffkit.utils.log import setup_logging
 
 setup_logging(LogSettings(level="DEBUG"))
 ```
@@ -83,10 +83,10 @@ Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `fe
 
 See the [architecture guide](architecture.md) for the layers and error handling.
 
-1. Create the code in `src/my_lib/core/slug.py`:
+1. Create the code in `src/ffkit/core/slug.py`:
 
 ```python
-from my_lib.core.errors import InvalidInputError
+from ffkit.core.errors import InvalidInputError
 
 
 def slugify(text: str) -> str:
@@ -97,12 +97,12 @@ def slugify(text: str) -> str:
     return "-".join(words)
 ```
 
-2. Export it from `src/my_lib/core/__init__.py` and `src/my_lib/__init__.py`:
+2. Export it from `src/ffkit/core/__init__.py` and `src/ffkit/__init__.py`:
 
 ```python
-from .core import InvalidInputError, MyLibError, greet, slugify
+from .core import InvalidInputError, FFKitError, greet, slugify
 
-__all__ = ["InvalidInputError", "MyLibError", "greet", "slugify"]
+__all__ = ["InvalidInputError", "FFKitError", "greet", "slugify"]
 ```
 
 3. Test it in `tests/core/test_slug.py` and add a row to `docs/reference/index.md`.
@@ -113,11 +113,11 @@ __all__ = ["InvalidInputError", "MyLibError", "greet", "slugify"]
 
 | Prefix | Controls |
 |--------|----------|
-| `MY_LIB_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
+| `FFKIT_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
 
 ```env
-MY_LIB_LOG__LEVEL=DEBUG
-MY_LIB_LOG__FORMAT=json
+FFKIT_LOG__LEVEL=DEBUG
+FFKIT_LOG__FORMAT=json
 ```
 
 All variables are listed on the [configuration page](configuration.md).
