@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -7,13 +8,91 @@ from collections.abc import Callable
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.audio.analysis import PROCESS_TIMEOUT, measure_loudness
+from ffkit.core.audio.analysis import PROCESS_TIMEOUT, TRIM_EDGE_TOLERANCE, measure_loudness, probe
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5
 MIN_CEILING_DB = -20
+MIN_TRAILING_SILENCE = 0.01
+
+
+def _scan_silence(command: list[str], cancelled: Callable[[], bool] | None) -> str:
+    with tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate arguments.
+            command, stdout=subprocess.DEVNULL, stderr=errors
+        )
+        try:
+            deadline = time.monotonic() + PROCESS_TIMEOUT
+            while process.poll() is None:
+                if cancelled and cancelled():
+                    raise RuntimeError("Export cancelled")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, PROCESS_TIMEOUT)
+                try:
+                    process.wait(timeout=min(0.1, remaining))
+                except subprocess.TimeoutExpired:
+                    continue
+            errors.seek(0, os.SEEK_END)
+            errors.seek(max(0, errors.tell() - 8192))
+            tail = errors.read().decode(errors="replace")
+            if process.returncode:
+                raise subprocess.CalledProcessError(process.returncode, command, stderr=tail)
+            return tail
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+
+
+def _trailing_silence_end(
+    track: Track, source: Path, cancelled: Callable[[], bool] | None
+) -> float | None:
+    duration = probe(Track(path=str(source))).duration
+    if duration is None:
+        raise ValueError("Track duration is unavailable")
+    start = track.effects.trim_start
+    end = min(track.effects.trim_end or duration, duration)
+    if end <= start:
+        return None
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "info",
+        "-ss",
+        str(start),
+        "-i",
+        str(source),
+        "-t",
+        str(end - start),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-af",
+        "silencedetect=noise=-50dB:d=0",
+        "-f",
+        "null",
+        "-",
+    ]
+    tail = _scan_silence(command, cancelled)
+    events = list(re.finditer(r"silence_(start|end): ([-\d.]+)", tail))
+    starts = [event for event in events if event.group(1) == "start"]
+    if not starts:
+        return None
+    last_start = starts[-1]
+    last_end = next((event for event in reversed(events) if event.group(1) == "end"), None)
+    trailing = (
+        last_end is None
+        or last_start.start() > last_end.start()
+        or (float(last_end.group(2)) >= end - start - TRIM_EDGE_TOLERANCE)
+    )
+    if trailing and end - start - float(last_start.group(2)) >= MIN_TRAILING_SILENCE:
+        return round(start + float(last_start.group(2)), 6)
+    return None
 
 
 def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry logic.
@@ -68,11 +147,21 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
             command.extend(["-metadata", f"{key}={value}"])
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
     try:
+        trailing_end = (
+            _trailing_silence_end(track, source, cancelled) if track.effects.trim_silence else None
+        )
+        if (
+            trailing_end is not None
+            and trailing_end <= track.effects.trim_start + MIN_TRAILING_SILENCE
+        ):
+            raise ValueError("Track contains no audible audio")
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
             attempt_track = track.model_copy(deep=True)
             attempt_track.effects.limiter_ceiling_db = effective_ceiling
-            filters = audio_filters(attempt_track, group_gain_db)
+            if trailing_end is not None:
+                attempt_track.effects.trim_end = trailing_end
+            filters = audio_filters(attempt_track, group_gain_db, streaming=True)
             current = command[:filter_position]
             if filters:
                 current.extend(["-af", ",".join(filters)])

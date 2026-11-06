@@ -36,7 +36,7 @@ class CLIGroup(TyperGroup):
             raise
         except (
             ValueError,
-            FileNotFoundError,
+            OSError,
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired,
             RuntimeError,

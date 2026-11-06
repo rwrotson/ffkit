@@ -89,7 +89,10 @@ the remaining effects.
 
 `probe()` combines container tags with tags from the first audio stream. Stream tags take precedence
 over container tags, and tags explicitly set on `Track` take precedence over both. Re-probing a track
-refreshes source tags while preserving explicit tag overrides.
+refreshes source tags while preserving explicit tag overrides, including after a JSON round trip of
+`Track`. The model includes `probed_source_tags` and `tag_overrides` to retain that distinction.
+Rendering and normalization scan for trailing silence before processing when `trim_silence` is
+enabled, so long tracks do not require buffering decoded audio in `areverse`.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.

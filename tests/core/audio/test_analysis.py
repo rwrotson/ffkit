@@ -131,6 +131,27 @@ def test_reprobe_refreshes_source_tags_and_keeps_overrides(
     }
 
 
+def test_reprobe_after_json_round_trip_refreshes_source_tags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.wav"
+    source.touch()
+    titles = iter(("Old", "New"))
+
+    def fake_probe(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        report = {
+            "streams": [{"codec_type": "audio"}],
+            "format": {"duration": "1", "tags": {"title": next(titles), "artist": "Source"}},
+        }
+        return subprocess.CompletedProcess([], 0, stdout=json.dumps(report))
+
+    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", fake_probe)
+    original = probe(Track(path=str(source), tags={"artist": "Custom"}))
+    restored = Track.model_validate_json(original.model_dump_json())
+    probe(restored)
+    assert restored.tags == {"title": "New", "artist": "Custom"}
+
+
 def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
     source = tmp_path / "delayed.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.

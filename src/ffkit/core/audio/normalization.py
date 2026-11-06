@@ -3,6 +3,7 @@ from pathlib import Path
 from ffkit.core.audio.analysis import measure_loudness
 from ffkit.core.audio.filters import audio_filters, normalization_gain
 from ffkit.core.audio.models import Track
+from ffkit.core.audio.render import MIN_TRAILING_SILENCE, _trailing_silence_end
 
 
 def calculate_normalization_gain(
@@ -13,10 +14,16 @@ def calculate_normalization_gain(
     measured.effects.normalize_lufs = None
     measured.effects.limiter_ceiling_db = None
     measured.effects.gain_db = 0
-    filters = audio_filters(measured, limiter_db=None)
     source = Path(measured.path)
     stat = source.stat()
     fingerprint = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    if measured.effects.trim_silence:
+        trailing_end = _trailing_silence_end(measured, source, None)
+        if trailing_end is not None:
+            if trailing_end <= measured.effects.trim_start + MIN_TRAILING_SILENCE:
+                raise ValueError("Track contains no audible audio")
+            measured.effects.trim_end = trailing_end
+    filters = audio_filters(measured, streaming=True, limiter_db=None)
     lufs: float | None
     peak: float | None
     if (

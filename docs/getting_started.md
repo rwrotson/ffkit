@@ -29,6 +29,7 @@ Install with `pip install 'ffkit[cli]'`, then run `ffkit audio --help`.
 The `audio` group includes `probe`, `loudness`, `trim-bounds`, `render`, and `extract-cover`.
 Use `--output-format json` before `audio` for machine-readable output. Output files are protected
 against replacement unless `--force` is passed.
+Filesystem errors are reported in the selected text or JSON output format.
 
 ```bash
 ffkit audio probe song.flac
@@ -52,7 +53,10 @@ the remaining effects.
 
 `probe()` reads container tags and tags from the first audio stream. Stream tags override container
 tags; explicitly provided `Track.tags` override both. Re-probing refreshes source tags and preserves
-explicit overrides.
+explicit overrides, including after a JSON round trip. The serialized `probed_source_tags` and
+`tag_overrides` fields retain tag provenance. With `trim_silence` enabled, rendering and
+normalization scan for trailing silence before processing with bounded memory.
+Older Track JSON without these fields cannot distinguish source tags from explicit overrides.
 
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.

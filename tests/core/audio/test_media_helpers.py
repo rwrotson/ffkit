@@ -185,6 +185,8 @@ def test_calculate_normalization_gain_uses_processed_audio(tmp_path: Path) -> No
     assert calculate_normalization_gain(track) == expected
     track.effects.trim_start = 0.2
     assert isinstance(calculate_normalization_gain(track), float)
+    track.effects.trim_silence = True
+    assert isinstance(calculate_normalization_gain(track), float)
 
 
 def test_calculate_normalization_gain_rejects_changed_source(
@@ -200,6 +202,18 @@ def test_calculate_normalization_gain_rejects_changed_source(
 
     monkeypatch.setattr(normalization_module, "measure_loudness", change_source)
     with pytest.raises(ValueError, match="Source audio changed"):
+        calculate_normalization_gain(track)
+
+
+def test_calculate_normalization_gain_rejects_all_silence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "silent.wav"
+    source.touch()
+    track = Track(path=str(source))
+    track.effects.trim_silence = True
+    monkeypatch.setattr(normalization_module, "_trailing_silence_end", lambda *args: 0.0)
+    with pytest.raises(ValueError, match="no audible audio"):
         calculate_normalization_gain(track)
 
 

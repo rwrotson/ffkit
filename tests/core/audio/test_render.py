@@ -6,7 +6,7 @@ from typing import BinaryIO
 
 import pytest
 
-from ffkit import Group, Track, measure_loudness, probe, render
+from ffkit import Group, Track, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.core.audio.render")
 
@@ -65,6 +65,99 @@ def test_render_mp3_with_trim_tags_and_gain(tmp_path: Path) -> None:
     assert output.tags["title"] == "New"
     assert output.tags["artist"] == "Me"
     assert not list(target.parent.glob("*.tmp.mp3"))
+
+
+def test_render_trims_edges_without_reversing_audio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "edges.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-filter_complex",
+            "[0:a][1:a][0:a][1:a][0:a]concat=n=5:v=0:a=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    track = Track(path=str(source))
+    track.effects.trim_start = 0.5
+    track.effects.trim_end = 4.5
+    track.effects.trim_silence = True
+
+    def checked_filters(current: Track, gain: float, *, streaming: bool) -> list[str]:
+        assert streaming is True
+        filters = audio_filters(current, gain, streaming=streaming)
+        assert "areverse" not in filters
+        return filters
+
+    monkeypatch.setattr(render_module, "audio_filters", checked_filters)
+    target = tmp_path / "trimmed.mp3"
+    render(track, target)
+    duration = probe(Track(path=str(target))).duration
+    assert duration is not None
+    assert 2.9 < duration < 3.2
+
+
+def test_trailing_silence_scan_handles_no_silence_and_empty_trim(tmp_path: Path) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source)
+    track = Track(path=str(source))
+    assert render_module._trailing_silence_end(track, source, None) is None
+    track.effects.trim_start = 2
+    assert render_module._trailing_silence_end(track, source, None) is None
+
+
+def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
+    source = tmp_path / "silent.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    track = Track(path=str(source))
+    track.effects.trim_silence = True
+    with pytest.raises(ValueError, match="no audible audio"):
+        render(track, tmp_path / "out.mp3")
+
+
+def test_trailing_silence_scan_respects_cancellation(tmp_path: Path) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source)
+    with pytest.raises(RuntimeError, match="Export cancelled"):
+        render_module._trailing_silence_end(Track(path=str(source)), source, lambda: True)
+
+
+def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(subprocess.CalledProcessError):
+        render_module._scan_silence(
+            ["ffmpeg", "-v", "error", "-i", "missing.wav", "-f", "null", "-"], None
+        )
+    monkeypatch.setattr(render_module, "PROCESS_TIMEOUT", 0)
+    with pytest.raises(subprocess.TimeoutExpired):
+        render_module._scan_silence([sys.executable, "-c", "import time; time.sleep(10)"], None)
 
 
 def test_render_limiter_checks_encoded_peak(tmp_path: Path) -> None:

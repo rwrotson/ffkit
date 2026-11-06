@@ -40,6 +40,23 @@ def test_existing_output_requires_force(tmp_path: Path) -> None:
     assert destination.read_bytes() == b"original"
 
 
+def test_filesystem_errors_use_json_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "source.wav"
+    source.touch()
+    occupied = tmp_path / "occupied"
+    occupied.write_text("file")
+    result = runner.invoke(
+        app, ["--output-format", "json", "audio", "render", str(source), str(occupied / "out.mp3")]
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.stderr)["error"]["type"] == "FileExistsError"
+
+    monkeypatch.setenv("FFKIT_LOG__DIR", str(occupied))
+    result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
+    assert result.exit_code == 1
+    assert json.loads(result.stderr)["error"]["type"] == "FileExistsError"
+
+
 def test_probe_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"input")
