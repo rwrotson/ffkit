@@ -23,6 +23,18 @@ uv run pre-commit install
 
 Ruff and mypy run from the locked project environment (`uv run --no-sync`), so hook and CI versions match.
 
+## Optional CLI
+
+Install with `pip install 'ffkit[cli]'`, then run `ffkit audio --help`.
+The `audio` group includes `probe`, `loudness`, `trim-bounds`, `render`, and `extract-cover`.
+Use `--output-format json` before `audio` for machine-readable output. Output files are protected
+against replacement unless `--force` is passed.
+
+```bash
+ffkit audio probe song.flac
+ffkit audio render song.flac song.mp3 --trim-start 1.5 --limiter-ceiling-db -1
+```
+
 ## Using the Library
 
 ```python

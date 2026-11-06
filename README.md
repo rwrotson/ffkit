@@ -41,6 +41,21 @@ uv run pre-commit install
 
 ## Usage
 
+Install the optional CLI with `pip install 'ffkit[cli]'` (or `uv sync --extra cli`).
+Run `ffkit --help` and `ffkit audio --help` to see the commands:
+
+```bash
+ffkit audio probe song.flac
+ffkit --output-format json audio loudness song.flac
+ffkit audio trim-bounds song.flac --threshold-db -45
+ffkit audio render song.flac song.mp3 --gain-db 3 --target-lufs -14
+ffkit audio extract-cover song.flac cover.jpg
+```
+
+`render` and `extract-cover` require `--force` to replace an existing output file.
+`ffmpeg` and `ffprobe` must be available on `PATH` for the corresponding operations.
+
+
 ```python
 from pathlib import Path
 

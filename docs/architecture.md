@@ -8,6 +8,7 @@ The core API does the library's work and knows nothing about configuration or lo
 | Core | `ffkit/core/` | Library functionality and the `FFKitError` hierarchy | Core, Pydantic models, and the standard library |
 | Configuration | `ffkit/config/` | `Settings` with defaults in code, loaded from `FFKIT_*` and `.env` | Pydantic and the standard library |
 | Utilities | `ffkit/utils/` | Opt-in logging setup and helpers for applications | Configuration and third-party libraries |
+| CLI | `ffkit/cli/`, `ffkit/main.py` | Optional Typer commands over the core audio API | Core, configuration, utilities, Typer, Rich |
 
 import-linter checks these boundaries with `uv run poe lint-imports`; the contracts are in `pyproject.toml`.
 
