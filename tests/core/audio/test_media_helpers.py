@@ -130,13 +130,15 @@ def test_extract_cover_timeout_removes_partial_file(
         timeout = kwargs["timeout"]
         assert isinstance(timeout, (int, float))
         assert timeout > 0
-        target.write_bytes(b"partial")
+        Path(command[-1]).write_bytes(b"partial")
         raise subprocess.TimeoutExpired(command, timeout)
 
+    target.write_bytes(b"previous cover")
     monkeypatch.setattr("ffkit.core.audio.cover.subprocess.run", time_out)
     with pytest.raises(subprocess.TimeoutExpired):
         extract_cover(Track(path="source.mp3"), target)
-    assert not target.exists()
+    assert target.read_bytes() == b"previous cover"
+    assert not list(tmp_path.glob("*.tmp.jpg"))
 
 
 def test_extract_embedded_cover(tmp_path: Path) -> None:
@@ -166,7 +168,12 @@ def test_extract_embedded_cover(tmp_path: Path) -> None:
     target = tmp_path / "embedded.jpg"
     assert extract_cover(embedded, target) == target
     assert target.is_file()
+    original = target.read_bytes()
+    target.write_bytes(b"stale cover")
     assert extract_cover(embedded, target) == target
+    assert target.read_bytes() == original
+    assert extract_cover(Track(path=str(source)), target) is None
+    assert target.read_bytes() == original
 
 
 def test_calculate_normalization_gain_uses_processed_audio(tmp_path: Path) -> None:

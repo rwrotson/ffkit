@@ -29,6 +29,8 @@ Install with `pip install 'ffkit[cli]'`, then run `ffkit audio --help`.
 The `audio` group includes `probe`, `loudness`, `trim-bounds`, `render`, and `extract-cover`.
 Use `--output-format json` before `audio` for machine-readable output. Output files are protected
 against replacement unless `--force` is passed.
+Library `extract_cover()` replaces its destination only after successful extraction and keeps the
+existing file when the source has no embedded image.
 Filesystem errors are reported in the selected text or JSON output format.
 
 ```bash
