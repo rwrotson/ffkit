@@ -10,6 +10,9 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.formats` | Discover supported audio inputs |
 | `ffkit.core.models` | Define audio track, effects, and group data |
 | `ffkit.core.render` | Render non-destructive MP3 output |
+| `ffkit.core.stream` | Stream MP3 audio from a playback position |
+| `ffkit.core.cover` | Extract an embedded cover image |
+| `ffkit.core.normalization` | Calculate gain for processed audio |
 | `ffkit.config.settings` | Define and load library settings |
 | `ffkit.utils.log` | Configure console and file logging for applications |
 | `ffkit.utils.misc` | Locate the project root |

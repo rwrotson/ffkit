@@ -4,7 +4,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 ## What Is Included
 
-- Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, filters, normalization gain, and MP3 rendering; `py.typed` for type checkers
+- Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, normalization, MP3 rendering and streaming, and cover extraction; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `setup_logging()` for applications: structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
@@ -29,6 +29,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 - Python 3.14+
 - uv
+- `ffmpeg` and `ffprobe` on `PATH` for audio operations
 
 ## Getting Started
 
@@ -43,12 +44,17 @@ uv run pre-commit install
 ```python
 from pathlib import Path
 
-from ffkit import Effects, Track, audio_filters, normalization_gain, probe, render
+from ffkit import (
+    Effects, Track, audio_filters, calculate_normalization_gain,
+    extract_cover, probe, render, stream_mp3,
+)
 
 track = probe(Track(path="song.flac", effects=Effects(gain_db=3)))
 filters = audio_filters(track)
-gain = normalization_gain(lufs=-18, peak=-5)
+gain = calculate_normalization_gain(track)
 render(track, Path("song.mp3"))
+chunks = stream_mp3(track, start=0.5)
+cover = extract_cover(track, Path("cover.jpg"))
 ```
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
@@ -131,6 +137,9 @@ src/
     │   ├── analysis.py      # probing and audio analysis
     │   ├── formats.py       # supported audio input discovery
     │   ├── render.py        # non-destructive MP3 rendering
+    │   ├── stream.py        # MP3 playback stream
+    │   ├── cover.py         # embedded cover extraction
+    │   ├── normalization.py # processed-track gain calculation
     │   └── models.py        # track, effects, and group models
     ├── config/
     │   └── settings.py      # Settings with the log section

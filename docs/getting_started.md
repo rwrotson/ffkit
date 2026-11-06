@@ -4,6 +4,7 @@
 
 - Python 3.14+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- `ffmpeg` and `ffprobe` on `PATH` for audio operations
 
 ## Installation
 
