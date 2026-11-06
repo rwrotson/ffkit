@@ -56,6 +56,7 @@ tags; explicitly provided `Track.tags` override both. Re-probing refreshes sourc
 explicit overrides, including after a JSON round trip. The serialized `probed_source_tags` and
 `tag_overrides` fields retain tag provenance. With `trim_silence` enabled, rendering and
 normalization scan for trailing silence before processing with bounded memory.
+An audible tail after an internal pause remains in the output.
 Older Track JSON without these fields cannot distinguish source tags from explicit overrides.
 
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose

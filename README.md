@@ -93,6 +93,7 @@ refreshes source tags while preserving explicit tag overrides, including after a
 `Track`. The model includes `probed_source_tags` and `tag_overrides` to retain that distinction.
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
+An audible ending is retained even when it follows a pause close to the end of the selected range.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.

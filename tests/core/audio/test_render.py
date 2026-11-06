@@ -160,6 +160,48 @@ def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout(
         render_module._scan_silence([sys.executable, "-c", "import time; time.sleep(10)"], None)
 
 
+def test_trailing_silence_scan_bounds_error_output() -> None:
+    command = [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(2)"]
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        render_module._scan_silence(command, None)
+    assert len(error.value.stderr) == render_module.SCAN_ERROR_LIMIT
+
+
+def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
+    source = tmp_path / "audible-tail.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "aevalsrc=0.1:s=44100:d=0.05",
+            "-filter_complex",
+            "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    track = Track(path=str(source))
+    track.effects.trim_silence = True
+    target = tmp_path / "rendered.mp3"
+    render(track, target)
+    duration = probe(Track(path=str(target))).duration
+    assert duration is not None
+    assert 2.0 < duration < 2.15
+
+
 def test_render_limiter_checks_encoded_peak(tmp_path: Path) -> None:
     source = tmp_path / "loud.wav"
     make_tone(source, gain=12)
