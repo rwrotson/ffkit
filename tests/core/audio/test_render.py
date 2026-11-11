@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 import pytest
 
-from ffkit import Group, Track, audio_filters, measure_loudness, probe, render
+from ffkit import CancelledError, Group, Track, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.core.audio.render")
 silence_module = importlib.import_module("ffkit.core.audio.silence")
@@ -165,7 +165,7 @@ def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
 def test_trailing_silence_scan_respects_cancellation(tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    with pytest.raises(RuntimeError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Export cancelled"):
         silence_module.trailing_silence_end(
             Track(path=str(source)).effects, source, 1.0, lambda: True
         )
@@ -363,7 +363,7 @@ def test_render_cancellation_preserves_output(
             return 0
 
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: PendingProcess())
-    with pytest.raises(RuntimeError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Export cancelled"):
         render(Track(path=str(source)), target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
@@ -400,7 +400,7 @@ def test_render_cancellation_after_encoding(
             return 0
 
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
-    with pytest.raises(RuntimeError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Export cancelled"):
         render(Track(path=str(source)), target, limiter_db=-1, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
@@ -420,6 +420,6 @@ def test_render_cancellation_before_replace_without_limiter(
             return 0
 
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
-    with pytest.raises(RuntimeError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Export cancelled"):
         render(Track(path=str(source)), target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"

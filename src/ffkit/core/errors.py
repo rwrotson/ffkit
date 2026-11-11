@@ -4,3 +4,7 @@ class FFKitError(Exception):
 
 class InvalidInputError(FFKitError, ValueError):
     """The input cannot be processed."""
+
+
+class CancelledError(FFKitError, RuntimeError):
+    """The caller cancelled the operation."""

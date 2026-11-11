@@ -14,6 +14,7 @@ from ffkit.core.audio._ffmpeg import (
     media_path,
 )
 from ffkit.core.audio.models import Effects
+from ffkit.core.errors import CancelledError
 
 ERROR_TAIL_LIMIT = 1000
 END_TOLERANCE = 0.001
@@ -93,7 +94,7 @@ def _read_scan_stream(
         selector.register(process.stderr, selectors.EVENT_READ)
         while selector.get_map():
             if cancelled and cancelled():
-                raise RuntimeError("Export cancelled")
+                raise CancelledError("Export cancelled")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise subprocess.TimeoutExpired(command, PROCESS_TIMEOUT)

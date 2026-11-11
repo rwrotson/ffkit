@@ -1,6 +1,7 @@
 import logging
 
 from .core import (
+    CancelledError,
     Effects,
     FFKitError,
     Group,
@@ -27,6 +28,7 @@ from .core import (
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "CancelledError",
     "Effects",
     "FFKitError",
     "Group",

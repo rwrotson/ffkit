@@ -13,6 +13,7 @@ from ffkit.core.audio.analysis import measure_loudness, probe
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
 from ffkit.core.audio.silence import ERROR_TAIL_LIMIT, MIN_TRAILING_SILENCE, trailing_silence_end
+from ffkit.core.errors import CancelledError
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5
@@ -76,7 +77,7 @@ def _run_encoder(command: list[str], cancelled: Callable[[], bool] | None) -> No
                 if cancelled is not None and cancelled():
                     process.terminate()
                     process.wait()
-                    raise RuntimeError("Export cancelled")
+                    raise CancelledError("Export cancelled")
                 wait = remaining if cancelled is None else min(CANCEL_POLL_INTERVAL, remaining)
                 try:
                     process.wait(timeout=wait)
@@ -94,7 +95,7 @@ def _run_encoder(command: list[str], cancelled: Callable[[], bool] | None) -> No
 
 def _check_cancelled(cancelled: Callable[[], bool] | None) -> None:
     if cancelled is not None and cancelled():
-        raise RuntimeError("Export cancelled")
+        raise CancelledError("Export cancelled")
 
 
 def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> float:

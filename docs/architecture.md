@@ -41,8 +41,9 @@ Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on 
 | --- | --- | --- |
 | `FFKitError` | `Exception` | Base for every expected library failure |
 | `InvalidInputError` | `FFKitError`, `ValueError` | The input cannot be processed |
+| `CancelledError` | `FFKitError`, `RuntimeError` | A `cancelled` callback stopped rendering or silence scanning |
 
-Ported Mixtable audio helpers retain their original built-in and subprocess exceptions. New APIs may use `FFKitError` subclasses for expected failures. Unexpected exceptions are not wrapped.
+Ported Mixtable audio helpers retain their original built-in and subprocess exceptions, except cancellation, which raises `CancelledError`. New APIs may use `FFKitError` subclasses for expected failures. Unexpected exceptions are not wrapped.
 
 ## Adding functionality
 

@@ -20,9 +20,10 @@ from .audio import (
     stream_mp3,
     tempo_estimates,
 )
-from .errors import FFKitError, InvalidInputError
+from .errors import CancelledError, FFKitError, InvalidInputError
 
 __all__ = [
+    "CancelledError",
     "Effects",
     "FFKitError",
     "Group",

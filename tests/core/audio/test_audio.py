@@ -14,7 +14,7 @@ from ffkit import (
     normalization_gain,
     safe_name,
 )
-from ffkit.core.errors import FFKitError, InvalidInputError
+from ffkit.core.errors import CancelledError, FFKitError, InvalidInputError
 
 
 def test_audio_models_preserve_mixtable_defaults_and_validation() -> None:
@@ -32,6 +32,8 @@ def test_audio_models_preserve_mixtable_defaults_and_validation() -> None:
     assert group.effective_gain_db == 5
     assert issubclass(InvalidInputError, FFKitError)
     assert issubclass(InvalidInputError, ValueError)
+    assert issubclass(CancelledError, FFKitError)
+    assert issubclass(CancelledError, RuntimeError)
     with pytest.raises(ValidationError):
         Track(path="song.flac", effects=Effects(trim_start=2, trim_end=1))
     with pytest.raises(ValidationError):
