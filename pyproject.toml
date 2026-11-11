@@ -250,12 +250,26 @@ name = "Audio layers"
 type = "layers"
 containers = ["ffkit.core.audio"]
 layers = [
-    "render : stream : normalization : cover",
+    "processing",
     "analysis",
-    "silence : filters : formats",
-    "models : runtime",
-    "defaults | _ffmpeg | _process",
+    "filters | files",
+    "models | runtime | _process",
+    "defaults | _ffmpeg",
 ]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "Audio analysis layers"
+type = "layers"
+containers = ["ffkit.core.audio.analysis"]
+layers = ["loudness | waveform", "silence", "probe"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "Audio processing modules are independent"
+type = "layers"
+containers = ["ffkit.core.audio.processing"]
+layers = ["render | stream | cover"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]

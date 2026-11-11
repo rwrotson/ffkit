@@ -78,7 +78,8 @@ class Track(BaseModel):
     effects: Effects = Field(default_factory=Effects)
     error: str | None = None
 
-    def _update_probed_tags(self, source_tags: dict[str, str]) -> None:
+    def merge_probed_tags(self, source_tags: dict[str, str]) -> None:
+        """Replace source tags with probed ones and keep tags the caller changed."""
         if self.probed_source_tags is None:
             overrides = self.tags.copy()
         else:

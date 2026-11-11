@@ -5,17 +5,18 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | Module | Purpose |
 |--------|---------|
 | `ffkit.core.errors` | Define the library error hierarchy |
-| `ffkit.core.audio.analysis` | Probe audio and measure silence, waveform, tempo, and loudness |
-| `ffkit.core.audio.cover` | Extract an embedded cover image |
 | `ffkit.core.audio.defaults` | Define default values for audio functions and CLI options |
-| `ffkit.core.audio.filters` | Build audio filters, gains, and export names |
-| `ffkit.core.audio.formats` | Discover supported audio inputs |
+| `ffkit.core.audio.files` | Discover supported audio inputs and build export names |
+| `ffkit.core.audio.filters` | Build the FFmpeg audio filter chain |
 | `ffkit.core.audio.models` | Define audio track, effects, and group data |
-| `ffkit.core.audio.normalization` | Calculate gain for processed audio |
-| `ffkit.core.audio.render` | Render non-destructive MP3 output |
 | `ffkit.core.audio.runtime` | Define FFmpeg executables and process time limits |
-| `ffkit.core.audio.silence` | Parse FFmpeg silence detection and find trailing silence |
-| `ffkit.core.audio.stream` | Stream MP3 audio from a playback position |
+| `ffkit.core.audio.analysis.probe` | Read duration and tags |
+| `ffkit.core.audio.analysis.silence` | Detect silence and trim bounds |
+| `ffkit.core.audio.analysis.loudness` | Measure loudness and calculate normalization gain |
+| `ffkit.core.audio.analysis.waveform` | Build waveforms and tempo estimates |
+| `ffkit.core.audio.processing.render` | Render non-destructive MP3 output |
+| `ffkit.core.audio.processing.stream` | Stream MP3 audio from a playback position |
+| `ffkit.core.audio.processing.cover` | Extract an embedded cover image |
 | `ffkit.logs.settings` | Define logging settings |
 | `ffkit.logs.setup` | Configure console and file logging for applications |
 | `ffkit.cli.app` | Provide the optional Typer audio commands |

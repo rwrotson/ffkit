@@ -21,7 +21,8 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 ### Rules
 
 - Layers outside the core import core names only from `ffkit`, never from `ffkit.core` or its modules.
-- A module whose name starts with `_` is imported only by modules in the same package.
+- A module whose name starts with `_` is imported only by modules in the same package and its
+  subpackages.
 - The library never reads the environment or `.env`. Only the CLI does, in `ffkit.cli.settings`;
   an application composes its own settings from `LogSettings` and `FFmpegRuntime`.
 - Library layers receive settings as arguments, such as `runtime=`, `target_lufs=`, or
@@ -33,18 +34,27 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 `core.audio` imports `core.errors`; `core.errors` imports nothing from `ffkit`. Future media
 domains, such as `core.video`, are sibling packages that do not import each other.
 
-Modules in `core.audio` are layered from top to bottom. Modules joined by `:` may import each other;
-modules joined by `|` may not:
+`core.audio` has two subpackages of operations on top of a shared base:
 
-| Layer | Modules |
-| --- | --- |
-| Operations | `render : stream : normalization : cover` |
-| Measurement | `analysis` |
-| Primitives | `silence : filters : formats` |
-| Models | `models : runtime` |
-| Constants | `defaults \| _ffmpeg \| _process` |
+- `analysis` measures audio and returns data or fills a `Track`; it never creates output files.
+- `processing` transforms audio into a new file or stream; it may use `analysis`.
 
-Every module in `core.audio` must belong to one of these layers.
+Layers are listed from top to bottom. Modules joined by `|` may not import each other:
+
+| Package | Layer | Modules |
+| --- | --- | --- |
+| `core.audio` | Processing | `processing` |
+| | Analysis | `analysis` |
+| | Primitives | `filters \| files` |
+| | Models | `models \| runtime \| _process` |
+| | Constants | `defaults \| _ffmpeg` |
+| `core.audio.analysis` | Measurement | `loudness \| waveform` |
+| | Silence | `silence` |
+| | Probe | `probe` |
+| `core.audio.processing` | Output | `render \| stream \| cover` |
+
+Every module in these packages must belong to one of their layers. The `__init__.py` files of
+`analysis` and `processing` are empty; `core/audio/__init__.py` re-exports from their modules.
 
 ### Enforcement
 
@@ -87,13 +97,14 @@ Ported Mixtable audio helpers retain their original built-in and subprocess exce
 
 ## Adding functionality
 
-- Put the code in `core/`, place a new module in one of the audio layers, and raise a `FFKitError`
-  subclass for expected failures.
+- Put the code in `core/`: measurement in `core/audio/analysis/`, output in
+  `core/audio/processing/`, and shared helpers in `core/audio/`. Place a new module in one of the
+  layers above, and raise a `FFKitError` subclass for expected failures.
 - Accept values as arguments; do not read the environment.
 - Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime | None`.
   Internal helpers receive only the fields they use, such as `ffmpeg` or `timeout`.
 - Export public names from the package `__init__.py` files up to `ffkit/__init__.py`, and add them to `__all__`.
 - Put default values that callers may need in `core/audio/defaults.py`.
-- Test the behaviour in `tests/core/`.
+- Test the behaviour in `tests/core/`, in a file that mirrors the module path.
 
 `core/audio/` groups the audio models and helpers. Future media domains can use sibling packages under `core/`.

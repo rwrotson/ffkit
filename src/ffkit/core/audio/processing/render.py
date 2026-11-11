@@ -9,7 +9,8 @@ from uuid import uuid4
 
 from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, media_path
 from ffkit.core.audio._process import error_tail, stop
-from ffkit.core.audio.analysis import measure_loudness, trailing_trim_end
+from ffkit.core.audio.analysis.loudness import measure_loudness
+from ffkit.core.audio.analysis.silence import trailing_trim_end
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
 from ffkit.core.audio.runtime import FFmpegRuntime

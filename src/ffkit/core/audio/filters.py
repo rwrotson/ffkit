@@ -1,11 +1,6 @@
-import math
-from pathlib import Path
-
 from ffkit.core.audio._ffmpeg import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB, ffmpeg_number
 from ffkit.core.audio.defaults import (
-    DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_THRESHOLD_DB,
-    DEFAULT_TARGET_LUFS,
 )
 from ffkit.core.audio.models import Track
 
@@ -45,37 +40,3 @@ def audio_filters(
     if ceiling is not None:
         filters.append(f"alimiter=limit={10 ** (ceiling / 20):.8f}:level=false:latency=true")
     return filters
-
-
-def safe_name(track: Track, index: int, width: int) -> str:
-    """Build a numbered MP3 filename from track metadata."""
-    artist = track.tags.get("artist", "")
-    title = track.tags.get("title") or Path(track.path).stem
-    name = f"{artist} - {title}" if artist else title
-    name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
-    prefix = f"{index + 1:0{width}d}. "
-    suffix = ".mp3"
-    # APFS limits a single UTF-8 filename to 255 bytes.
-    remaining = 255 - len(prefix.encode()) - len(suffix.encode())
-    name = name.encode("utf-8")[:remaining].decode("utf-8", errors="ignore").rstrip(" .")
-    return f"{prefix}{name or 'Untitled'}.mp3"
-
-
-def normalization_gain(
-    lufs: float | None,
-    peak: float | None,
-    target: float = DEFAULT_TARGET_LUFS,
-    ceiling: float = DEFAULT_PEAK_CEILING_DB,
-) -> float:
-    """Return a fixed gain, keeping the measured true peak below the ceiling."""
-    if lufs is None or not math.isfinite(lufs):
-        raise ValueError("Cannot measure track loudness")
-    gain = target - lufs
-    if peak is not None:
-        if not math.isfinite(peak):
-            raise ValueError("Cannot measure track true peak")
-        gain = min(gain, ceiling - peak)
-    rounded = round(gain, 1)
-    if peak is not None and rounded > ceiling - peak:
-        rounded = round(rounded - 0.1, 1)
-    return rounded

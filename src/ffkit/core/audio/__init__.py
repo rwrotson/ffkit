@@ -1,26 +1,25 @@
-from .analysis import (
+from .analysis.loudness import (
     analyze_loudness,
-    analyze_peak_waveform,
-    analyze_waveform_tempo,
-    detect_trim_bounds,
+    calculate_normalization_gain,
     measure_loudness,
-    probe,
-    tempo_estimates,
+    normalization_gain,
 )
-from .cover import extract_cover
+from .analysis.probe import probe
+from .analysis.silence import detect_trim_bounds
+from .analysis.waveform import analyze_peak_waveform, analyze_waveform_tempo, tempo_estimates
 from .defaults import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
 )
-from .filters import audio_filters, normalization_gain, safe_name
-from .formats import audio_files
+from .files import audio_files, safe_name
+from .filters import audio_filters
 from .models import Effects, Group, TempoSegment, Track
-from .normalization import calculate_normalization_gain
-from .render import render
+from .processing.cover import extract_cover
+from .processing.render import render
+from .processing.stream import stream_mp3
 from .runtime import FFmpegRuntime
-from .stream import stream_mp3
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",

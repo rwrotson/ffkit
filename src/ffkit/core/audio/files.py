@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from ffkit.core.audio.models import Track
+
 EXTENSIONS = frozenset({".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus"})
 
 
@@ -18,3 +20,17 @@ def audio_files(paths: list[Path]) -> list[Path]:
         elif path.is_file() and _is_audio(path):
             files.add(path)
     return sorted(files)
+
+
+def safe_name(track: Track, index: int, width: int) -> str:
+    """Build a numbered MP3 filename from track metadata."""
+    artist = track.tags.get("artist", "")
+    title = track.tags.get("title") or Path(track.path).stem
+    name = f"{artist} - {title}" if artist else title
+    name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
+    prefix = f"{index + 1:0{width}d}. "
+    suffix = ".mp3"
+    # APFS limits a single UTF-8 filename to 255 bytes.
+    remaining = 255 - len(prefix.encode()) - len(suffix.encode())
+    name = name.encode("utf-8")[:remaining].decode("utf-8", errors="ignore").rstrip(" .")
+    return f"{prefix}{name or 'Untitled'}.mp3"
