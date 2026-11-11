@@ -12,14 +12,16 @@ from pathlib import Path
 from statistics import median
 
 from ffkit.core.audio._ffmpeg import (
-    DEFAULT_TARGET_LUFS,
-    DEFAULT_TRIM_MIN_DURATION,
     LOUDNORM_RANGE,
     LOUDNORM_TRUE_PEAK_DB,
-    SILENCE_THRESHOLD_DB,
     ffmpeg_number,
     media_path,
     source_fingerprint,
+)
+from ffkit.core.audio.defaults import (
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
 )
 from ffkit.core.audio.models import Effects, TempoSegment, Track
 from ffkit.core.audio.runtime import FFmpegRuntime
@@ -100,7 +102,7 @@ def probe(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
 def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
     path: Path,
     duration: float | None = None,
-    threshold_db: float = SILENCE_THRESHOLD_DB,
+    threshold_db: float = DEFAULT_SILENCE_THRESHOLD_DB,
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
     cancelled: Callable[[], bool] | None = None,
     *,

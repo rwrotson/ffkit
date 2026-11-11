@@ -11,25 +11,23 @@ from pydantic import ValidationError
 from rich.console import Console
 from typer.core import TyperGroup
 
-from ffkit.config import load_settings
-from ffkit.core.audio import (
+from ffkit import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
     Effects,
     FFmpegRuntime,
     Track,
     calculate_normalization_gain,
+    detect_trim_bounds,
     extract_cover,
     measure_loudness,
     probe,
     render,
 )
-from ffkit.core.audio._ffmpeg import (
-    DEFAULT_PEAK_CEILING_DB,
-    DEFAULT_TARGET_LUFS,
-    DEFAULT_TRIM_MIN_DURATION,
-    SILENCE_THRESHOLD_DB,
-)
-from ffkit.core.audio.analysis import detect_trim_bounds
-from ffkit.utils.log import setup_logging
+from ffkit.config import load_settings
+from ffkit.logs import setup_logging
 
 
 class OutputFormat(StrEnum):
@@ -197,7 +195,7 @@ def trim_bounds_command(
     source: Path,
     threshold_db: Annotated[
         float, typer.Option("--threshold-db", min=-100, max=0)
-    ] = SILENCE_THRESHOLD_DB,
+    ] = DEFAULT_SILENCE_THRESHOLD_DB,
     min_duration: Annotated[
         float, typer.Option("--min-duration", min=0, max=10)
     ] = DEFAULT_TRIM_MIN_DURATION,

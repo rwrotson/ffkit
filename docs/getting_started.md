@@ -15,6 +15,17 @@ Install a release tag directly from GitHub (replace `vX.Y.Z` with a release tag)
 pip install "ffkit @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
 ```
 
+The base install provides the audio API and depends only on Pydantic. Extras add application layers:
+
+| Extra | Adds | Packages |
+| --- | --- | --- |
+| `app` | `ffkit.config` settings and `ffkit.logs.setup_logging()` | Pydantic Settings, structlog |
+| `cli` | The `ffkit` command; includes `app` | Typer, Rich |
+
+```bash
+pip install "ffkit[app] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
+```
+
 For development in a clone of the repository:
 
 ```bash
@@ -99,11 +110,11 @@ callers pass to the corresponding functions themselves.
 `analyze_loudness()` stores source loudness, true peak, and the file fingerprint on the track;
 `calculate_normalization_gain()` reuses them while no filters apply and the file is unchanged.
 
-Configure logging in the application, or use the bundled helper:
+Configure logging in the application, or use the bundled helper from the `app` extra:
 
 ```python
 from ffkit.config import LogSettings
-from ffkit.utils.log import setup_logging
+from ffkit.logs import setup_logging
 
 setup_logging(LogSettings(level="DEBUG"))
 ```

@@ -1,6 +1,10 @@
 """Public library API, independent of configuration and logging setup."""
 
 from .audio import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
     Effects,
     FFmpegRuntime,
     Group,
@@ -25,6 +29,10 @@ from .audio import (
 from .errors import CancelledError, FFKitError, InvalidInputError
 
 __all__ = [
+    "DEFAULT_PEAK_CEILING_DB",
+    "DEFAULT_SILENCE_THRESHOLD_DB",
+    "DEFAULT_TARGET_LUFS",
+    "DEFAULT_TRIM_MIN_DURATION",
     "CancelledError",
     "Effects",
     "FFKitError",

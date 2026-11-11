@@ -14,7 +14,7 @@ The wheel includes `py.typed`, so type checkers use the package's inline annotat
 
 ## structlog Integration
 
-`ffkit.utils.log.setup_logging()` connects [structlog](https://www.structlog.org/) to stdlib logging through `ProcessorFormatter`:
+`ffkit.logs.setup_logging()` connects [structlog](https://www.structlog.org/) to stdlib logging through `ProcessorFormatter`:
 
 - Library modules use stdlib loggers; their records and structlog events share the same handlers.
 - Console logs use colourised `ConsoleRenderer` output or JSON when `FFKIT_LOG__FORMAT=json`.

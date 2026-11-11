@@ -1,6 +1,10 @@
 import logging
 
 from .core import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
     CancelledError,
     Effects,
     FFKitError,
@@ -30,6 +34,10 @@ from .core import (
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "DEFAULT_PEAK_CEILING_DB",
+    "DEFAULT_SILENCE_THRESHOLD_DB",
+    "DEFAULT_TARGET_LUFS",
+    "DEFAULT_TRIM_MIN_DURATION",
     "CancelledError",
     "Effects",
     "FFKitError",

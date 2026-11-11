@@ -1,13 +1,11 @@
 import math
 from pathlib import Path
 
-from ffkit.core.audio._ffmpeg import (
+from ffkit.core.audio._ffmpeg import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB, ffmpeg_number
+from ffkit.core.audio.defaults import (
     DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
-    LOUDNORM_RANGE,
-    LOUDNORM_TRUE_PEAK_DB,
-    SILENCE_THRESHOLD_DB,
-    ffmpeg_number,
 )
 from ffkit.core.audio.models import Track
 
@@ -30,7 +28,7 @@ def audio_filters(
     if effects.trim_silence:
         edge_trim = (
             "silenceremove=start_periods=1:start_duration=0:"
-            f"start_threshold={SILENCE_THRESHOLD_DB}dB"
+            f"start_threshold={DEFAULT_SILENCE_THRESHOLD_DB}dB"
         )
         filters.append(edge_trim)
         if not streaming:

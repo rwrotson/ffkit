@@ -8,6 +8,12 @@ from .analysis import (
     tempo_estimates,
 )
 from .cover import extract_cover
+from .defaults import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
+)
 from .filters import audio_filters, normalization_gain, safe_name
 from .formats import audio_files
 from .models import Effects, Group, TempoSegment, Track
@@ -17,6 +23,10 @@ from .runtime import FFmpegRuntime
 from .stream import stream_mp3
 
 __all__ = [
+    "DEFAULT_PEAK_CEILING_DB",
+    "DEFAULT_SILENCE_THRESHOLD_DB",
+    "DEFAULT_TARGET_LUFS",
+    "DEFAULT_TRIM_MIN_DURATION",
     "Effects",
     "FFmpegRuntime",
     "Group",

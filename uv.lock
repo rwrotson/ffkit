@@ -400,13 +400,17 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "structlog" },
 ]
 
 [package.optional-dependencies]
+app = [
+    { name = "pydantic-settings" },
+    { name = "structlog" },
+]
 cli = [
+    { name = "pydantic-settings" },
     { name = "rich" },
+    { name = "structlog" },
     { name = "typer" },
 ]
 
@@ -417,6 +421,7 @@ dev = [
     { name = "mypy" },
     { name = "poethepoet" },
     { name = "pre-commit" },
+    { name = "pydantic-settings" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-randomly" },
@@ -424,6 +429,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "rich" },
     { name = "ruff" },
+    { name = "structlog" },
     { name = "typer" },
 ]
 docs = [
@@ -437,13 +443,14 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ffkit", extras = ["app"], marker = "extra == 'cli'" },
     { name = "pydantic", specifier = ">=2.12.0" },
-    { name = "pydantic-settings", specifier = ">=2.15.0" },
+    { name = "pydantic-settings", marker = "extra == 'app'", specifier = ">=2.15.0" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=15.0.0" },
-    { name = "structlog", specifier = ">=26.1.0" },
+    { name = "structlog", marker = "extra == 'app'", specifier = ">=26.1.0" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.27.3" },
 ]
-provides-extras = ["cli"]
+provides-extras = ["app", "cli"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -452,6 +459,7 @@ dev = [
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "poethepoet", specifier = ">=0.48.0" },
     { name = "pre-commit", specifier = ">=4.6.2" },
+    { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-randomly", specifier = ">=5.0.0" },
@@ -459,6 +467,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", specifier = ">=0.16.10" },
+    { name = "structlog", specifier = ">=26.1.0" },
     { name = "typer", specifier = ">=0.27.3" },
 ]
 docs = [

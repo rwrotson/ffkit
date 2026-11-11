@@ -27,12 +27,11 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.12.0",
-    "pydantic-settings>=2.15.0",
-    "structlog>=26.1.0",
 ]
 
 [project.optional-dependencies]
-cli = ["rich>=15.0.0", "typer>=0.27.3"]
+app = ["pydantic-settings>=2.15.0", "structlog>=26.1.0"]
+cli = ["ffkit[app]", "rich>=15.0.0", "typer>=0.27.3"]
 
 [project.scripts]
 ffkit = "ffkit.main:main"
@@ -49,6 +48,7 @@ dev = [
     "mypy>=2.4.0",
     "poethepoet>=0.48.0",
     "pre-commit>=4.6.2",
+    "pydantic-settings>=2.15.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
@@ -56,6 +56,7 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.10",
     "rich>=15.0.0",
+    "structlog>=26.1.0",
     "typer>=0.27.3",
 ]
 docs = [
@@ -233,32 +234,55 @@ root_package = "ffkit"
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "Core API stays independent of configuration and logging setup"
-type = "forbidden"
-source_modules = ["ffkit.core"]
-forbidden_modules = [
-    "structlog", "pydantic_settings", "ffkit.config", "ffkit.utils",
+name = "Package layers"
+type = "layers"
+layers = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.config", "ffkit.core"]
+
+[[tool.importlinter.contracts]]
+name = "Core layers"
+type = "layers"
+containers = ["ffkit.core"]
+layers = ["audio", "errors"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
+name = "Audio layers"
+type = "layers"
+containers = ["ffkit.core.audio"]
+layers = [
+    "render : stream : normalization : cover",
+    "analysis",
+    "silence : filters : formats",
+    "models : runtime",
+    "defaults | _ffmpeg",
 ]
+exhaustive = true
 
 [[tool.importlinter.contracts]]
-name = "Configuration does not depend on logging setup"
+name = "Other layers use the core only through the ffkit public API"
 type = "forbidden"
-source_modules = ["ffkit.config"]
-forbidden_modules = ["structlog", "ffkit.utils"]
-
-[[tool.importlinter.contracts]]
-name = "Utilities do not depend on the core API"
-type = "forbidden"
-source_modules = ["ffkit.utils"]
-forbidden_modules = ["ffkit.core"]
-# Settings sections reuse core models, so utils reaches core only through ffkit.config.
+source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.config"]
+forbidden_modules = ["ffkit.core", "ffkit.core.**"]
+# The ffkit package itself re-exports the core.
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Library layers stay independent of CLI dependencies"
+name = "Core uses only Pydantic among third-party packages"
 type = "forbidden"
-source_modules = ["ffkit.core", "ffkit.config", "ffkit.utils"]
-forbidden_modules = ["typer", "rich", "ffkit.cli"]
+source_modules = ["ffkit.core"]
+forbidden_modules = ["pydantic_settings", "structlog", "typer", "rich"]
+
+[[tool.importlinter.contracts]]
+name = "Configuration does not use logging or CLI packages"
+type = "forbidden"
+source_modules = ["ffkit.config"]
+forbidden_modules = ["structlog", "typer", "rich"]
+
+[[tool.importlinter.contracts]]
+name = "Logging setup does not use CLI packages"
+type = "forbidden"
+source_modules = ["ffkit.logs"]
+forbidden_modules = ["typer", "rich"]
 
 
 # POETHEPOET -------------------------------------------------------------------

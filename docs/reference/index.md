@@ -7,6 +7,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.errors` | Define the library error hierarchy |
 | `ffkit.core.audio.analysis` | Probe audio and measure silence, waveform, tempo, and loudness |
 | `ffkit.core.audio.cover` | Extract an embedded cover image |
+| `ffkit.core.audio.defaults` | Define default values for audio functions and CLI options |
 | `ffkit.core.audio.filters` | Build audio filters, gains, and export names |
 | `ffkit.core.audio.formats` | Discover supported audio inputs |
 | `ffkit.core.audio.models` | Define audio track, effects, and group data |
@@ -16,6 +17,6 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.audio.silence` | Parse FFmpeg silence detection and find trailing silence |
 | `ffkit.core.audio.stream` | Stream MP3 audio from a playback position |
 | `ffkit.config.settings` | Define and load library settings |
-| `ffkit.utils.log` | Configure console and file logging for applications |
+| `ffkit.logs.setup` | Configure console and file logging for applications |
 | `ffkit.cli.app` | Provide the optional Typer audio commands |
 | `ffkit.main` | Start the optional CLI |

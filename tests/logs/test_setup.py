@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit.config import LogSettings
-from ffkit.utils.log import _AppConsoleHandler, _AppFileHandler, _AppNullHandler, setup_logging
+from ffkit.logs.setup import _AppConsoleHandler, _AppFileHandler, _AppNullHandler, setup_logging
 
 _EXPECTED_HANDLER_COUNT = 2
 

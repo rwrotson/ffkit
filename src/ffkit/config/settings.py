@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ffkit.core.audio.runtime import FFmpegRuntime
+from ffkit import FFmpegRuntime
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 

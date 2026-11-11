@@ -193,12 +193,13 @@ def test_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
     assert error.value.code == 7
 
 
+@pytest.mark.parametrize("missing", ["typer", "rich", "pydantic_settings", "structlog"])
 def test_entrypoint_without_cli_extra(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    missing: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     original_import = builtins.__import__
 
-    def missing_typer(
+    def missing_dependency(
         name: str,
         globals: Mapping[str, object] | None = None,  # noqa: A002 - Match __import__.
         locals: Mapping[str, object] | None = None,  # noqa: A002 - Match __import__.
@@ -206,10 +207,10 @@ def test_entrypoint_without_cli_extra(
         level: int = 0,
     ) -> ModuleType:
         if name == "ffkit.cli.app":
-            raise ModuleNotFoundError("No module named 'typer'", name="typer")
+            raise ModuleNotFoundError(f"No module named {missing!r}", name=missing)
         return original_import(name, globals, locals, fromlist, level)
 
-    monkeypatch.setattr(builtins, "__import__", missing_typer)
+    monkeypatch.setattr(builtins, "__import__", missing_dependency)
     with pytest.raises(SystemExit) as error:
         main()
     assert error.value.code == 1

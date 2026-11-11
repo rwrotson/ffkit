@@ -1,11 +1,8 @@
 from pathlib import Path
 
-from ffkit.core.audio._ffmpeg import (
-    DEFAULT_PEAK_CEILING_DB,
-    DEFAULT_TARGET_LUFS,
-    source_fingerprint,
-)
+from ffkit.core.audio._ffmpeg import source_fingerprint
 from ffkit.core.audio.analysis import measure_loudness, trailing_trim_end
+from ffkit.core.audio.defaults import DEFAULT_PEAK_CEILING_DB, DEFAULT_TARGET_LUFS
 from ffkit.core.audio.filters import audio_filters, normalization_gain
 from ffkit.core.audio.models import Track
 from ffkit.core.audio.runtime import FFmpegRuntime

@@ -8,11 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from ffkit.core.audio._ffmpeg import (
-    SILENCE_THRESHOLD_DB,
-    ffmpeg_number,
-    media_path,
-)
+from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
+from ffkit.core.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB
 from ffkit.core.audio.models import Effects
 from ffkit.core.errors import CancelledError
 
@@ -169,7 +166,7 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
         "0:a:0",
         "-vn",
         "-af",
-        f"silencedetect=noise={SILENCE_THRESHOLD_DB}dB:d={MIN_TRAILING_SILENCE}",
+        f"silencedetect=noise={DEFAULT_SILENCE_THRESHOLD_DB}dB:d={MIN_TRAILING_SILENCE}",
         "-progress",
         "pipe:2",
         "-f",
