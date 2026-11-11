@@ -75,6 +75,10 @@ def root(
     if show_version:
         typer.echo(f"ffkit {version('ffkit')}")
         raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        # A missing command is a usage error, as in Click groups without this callback.
+        typer.echo(ctx.get_help())
+        raise typer.Exit(2)
     ctx.obj = output_format
     try:
         settings = load_settings()

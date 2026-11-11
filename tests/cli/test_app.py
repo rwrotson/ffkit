@@ -24,6 +24,13 @@ def test_help_and_version() -> None:
     assert f"ffkit {version('ffkit')}" in result.stdout
 
 
+def test_no_command_shows_help() -> None:
+    result = runner.invoke(app, [])
+    assert result.exit_code == 2
+    assert "audio" in result.stdout
+    assert "Usage" in result.stdout
+
+
 def test_missing_input_reports_json_error() -> None:
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", "missing.mp3"])
     assert result.exit_code == 2

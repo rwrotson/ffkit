@@ -258,9 +258,9 @@ source_modules = ["ffkit.utils"]
 forbidden_modules = ["ffkit.core"]
 
 [[tool.importlinter.contracts]]
-name = "Core stays independent of CLI dependencies"
+name = "Library layers stay independent of CLI dependencies"
 type = "forbidden"
-source_modules = ["ffkit.core"]
+source_modules = ["ffkit.core", "ffkit.config", "ffkit.utils"]
 forbidden_modules = ["typer", "rich", "ffkit.cli"]
 
 

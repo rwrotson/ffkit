@@ -1,10 +1,18 @@
 import logging
 import os
+import shutil
 from collections.abc import Generator, Iterator
 from pathlib import Path
 
 import pytest
 import structlog
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Stop before collection with one clear message when FFmpeg tools are missing."""
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None]
+    if missing:
+        raise pytest.UsageError(f"{' and '.join(missing)} must be on PATH to run the tests")
 
 
 @pytest.fixture(autouse=True)

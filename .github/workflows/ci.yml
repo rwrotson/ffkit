@@ -66,6 +66,13 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --all-groups
       - run: uv build
+      - name: Smoke-test the wheel
+        run: |
+          wheel=$(ls dist/*.whl)
+          unzip -l "$wheel" | grep -q 'ffkit/py.typed'
+          uv run --isolated --no-project --with "$wheel" \
+            python -c "import ffkit; assert 'site-packages' in ffkit.__file__, ffkit.__file__"
+          uv run --isolated --no-project --with "ffkit[cli] @ file://$PWD/$wheel" ffkit --version
       - run: uv run --no-sync properdocs build --strict
       - run: uv run --no-sync poe audit
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
