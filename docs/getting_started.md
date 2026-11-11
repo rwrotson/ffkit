@@ -61,7 +61,8 @@ filters = audio_filters(track)
 `track.effects` and render or stream from that same original source. Never feed an earlier render
 back into the track: doing so applies effects again to processed audio. Trim bounds refer to the
 original file, and `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
-the remaining effects.
+the remaining effects. Leading silence removal applies only when streaming from `start=0`.
+`audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
 `probe()` reads container tags and tags from the first audio stream. Stream tags override container
 tags; explicitly provided `Track.tags` override both. Re-probing refreshes source tags and preserves

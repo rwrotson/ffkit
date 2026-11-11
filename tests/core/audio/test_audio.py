@@ -137,3 +137,11 @@ def test_audio_files_resolves_deduplicates_and_sorts(tmp_path: Path) -> None:
         path.write_bytes(b"x")
     found = audio_files([folder, one, tmp_path / "missing.mp3", ignored])
     assert found == [one, two]
+
+
+def test_audio_files_skip_hidden_files(tmp_path: Path) -> None:
+    visible = tmp_path / "song.mp3"
+    hidden = [tmp_path / "._song.mp3", tmp_path / ".song.0123.tmp.mp3"]
+    for path in (visible, *hidden):
+        path.write_bytes(b"x")
+    assert audio_files([tmp_path, *hidden]) == [visible]

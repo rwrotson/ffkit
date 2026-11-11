@@ -254,3 +254,46 @@ def test_stream_reports_failed_encoder_and_closes_early(tmp_path: Path) -> None:
     stream = stream_mp3(Track(path=str(source)))
     assert next(stream)
     stream.close()
+
+
+def test_stream_rejects_negative_start_on_call(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="must not be negative"):
+        stream_mp3(Track(path=str(tmp_path / "source.wav")), start=-1)
+
+
+def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
+    source = tmp_path / "pause.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-filter_complex",
+            "[0][1][2]concat=n=3:v=0:a=1",
+            "-ar",
+            "44100",
+            "-ac",
+            "1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    track = Track(path=str(source))
+    track.effects.trim_silence = True
+    plain = Track(path=str(source))
+    seeked = len(pcm(b"".join(stream_mp3(track, start=1.2))))
+    expected = len(pcm(b"".join(stream_mp3(plain, start=1.2))))
+    assert abs(seeked - expected) < 12000

@@ -93,7 +93,8 @@ Keep `Track.path` pointed at the original audio file. Change `Effects` on that t
 stream from the original again. Never use a rendered output as the input for another effect change:
 that would apply effects a second time to already processed audio. Effect trim bounds are positions
 in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
-the remaining effects.
+the remaining effects. Leading silence removal applies only when streaming from `start=0`.
+`audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
 `probe()` combines container tags with tags from the first audio stream. Stream tags take precedence
 over container tags, and tags explicitly set on `Track` take precedence over both. Re-probing a track

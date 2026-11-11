@@ -24,15 +24,25 @@ def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
             **snapshot.effects.model_dump(),
             "trim_start": 0,
             "trim_end": None if trim_end is None else trim_end - source_offset,
+            # Leading silence removal after a seek would drop a pause at the seek position.
+            "trim_silence": snapshot.effects.trim_silence and start == 0,
         }
     )
     return snapshot, source_offset
 
 
-def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
+def stream_mp3(
     track: Track, gain: float = 0, start: float = 0, limiter_db: float | None = None
 ) -> Generator[bytes]:
     """Stream original source audio from a position after its trim start."""
+    if start < 0:
+        raise ValueError("Stream start must not be negative")
+    return _stream(track, gain, start, limiter_db)
+
+
+def _stream(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
+    track: Track, gain: float, start: float, limiter_db: float | None
+) -> Generator[bytes]:
     seeked = _seeked_track(track, start)
     if seeked is None:
         return
