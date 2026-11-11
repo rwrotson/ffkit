@@ -1,0 +1,117 @@
+import subprocess
+from collections.abc import Callable
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from ffkit import (
+    FFmpegRuntime,
+    Track,
+    analyze_loudness,
+    analyze_peak_waveform,
+    analyze_waveform_tempo,
+    calculate_normalization_gain,
+    detect_trim_bounds,
+    extract_cover,
+    measure_loudness,
+    probe,
+    render,
+    stream_mp3,
+)
+
+
+@pytest.fixture
+def source(tmp_path: Path) -> Path:
+    path = tmp_path / "tone.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-y",
+            str(path),
+        ],
+        check=True,
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"ffmpeg_path": ""},
+        {"ffprobe_path": ""},
+        {"process_timeout": 0},
+        {"stream_idle_timeout": -1},
+    ],
+)
+def test_runtime_rejects_invalid_values(value: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        FFmpegRuntime.model_validate(value)
+
+
+def test_runtime_is_frozen() -> None:
+    runtime = FFmpegRuntime()
+    with pytest.raises(ValidationError):
+        runtime.ffmpeg_path = "other"  # type: ignore[misc]  # Checks the frozen model at runtime.
+
+
+ffprobe_calls: list[Callable[[Track, Path, FFmpegRuntime], object]] = [
+    lambda track, _, runtime: probe(track, runtime=runtime),
+    lambda track, _, runtime: analyze_peak_waveform(track, runtime=runtime),
+]
+ffmpeg_calls: list[Callable[[Track, Path, FFmpegRuntime], object]] = [
+    lambda track, _, runtime: measure_loudness(Path(track.path), runtime=runtime),
+    lambda track, _, runtime: analyze_loudness(track, runtime=runtime),
+    lambda track, _, runtime: analyze_waveform_tempo(track, runtime=runtime),
+    lambda track, _, runtime: calculate_normalization_gain(track, runtime=runtime),
+    lambda track, _, runtime: detect_trim_bounds(Path(track.path), duration=1, runtime=runtime),
+    lambda track, out, runtime: render(track, out / "out.mp3", runtime=runtime),
+    lambda track, _, runtime: b"".join(stream_mp3(track, runtime=runtime)),
+]
+
+
+@pytest.mark.parametrize("call", ffprobe_calls)
+def test_functions_use_configured_ffprobe(
+    call: Callable[[Track, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+) -> None:
+    missing = str(tmp_path / "missing-ffprobe")
+    with pytest.raises(FileNotFoundError) as error:
+        call(Track(path=str(source)), tmp_path, FFmpegRuntime(ffprobe_path=missing))
+    assert error.value.filename == missing
+
+
+@pytest.mark.parametrize("call", ffmpeg_calls)
+def test_functions_use_configured_ffmpeg(
+    call: Callable[[Track, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+) -> None:
+    missing = str(tmp_path / "missing-ffmpeg")
+    track = Track(path=str(source), duration=1)
+    with pytest.raises(FileNotFoundError) as error:
+        call(track, tmp_path, FFmpegRuntime(ffmpeg_path=missing))
+    assert error.value.filename == missing
+
+
+def test_extract_cover_uses_configured_ffmpeg(source: Path, tmp_path: Path) -> None:
+    missing = str(tmp_path / "missing-ffmpeg")
+    with pytest.raises(FileNotFoundError) as error:
+        extract_cover(
+            Track(path=str(source)),
+            tmp_path / "cover.jpg",
+            runtime=FFmpegRuntime(ffmpeg_path=missing),
+        )
+    assert error.value.filename == missing
+
+
+def test_stream_uses_idle_timeout(source: Path, tmp_path: Path) -> None:
+    silent_encoder = tmp_path / "silent-ffmpeg"
+    silent_encoder.write_text("#!/bin/sh\nsleep 10\n")
+    silent_encoder.chmod(0o755)
+    runtime = FFmpegRuntime(ffmpeg_path=str(silent_encoder), stream_idle_timeout=0.1)
+    with pytest.raises(TimeoutError, match="stopped responding"):
+        b"".join(stream_mp3(Track(path=str(source)), runtime=runtime))

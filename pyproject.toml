@@ -241,16 +241,18 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Configuration has no library dependencies"
+name = "Configuration does not depend on logging setup"
 type = "forbidden"
 source_modules = ["ffkit.config"]
-forbidden_modules = ["structlog", "ffkit.core", "ffkit.utils"]
+forbidden_modules = ["structlog", "ffkit.utils"]
 
 [[tool.importlinter.contracts]]
 name = "Utilities do not depend on the core API"
 type = "forbidden"
 source_modules = ["ffkit.utils"]
 forbidden_modules = ["ffkit.core"]
+# Settings sections reuse core models, so utils reaches core only through ffkit.config.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Library layers stay independent of CLI dependencies"

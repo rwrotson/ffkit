@@ -7,10 +7,20 @@ from typing import BinaryIO
 
 import pytest
 
-from ffkit import CancelledError, Group, Track, audio_filters, measure_loudness, probe, render
+from ffkit import (
+    CancelledError,
+    FFmpegRuntime,
+    Group,
+    Track,
+    audio_filters,
+    measure_loudness,
+    probe,
+    render,
+)
 
 render_module = importlib.import_module("ffkit.core.audio.render")
 silence_module = importlib.import_module("ffkit.core.audio.silence")
+TOOLS = {"ffmpeg": "ffmpeg", "timeout": 30.0}
 
 
 def make_tone(path: Path, *, gain: int = 0) -> None:
@@ -133,11 +143,11 @@ def test_trailing_silence_scan_handles_no_silence_and_empty_trim(tmp_path: Path)
     source = tmp_path / "tone.wav"
     make_tone(source)
     effects = Track(path=str(source)).effects
-    assert silence_module.trailing_silence_end(effects, source, 1.0) is None
+    assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     effects.trim_start = 2
-    assert silence_module.trailing_silence_end(effects, source, 1.0) is None
+    assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     with pytest.raises(ValueError, match="duration is unavailable"):
-        silence_module.trailing_silence_end(effects, source, None)
+        silence_module.trailing_silence_end(effects, source, None, **TOOLS)
 
 
 def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
@@ -167,26 +177,25 @@ def test_trailing_silence_scan_respects_cancellation(tmp_path: Path) -> None:
     make_tone(source)
     with pytest.raises(CancelledError, match="Export cancelled"):
         silence_module.trailing_silence_end(
-            Track(path=str(source)).effects, source, 1.0, lambda: True
+            Track(path=str(source)).effects, source, 1.0, lambda: True, **TOOLS
         )
 
 
-def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout() -> None:
     with pytest.raises(subprocess.CalledProcessError):
         silence_module.scan_silence(
-            ["ffmpeg", "-v", "error", "-i", "missing.wav", "-f", "null", "-"], None
+            ["ffmpeg", "-v", "error", "-i", "missing.wav", "-f", "null", "-"], None, timeout=30
         )
-    monkeypatch.setattr(silence_module, "PROCESS_TIMEOUT", 0)
     with pytest.raises(subprocess.TimeoutExpired):
-        silence_module.scan_silence([sys.executable, "-c", "import time; time.sleep(10)"], None)
+        silence_module.scan_silence(
+            [sys.executable, "-c", "import time; time.sleep(10)"], None, timeout=0.01
+        )
 
 
 def test_trailing_silence_scan_bounds_error_output() -> None:
     command = [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(2)"]
     with pytest.raises(subprocess.CalledProcessError) as error:
-        silence_module.scan_silence(command, None)
+        silence_module.scan_silence(command, None, timeout=30)
     assert len(error.value.stderr) == silence_module.ERROR_TAIL_LIMIT
 
 
@@ -243,7 +252,7 @@ def test_render_retries_from_source(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     make_tone(source)
     target = tmp_path / "out.mp3"
     measured = iter([(None, 0.0), (None, -2.0)])
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path: next(measured))
+    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: next(measured))
     original_popen = subprocess.Popen
     commands: list[list[str]] = []
 
@@ -257,7 +266,7 @@ def test_render_retries_from_source(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert all(str(source) in command for command in commands)
     assert target.exists()
     target.write_bytes(b"existing")
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path: (None, 0.0))
+    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 0.0))
     with pytest.raises(RuntimeError, match="exceeds"):
         render(Track(path=str(source)), target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
@@ -302,9 +311,12 @@ def test_render_encoder_timeout_kills_process(
         )
 
     monkeypatch.setattr(subprocess, "Popen", slow_process)
-    monkeypatch.setattr(render_module, "PROCESS_TIMEOUT", 0.2)
     with pytest.raises(subprocess.TimeoutExpired):
-        render(Track(path=str(source)), tmp_path / "out.mp3")
+        render(
+            Track(path=str(source)),
+            tmp_path / "out.mp3",
+            runtime=FFmpegRuntime(process_timeout=0.2),
+        )
     assert not list(tmp_path.glob("*.tmp.mp3"))
 
 
@@ -375,11 +387,11 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
     make_tone(source)
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path: (None, None))
+    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, None))
     with pytest.raises(RuntimeError, match="Could not measure encoded true peak"):
         render(Track(path=str(source)), target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path: (None, 30.0))
+    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 30.0))
     with pytest.raises(RuntimeError, match="ceiling could not be reached"):
         render(Track(path=str(source)), target, limiter_db=-1)
     assert target.read_bytes() == b"existing"

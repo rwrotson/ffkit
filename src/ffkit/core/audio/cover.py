@@ -3,12 +3,16 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import FFMPEG, PROCESS_TIMEOUT, media_path
+from ffkit.core.audio._ffmpeg import media_path
 from ffkit.core.audio.models import Track
+from ffkit.core.audio.runtime import FFmpegRuntime
 
 
-def extract_cover(track: Track, destination: Path) -> Path | None:
+def extract_cover(
+    track: Track, destination: Path, *, runtime: FFmpegRuntime | None = None
+) -> Path | None:
     """Return a custom cover or atomically extract the first embedded image as JPEG."""
+    runtime = runtime or FFmpegRuntime()
     if track.cover_removed:
         return None
     if track.cover_path:
@@ -24,7 +28,7 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
     try:
         result = subprocess.run(  # noqa: S603 - Fixed FFmpeg command with separate paths.
             [
-                FFMPEG,
+                runtime.ffmpeg_path,
                 "-v",
                 "error",
                 "-i",
@@ -39,7 +43,7 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
-            timeout=PROCESS_TIMEOUT,
+            timeout=runtime.process_timeout,
         )
         if result.returncode != 0 or not temporary.is_file():
             return None

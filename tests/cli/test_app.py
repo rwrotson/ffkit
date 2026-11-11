@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
 from ffkit.cli.app import app
-from ffkit.core.audio import Track
+from ffkit.core.audio import FFmpegRuntime, Track
 from ffkit.main import main
 
 runner = CliRunner()
@@ -84,7 +84,7 @@ def test_probe_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"input")
 
-    def fake_probe(track: Track) -> Track:
+    def fake_probe(track: Track, *, runtime: FFmpegRuntime) -> Track:
         track.duration = 12.5
         track.tags = {"title": "Example"}
         return track
@@ -103,7 +103,7 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
 
-    def fake_probe(track: Track) -> Track:
+    def fake_probe(track: Track, *, runtime: FFmpegRuntime) -> Track:
         track.duration = 5
         track.tags = {"title": "[red]Example[/red]"}
         return track
@@ -117,7 +117,7 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
-    monkeypatch.setattr(cli_app, "measure_loudness", lambda path: (-14.2, -1.1))
+    monkeypatch.setattr(cli_app, "measure_loudness", lambda path, *, runtime: (-14.2, -1.1))
     monkeypatch.setattr(cli_app, "detect_trim_bounds", lambda path, **kwargs: (1.0, 9.0))
     loudness = runner.invoke(app, ["--output-format", "json", "audio", "loudness", str(source)])
     bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
@@ -139,7 +139,7 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     source.touch()
     destination.write_bytes(b"original")
 
-    def fake_render(track: Track, path: Path) -> None:
+    def fake_render(track: Track, path: Path, *, runtime: FFmpegRuntime) -> None:
         assert track.effects.gain_db == 3
         path.write_bytes(b"rendered")
 
@@ -150,7 +150,7 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert result.exit_code == 0
     assert destination.read_bytes() == b"rendered"
 
-    def fail_render(track: Track, path: Path) -> None:
+    def fail_render(track: Track, path: Path, *, runtime: FFmpegRuntime) -> None:
         raise subprocess.CalledProcessError(1, ["ffmpeg"])
 
     monkeypatch.setattr(cli_app, "render", fail_render)
@@ -165,7 +165,7 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     source.touch()
     destination.write_bytes(b"original")
 
-    def fake_cover(track: Track, path: Path) -> Path:
+    def fake_cover(track: Track, path: Path, *, runtime: FFmpegRuntime) -> Path:
         path.write_bytes(b"cover")
         return path
 
@@ -175,7 +175,7 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     )
     assert result.exit_code == 0
     assert destination.read_bytes() == b"cover"
-    monkeypatch.setattr(cli_app, "extract_cover", lambda track, path: None)
+    monkeypatch.setattr(cli_app, "extract_cover", lambda track, path, *, runtime: None)
     failed = runner.invoke(
         app, ["audio", "extract-cover", str(source), str(destination), "--force"]
     )
@@ -232,7 +232,7 @@ def test_missing_ffmpeg_is_processing_error(
     source = tmp_path / "source.mp3"
     source.touch()
 
-    def missing_tool(path: Path) -> tuple[float | None, float | None]:
+    def missing_tool(path: Path, *, runtime: FFmpegRuntime) -> tuple[float | None, float | None]:
         raise FileNotFoundError(2, "No such file or directory", "ffmpeg")
 
     monkeypatch.setattr(cli_app, "measure_loudness", missing_tool)
@@ -253,7 +253,7 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     source.touch()
     image.touch()
     rendered: list[Track] = []
-    monkeypatch.setattr(cli_app, "render", lambda track, path: rendered.append(track))
+    monkeypatch.setattr(cli_app, "render", lambda track, path, *, runtime: rendered.append(track))
     base = ["audio", "render", str(source)]
     result = runner.invoke(
         app,
@@ -287,7 +287,7 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     source.touch()
     calls: list[tuple[float, float]] = []
 
-    def fake_gain(track: Track, target: float, ceiling: float) -> float:
+    def fake_gain(track: Track, target: float, ceiling: float, *, runtime: FFmpegRuntime) -> float:
         calls.append((target, ceiling))
         return 2.5
 
@@ -304,3 +304,32 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         app, ["audio", "normalization-gain", str(source), "--peak-ceiling-db", "0"]
     )
     assert invalid.exit_code == 2
+
+
+def test_commands_use_configured_runtime(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    monkeypatch.setenv("FFKIT_FFMPEG__FFMPEG_PATH", "/opt/ffmpeg/bin/ffmpeg")
+    monkeypatch.setenv("FFKIT_FFMPEG__PROCESS_TIMEOUT", "60")
+    runtimes: list[FFmpegRuntime] = []
+
+    def fake_loudness(path: Path, *, runtime: FFmpegRuntime) -> tuple[float, float]:
+        runtimes.append(runtime)
+        return -14.0, -1.0
+
+    monkeypatch.setattr(cli_app, "measure_loudness", fake_loudness)
+    result = runner.invoke(app, ["audio", "loudness", str(source)])
+    assert result.exit_code == 0
+    assert runtimes == [FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=60)]
+
+
+def test_missing_configured_ffprobe_is_processing_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    missing = tmp_path / "missing-ffprobe"
+    monkeypatch.setenv("FFKIT_FFMPEG__FFPROBE_PATH", str(missing))
+    result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
+    assert result.exit_code == 1
+    assert json.loads(result.stderr)["error"]["type"] == "FileNotFoundError"

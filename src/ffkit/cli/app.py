@@ -1,5 +1,6 @@
 import json
 import subprocess
+from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
@@ -13,6 +14,7 @@ from typer.core import TyperGroup
 from ffkit.config import load_settings
 from ffkit.core.audio import (
     Effects,
+    FFmpegRuntime,
     Track,
     calculate_normalization_gain,
     extract_cover,
@@ -37,6 +39,20 @@ class OutputFormat(StrEnum):
     json = "json"
 
 
+@dataclass(frozen=True)
+class CLIState:
+    """Options shared by all commands of one invocation."""
+
+    output_format: OutputFormat = OutputFormat.text
+    runtime: FFmpegRuntime = field(default_factory=FFmpegRuntime)
+
+
+def cli_state(ctx: typer.Context) -> CLIState:
+    """Return the state stored by the root callback."""
+    state = ctx.find_root().obj
+    return state if isinstance(state, CLIState) else CLIState()
+
+
 class CLIGroup(TyperGroup):
     """Report expected command failures without tracebacks."""
 
@@ -53,15 +69,15 @@ class CLIGroup(TyperGroup):
             subprocess.TimeoutExpired,
             RuntimeError,
         ) as error:
+            state = cli_state(ctx)
             missing_tool = isinstance(error, FileNotFoundError) and error.filename in {
-                "ffmpeg",
-                "ffprobe",
+                state.runtime.ffmpeg_path,
+                state.runtime.ffprobe_path,
             }
             code = (
                 2 if isinstance(error, (ValueError, FileNotFoundError)) and not missing_tool else 1
             )
-            fmt = ctx.find_root().obj
-            if fmt == OutputFormat.json:
+            if state.output_format == OutputFormat.json:
                 typer.echo(
                     json.dumps({"error": {"type": type(error).__name__, "message": str(error)}}),
                     err=True,
@@ -93,7 +109,7 @@ def root(
         # A missing command is a usage error, as in Click groups without this callback.
         typer.echo(ctx.get_help())
         raise typer.Exit(2)
-    ctx.obj = output_format
+    ctx.obj = CLIState(output_format)
     try:
         settings = load_settings()
     except ValidationError as error:
@@ -108,11 +124,12 @@ def root(
     if verbose:
         settings.log.level = "DEBUG"
     setup_logging(settings.log, console=output_format != OutputFormat.json)
+    ctx.obj = CLIState(output_format, settings.ffmpeg)
 
 
 def emit(ctx: typer.Context, data: dict[str, object], lines: list[str]) -> None:
     """Write a result in the selected format."""
-    if ctx.find_root().obj == OutputFormat.json:
+    if cli_state(ctx).output_format == OutputFormat.json:
         typer.echo(json.dumps(data))
     else:
         console = Console()
@@ -150,7 +167,7 @@ def output_file(path: Path, force: bool) -> Path:
 @audio.command("probe")
 def probe_command(ctx: typer.Context, source: Path) -> None:
     """Read audio duration and tags."""
-    track = probe(Track(path=str(input_file(source))))
+    track = probe(Track(path=str(input_file(source))), runtime=cli_state(ctx).runtime)
     data: dict[str, object] = {"path": track.path, "duration": track.duration, "tags": track.tags}
     emit(
         ctx,
@@ -166,7 +183,7 @@ def probe_command(ctx: typer.Context, source: Path) -> None:
 @audio.command("loudness")
 def loudness_command(ctx: typer.Context, source: Path) -> None:
     """Measure integrated loudness and true peak."""
-    lufs, peak = measure_loudness(input_file(source))
+    lufs, peak = measure_loudness(input_file(source), runtime=cli_state(ctx).runtime)
     emit(
         ctx,
         {"loudness_lufs": lufs, "true_peak_db": peak},
@@ -189,7 +206,10 @@ def trim_bounds_command(
     if min_duration == 0:
         raise typer.BadParameter("must be greater than 0", param_hint="'--min-duration'")
     start, end = detect_trim_bounds(
-        input_file(source), threshold_db=threshold_db, min_duration=min_duration
+        input_file(source),
+        threshold_db=threshold_db,
+        min_duration=min_duration,
+        runtime=cli_state(ctx).runtime,
     )
     emit(ctx, {"start": start, "end": end}, [f"Start: {start} s", f"End: {end} s"])
 
@@ -238,7 +258,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         cover_path=cover_path,
         cover_removed=no_cover,
     )
-    render(track, destination)
+    render(track, destination, runtime=cli_state(ctx).runtime)
     emit(ctx, {"path": str(destination)}, [str(destination)])
 
 
@@ -255,7 +275,10 @@ def normalization_gain_command(
 ) -> None:
     """Calculate a fixed gain that reaches the target loudness within the peak ceiling."""
     gain = calculate_normalization_gain(
-        Track(path=str(input_file(source))), target_lufs, peak_ceiling_db
+        Track(path=str(input_file(source))),
+        target_lufs,
+        peak_ceiling_db,
+        runtime=cli_state(ctx).runtime,
     )
     emit(ctx, {"gain_db": gain}, [f"Gain: {gain} dB"])
 
@@ -270,6 +293,6 @@ def extract_cover_command(
     """Extract an embedded cover as JPEG."""
     source = input_file(source)
     destination = output_file(destination, force)
-    if extract_cover(Track(path=str(source)), destination) is None:
+    if extract_cover(Track(path=str(source)), destination, runtime=cli_state(ctx).runtime) is None:
         raise RuntimeError("No embedded cover found")
     emit(ctx, {"path": str(destination)}, [str(destination)])

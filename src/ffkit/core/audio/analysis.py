@@ -14,17 +14,15 @@ from statistics import median
 from ffkit.core.audio._ffmpeg import (
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
-    FFMPEG,
-    FFPROBE,
     LOUDNORM_RANGE,
     LOUDNORM_TRUE_PEAK_DB,
-    PROCESS_TIMEOUT,
     SILENCE_THRESHOLD_DB,
     ffmpeg_number,
     media_path,
     source_fingerprint,
 )
 from ffkit.core.audio.models import Effects, TempoSegment, Track
+from ffkit.core.audio.runtime import FFmpegRuntime
 from ffkit.core.audio.silence import MIN_TRAILING_SILENCE, scan_silence, trailing_silence_end
 
 TRIM_EDGE_TOLERANCE = 0.1
@@ -37,8 +35,8 @@ TEMPO_MIN_WINDOW = 160
 TEMPO_MIN_CONFIDENCE = 0.1
 
 
-def _decoded_chunks(process: subprocess.Popen[bytes]) -> Iterator[bytes]:
-    deadline = time.monotonic() + PROCESS_TIMEOUT
+def _decoded_chunks(process: subprocess.Popen[bytes], *, timeout: float) -> Iterator[bytes]:
+    deadline = time.monotonic() + timeout
     if process.stdout is None:
         raise RuntimeError("FFmpeg stdout is unavailable")
     with selectors.DefaultSelector() as selector:
@@ -46,7 +44,7 @@ def _decoded_chunks(process: subprocess.Popen[bytes]) -> Iterator[bytes]:
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0 or not selector.select(remaining):
-                raise subprocess.TimeoutExpired(process.args, PROCESS_TIMEOUT)
+                raise subprocess.TimeoutExpired(process.args, timeout)
             chunk = os.read(process.stdout.fileno(), 65536)
             if not chunk:
                 break
@@ -56,15 +54,16 @@ def _decoded_chunks(process: subprocess.Popen[bytes]) -> Iterator[bytes]:
         raise subprocess.CalledProcessError(process.returncode, process.args)
 
 
-def probe(track: Track) -> Track:
+def probe(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
     """Read duration and tags from the first audio stream."""
+    runtime = runtime or FFmpegRuntime()
     source = Path(track.path)
     if not source.is_file():
         track.error = "Source file is missing"
         return track
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
-            FFPROBE,
+            runtime.ffprobe_path,
             "-v",
             "error",
             "-show_format",
@@ -76,7 +75,7 @@ def probe(track: Track) -> Track:
         capture_output=True,
         text=True,
         check=True,
-        timeout=PROCESS_TIMEOUT,
+        timeout=runtime.process_timeout,
     )
     report = json.loads(result.stdout)
     audio_stream = next(
@@ -98,20 +97,23 @@ def probe(track: Track) -> Track:
     return track
 
 
-def detect_trim_bounds(
+def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
     path: Path,
     duration: float | None = None,
     threshold_db: float = SILENCE_THRESHOLD_DB,
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
     cancelled: Callable[[], bool] | None = None,
+    *,
+    runtime: FFmpegRuntime | None = None,
 ) -> tuple[float, float | None]:
     """Find audible bounds; retain pauses inside the track."""
+    runtime = runtime or FFmpegRuntime()
     if duration is None:
-        duration = probe(Track(path=str(path))).duration
+        duration = probe(Track(path=str(path)), runtime=runtime).duration
     if not duration or duration <= 0:
         raise ValueError("Track duration is unavailable")
     command = [
-        FFMPEG,
+        runtime.ffmpeg_path,
         "-hide_banner",
         "-nostats",
         "-loglevel",
@@ -129,7 +131,7 @@ def detect_trim_bounds(
         "null",
         "-",
     ]
-    scan = scan_silence(command, cancelled)
+    scan = scan_silence(command, cancelled, timeout=runtime.process_timeout)
     leading = scan.first_start is not None and scan.first_start <= TRIM_EDGE_TOLERANCE
     start = scan.first_end if leading and scan.first_end is not None else 0.0
     end = scan.trailing_start()
@@ -139,28 +141,40 @@ def detect_trim_bounds(
 
 
 def trailing_trim_end(
-    effects: Effects, source: Path, cancelled: Callable[[], bool] | None = None
+    effects: Effects,
+    source: Path,
+    cancelled: Callable[[], bool] | None = None,
+    *,
+    runtime: FFmpegRuntime,
 ) -> float | None:
     """Return where trailing silence starts when ``trim_silence`` is enabled."""
     if not effects.trim_silence:
         return None
-    duration = probe(Track(path=str(source))).duration
-    trailing_end = trailing_silence_end(effects, source, duration, cancelled)
+    duration = probe(Track(path=str(source)), runtime=runtime).duration
+    trailing_end = trailing_silence_end(
+        effects,
+        source,
+        duration,
+        cancelled,
+        ffmpeg=runtime.ffmpeg_path,
+        timeout=runtime.process_timeout,
+    )
     if trailing_end is not None and trailing_end <= effects.trim_start + MIN_TRAILING_SILENCE:
         raise ValueError("Track contains no audible audio")
     return trailing_end
 
 
-def analyze_peak_waveform(track: Track) -> list[float]:
+def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None) -> list[float]:
     """Measure a full-scale peak envelope from four-times oversampled audio."""
+    runtime = runtime or FFmpegRuntime()
     duration = track.duration
     if duration is None:
-        duration = probe(Track(path=track.path)).duration
+        duration = probe(Track(path=track.path), runtime=runtime).duration
     if duration is None or not math.isfinite(duration) or duration <= 0:
         raise ValueError("Track duration is unavailable")
     info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
-            FFPROBE,
+            runtime.ffprobe_path,
             "-v",
             "error",
             "-select_streams",
@@ -174,7 +188,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
         capture_output=True,
         text=True,
         check=True,
-        timeout=PROCESS_TIMEOUT,
+        timeout=runtime.process_timeout,
     )
     stream = json.loads(info.stdout)["streams"][0]
     channels = int(stream["channels"])
@@ -183,7 +197,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     peaks = [0.0] * WAVEFORM_BINS
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
-            FFMPEG,
+            runtime.ffmpeg_path,
             "-v",
             "error",
             "-i",
@@ -206,7 +220,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     frame_index = 0
     pending = b""
     try:
-        for chunk in _decoded_chunks(process):
+        for chunk in _decoded_chunks(process, timeout=runtime.process_timeout):
             pending += chunk
             while len(pending) >= frame_bytes:
                 boundary = frames_per_bin - frame_index % frames_per_bin
@@ -229,11 +243,14 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     return [round(value, 5) for value in peaks]
 
 
-def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable streaming analysis.
+def analyze_waveform_tempo(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable streaming analysis.
+    track: Track, *, runtime: FFmpegRuntime | None = None
+) -> Track:
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
+    runtime = runtime or FFmpegRuntime()
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
-            FFMPEG,
+            runtime.ffmpeg_path,
             "-v",
             "error",
             "-i",
@@ -260,7 +277,7 @@ def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR09
         try:
             if process.stdout is None:
                 raise RuntimeError("FFmpeg stdout is unavailable")
-            for chunk in _decoded_chunks(process):
+            for chunk in _decoded_chunks(process, timeout=runtime.process_timeout):
                 data = remaining_bytes + chunk
                 complete = len(data) // (hop * 2) * (hop * 2)
                 for offset in range(0, complete, hop * 2):
@@ -298,7 +315,7 @@ def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR09
                 estimates = tempo_estimates(energy)
             finally:
                 energy.release()
-    track.waveform_peak = analyze_peak_waveform(track)
+    track.waveform_peak = analyze_peak_waveform(track, runtime=runtime)
     segments: list[TempoSegment] = []
     if estimates:
         smoothed = [
@@ -349,9 +366,10 @@ def tempo_estimates(energy: memoryview[float]) -> list[tuple[float, float, float
 
 
 def measure_loudness(
-    path: Path, filters: list[str] | None = None
+    path: Path, filters: list[str] | None = None, *, runtime: FFmpegRuntime | None = None
 ) -> tuple[float | None, float | None]:
     """Measure integrated LUFS and true peak from ffmpeg's loudnorm report."""
+    runtime = runtime or FFmpegRuntime()
     chain = [
         *(filters or []),
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
@@ -359,7 +377,7 @@ def measure_loudness(
     ]
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
-            FFMPEG,
+            runtime.ffmpeg_path,
             "-hide_banner",
             "-i",
             media_path(path),
@@ -375,7 +393,7 @@ def measure_loudness(
         capture_output=True,
         text=True,
         check=True,
-        timeout=PROCESS_TIMEOUT,
+        timeout=runtime.process_timeout,
     )
     marker = result.stderr.rfind('"input_i"')
     if marker < 0:
@@ -394,11 +412,11 @@ def measure_loudness(
     return finite(data.get("input_i")), finite(data.get("input_tp"))
 
 
-def analyze_loudness(track: Track) -> Track:
+def analyze_loudness(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
     """Measure source loudness and record the file fingerprint for normalization reuse."""
     source = Path(track.path)
     fingerprint = source_fingerprint(source)
-    lufs, peak = measure_loudness(source)
+    lufs, peak = measure_loudness(source, runtime=runtime)
     if source_fingerprint(source) != fingerprint:
         raise ValueError("Source audio changed during loudness analysis")
     track.loudness_lufs = lufs

@@ -2,6 +2,7 @@
 
 from .audio import (
     Effects,
+    FFmpegRuntime,
     Group,
     TempoSegment,
     Track,
@@ -27,6 +28,7 @@ __all__ = [
     "CancelledError",
     "Effects",
     "FFKitError",
+    "FFmpegRuntime",
     "Group",
     "InvalidInputError",
     "TempoSegment",

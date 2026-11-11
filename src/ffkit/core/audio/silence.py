@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Self
 
 from ffkit.core.audio._ffmpeg import (
-    FFMPEG,
-    PROCESS_TIMEOUT,
     SILENCE_THRESHOLD_DB,
     ffmpeg_number,
     media_path,
@@ -84,14 +82,18 @@ def _consume_scan_chunk(scan: SilenceScan, pending: bytes, chunk: bytes) -> byte
 
 
 def _read_scan_stream(
-    process: subprocess.Popen[bytes], command: list[str], cancelled: Callable[[], bool] | None
+    process: subprocess.Popen[bytes],
+    command: list[str],
+    cancelled: Callable[[], bool] | None,
+    *,
+    timeout: float,
 ) -> tuple[SilenceScan, bytes]:
     scan = SilenceScan()
     pending = b""
     tail = b""
     if process.stderr is None:
         raise RuntimeError("FFmpeg stderr is unavailable")
-    deadline = time.monotonic() + PROCESS_TIMEOUT
+    deadline = time.monotonic() + timeout
     with selectors.DefaultSelector() as selector:
         selector.register(process.stderr, selectors.EVENT_READ)
         while selector.get_map():
@@ -99,7 +101,7 @@ def _read_scan_stream(
                 raise CancelledError("Export cancelled")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise subprocess.TimeoutExpired(command, PROCESS_TIMEOUT)
+                raise subprocess.TimeoutExpired(command, timeout)
             for key, _ in selector.select(min(0.1, remaining)):
                 chunk = os.read(key.fd, 65536)
                 if not chunk:
@@ -112,14 +114,16 @@ def _read_scan_stream(
     return scan, tail
 
 
-def scan_silence(command: list[str], cancelled: Callable[[], bool] | None) -> SilenceScan:
+def scan_silence(
+    command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
+) -> SilenceScan:
     """Run an FFmpeg silencedetect command and parse its stderr with bounded memory."""
     process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate arguments.
         command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
     )
     try:
-        deadline = time.monotonic() + PROCESS_TIMEOUT
-        scan, tail = _read_scan_stream(process, command, cancelled)
+        deadline = time.monotonic() + timeout
+        scan, tail = _read_scan_stream(process, command, cancelled, timeout=timeout)
         if process.wait(timeout=max(0, deadline - time.monotonic())):
             raise subprocess.CalledProcessError(
                 process.returncode, command, stderr=tail.decode(errors="replace")
@@ -133,11 +137,14 @@ def scan_silence(command: list[str], cancelled: Callable[[], bool] | None) -> Si
             process.stderr.close()
 
 
-def trailing_silence_end(
+def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.
     effects: Effects,
     source: Path,
     duration: float | None,
     cancelled: Callable[[], bool] | None = None,
+    *,
+    ffmpeg: str,
+    timeout: float,
 ) -> float | None:
     """Return the source position where trailing silence in the trimmed range starts."""
     if duration is None:
@@ -147,7 +154,7 @@ def trailing_silence_end(
     if end <= start:
         return None
     command = [
-        FFMPEG,
+        ffmpeg,
         "-hide_banner",
         "-nostats",
         "-loglevel",
@@ -169,7 +176,7 @@ def trailing_silence_end(
         "null",
         "-",
     ]
-    scan = scan_silence(command, cancelled)
+    scan = scan_silence(command, cancelled, timeout=timeout)
     trailing = scan.trailing_start()
     if trailing is None:
         return None

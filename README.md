@@ -7,7 +7,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 - Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, normalization, MP3 rendering and streaming, and cover extraction; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `setup_logging()` for applications: structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
-- One Pydantic `Settings` with a nested `FFKIT_LOG__*` section, a test that keeps `.env.example` in sync, and a generated configuration page
+- One Pydantic `Settings` with nested `FFKIT_LOG__*` and `FFKIT_FFMPEG__*` sections, a test that keeps `.env.example` in sync, and a generated configuration page
 - import-linter contracts that keep the core API independent of configuration and logging setup
 - Strict MyPy with the Pydantic plugin, Ruff, pytest in parallel and random order with a 95% branch coverage gate, poethepoet tasks, pre-commit hooks, Commitizen
 - CI on Ubuntu and macOS with a lowest-dependency test job, package and strict docs builds, pip-audit, and trivy; actions pinned to commit SHAs; release artifacts and ProperDocs on GitHub Pages after CI passes on a release tag
@@ -29,7 +29,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 - Python 3.14+
 - Git for installation from the repository; uv for development
-- `ffmpeg` and `ffprobe` on `PATH` for audio operations
+- `ffmpeg` and `ffprobe` on `PATH`, or paths configured through `FFmpegRuntime`, for audio operations
 
 ## Getting Started
 
@@ -66,7 +66,8 @@ ffkit audio extract-cover song.flac cover.jpg
 `render` embeds the source cover unless `--cover PATH` replaces it or `--no-cover` drops it;
 `--tag KEY=VALUE` sets a tag and may be repeated. `normalization-gain` prints the fixed gain that
 reaches the target loudness without exceeding the true-peak ceiling.
-`ffmpeg` and `ffprobe` must be available on `PATH` for the corresponding operations.
+The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PATH` or
+`FFKIT_FFMPEG__FFPROBE_PATH` is set.
 
 
 ```python
@@ -117,9 +118,18 @@ differ from the source audio file.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
-Each FFmpeg or FFprobe run for probing, analysis, silence scanning, rendering, and cover extraction
-has a 15-minute processing deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
-when the encoder produces no output for 30 seconds.
+Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
+executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
+for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
+(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
+when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
+
+```python
+from ffkit import FFmpegRuntime, Track, probe
+
+runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
+track = probe(Track(path="song.flac"), runtime=runtime)
+```
 `Group` holds shared settings for an application. The library reads only `gain_db`,
 `normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
 `limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
@@ -189,16 +199,20 @@ Bump type is inferred automatically: `fix:` → patch, `feat:` → minor, `feat!
 | Prefix | Controls |
 |--------|----------|
 | `FFKIT_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
+| `FFKIT_FFMPEG__*` | FFmpeg and FFprobe executables and process time limits |
 
 ```env
 FFKIT_LOG__LEVEL=DEBUG
 FFKIT_LOG__FORMAT=json
 FFKIT_LOG__DIR=./logs
+FFKIT_FFMPEG__FFMPEG_PATH=/opt/ffmpeg/bin/ffmpeg
 ```
 
 See `.env.example` and the generated configuration page in the documentation site.
 `FFKIT_LOG__FILE_NAME` must be a filename without directory separators; `FFKIT_LOG__DIR`
 selects its directory.
+The library does not read `FFKIT_FFMPEG__*`; `load_settings().ffmpeg` is an `FFmpegRuntime` that an
+application passes as `runtime=`, as the CLI does.
 
 ## Project Structure
 

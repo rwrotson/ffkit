@@ -5,7 +5,7 @@
 - Python 3.14+
 - Git for installation from the repository
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) for development
-- `ffmpeg` and `ffprobe` on `PATH` for audio operations
+- `ffmpeg` and `ffprobe` on `PATH`, or paths configured through `FFmpegRuntime`, for audio operations
 
 ## Installation
 
@@ -79,9 +79,18 @@ Older Track JSON without these fields cannot distinguish source tags from explic
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.
 Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
-Each FFmpeg or FFprobe run for probing, analysis, silence scanning, rendering, and cover extraction
-has a 15-minute processing deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
-when the encoder produces no output for 30 seconds.
+Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
+executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
+for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
+(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
+when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
+
+```python
+from ffkit import FFmpegRuntime, Track, probe
+
+runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
+track = probe(Track(path="song.flac"), runtime=runtime)
+```
 `Group` holds shared settings for an application. The library reads only `gain_db`,
 `normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
 `limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
@@ -150,10 +159,15 @@ Add audio operations under `ffkit.core.audio`, export supported names from `ffki
 | Prefix | Controls |
 |--------|----------|
 | `FFKIT_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
+| `FFKIT_FFMPEG__*` | FFmpeg and FFprobe executables and process time limits |
 
 ```env
 FFKIT_LOG__LEVEL=DEBUG
 FFKIT_LOG__FORMAT=json
+FFKIT_FFMPEG__PROCESS_TIMEOUT=3600
 ```
+
+The CLI passes `FFKIT_FFMPEG__*` values to the audio functions. Library code does not read them;
+`load_settings().ffmpeg` is an `FFmpegRuntime` that an application passes as `runtime=`.
 
 All variables are listed on the [configuration page](configuration.md).

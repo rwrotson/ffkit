@@ -177,14 +177,13 @@ def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
     assert 100 < next(index for index, peak in enumerate(peaks) if peak > 0) < 150
 
 
-def test_decoded_chunks_timeout_includes_stdout_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(analysis, "PROCESS_TIMEOUT", 0.01)
+def test_decoded_chunks_timeout_includes_stdout_read() -> None:
     process = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(10)"], stdout=subprocess.PIPE
     )
     try:
         with pytest.raises(subprocess.TimeoutExpired):
-            list(analysis._decoded_chunks(process))
+            list(analysis._decoded_chunks(process, timeout=0.01))
     finally:
         process.kill()
         process.wait()
@@ -301,7 +300,7 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     scan = SilenceScan.from_lines([b"silence_start: 0", b"silence_end: 2", b"silence_start: 2"])
-    monkeypatch.setattr("ffkit.core.audio.analysis.scan_silence", lambda *args: scan)
+    monkeypatch.setattr("ffkit.core.audio.analysis.scan_silence", lambda *args, **kwargs: scan)
     with pytest.raises(ValueError, match="no audible audio"):
         detect_trim_bounds(Path("silent.wav"), duration=2)
 

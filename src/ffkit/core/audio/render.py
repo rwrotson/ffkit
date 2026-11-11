@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import IO
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import FFMPEG, MP3_ENCODER_ARGS, PROCESS_TIMEOUT, media_path
+from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, media_path
 from ffkit.core.audio.analysis import measure_loudness, trailing_trim_end
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
+from ffkit.core.audio.runtime import FFmpegRuntime
 from ffkit.core.audio.silence import ERROR_TAIL_LIMIT
 from ffkit.core.errors import CancelledError
 
@@ -23,9 +24,9 @@ CANCEL_POLL_INTERVAL = 0.1
 RENDERED_TAGS = frozenset({"title", "artist", "album", "date", "genre", "track"})
 
 
-def _command_parts(track: Track, source: Path) -> tuple[list[str], list[str]]:
+def _command_parts(track: Track, source: Path, *, ffmpeg: str) -> tuple[list[str], list[str]]:
     """Return the FFmpeg arguments before and after the audio filter option."""
-    inputs = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
+    inputs = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
     cover = Path(track.cover_path) if track.cover_path else None
     if track.cover_removed:
         inputs.extend(["-vn", "-map", "0:a:0"])
@@ -63,17 +64,19 @@ def _error_tail(errors: IO[bytes]) -> str:
     return errors.read().decode(errors="replace")
 
 
-def _run_encoder(command: list[str], cancelled: Callable[[], bool] | None) -> None:
+def _run_encoder(
+    command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
+) -> None:
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
             command, stdout=subprocess.DEVNULL, stderr=errors
         )
         try:
-            deadline = time.monotonic() + PROCESS_TIMEOUT
+            deadline = time.monotonic() + timeout
             while process.poll() is None:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise subprocess.TimeoutExpired(command, PROCESS_TIMEOUT)
+                    raise subprocess.TimeoutExpired(command, timeout)
                 if cancelled is not None and cancelled():
                     process.terminate()
                     process.wait()
@@ -108,24 +111,28 @@ def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> 
     return lowered
 
 
-def _encode(track: Track, command: list[str], cancelled: Callable[[], bool] | None) -> None:
+def _encode(
+    track: Track, command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
+) -> None:
     try:
-        _run_encoder(command, cancelled)
+        _run_encoder(command, cancelled, timeout=timeout)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         detail = error.stderr or "FFmpeg timed out"
         log.error("audio_render_failed track=%s error=%s", track.id, detail)
         raise
 
 
-def render(
+def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runtime.
     track: Track,
     destination: Path,
     group_gain_db: float = 0,
     *,
     limiter_db: float | None = None,
     cancelled: Callable[[], bool] | None = None,
+    runtime: FFmpegRuntime | None = None,
 ) -> None:
     """Apply effects to the original source and render a separate MP3 file."""
+    runtime = runtime or FFmpegRuntime()
     source = Path(track.path)
     if not source.is_file():
         raise FileNotFoundError(source)
@@ -135,10 +142,10 @@ def render(
         raise ValueError("Output path must differ from source audio")
     ceiling = track.effects.effective_limiter_db(limiter_db)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    inputs, outputs = _command_parts(track, source)
+    inputs, outputs = _command_parts(track, source, ffmpeg=runtime.ffmpeg_path)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
     try:
-        trailing_end = trailing_trim_end(track.effects, source, cancelled)
+        trailing_end = trailing_trim_end(track.effects, source, cancelled, runtime=runtime)
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
             attempt_track = track.model_copy(deep=True)
@@ -147,11 +154,16 @@ def render(
                 attempt_track.effects.trim_end = trailing_end
             filters = audio_filters(attempt_track, group_gain_db, streaming=True)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
-            _encode(track, [*command, *outputs, media_path(temporary)], cancelled)
+            _encode(
+                track,
+                [*command, *outputs, media_path(temporary)],
+                cancelled,
+                timeout=runtime.process_timeout,
+            )
             if ceiling is None or effective_ceiling is None:
                 break
             _check_cancelled(cancelled)
-            _, peak = measure_loudness(temporary)
+            _, peak = measure_loudness(temporary, runtime=runtime)
             if peak is None:
                 raise RuntimeError("Could not measure encoded true peak")
             if peak <= ceiling:

@@ -13,10 +13,12 @@ from .formats import audio_files
 from .models import Effects, Group, TempoSegment, Track
 from .normalization import calculate_normalization_gain
 from .render import render
+from .runtime import FFmpegRuntime
 from .stream import stream_mp3
 
 __all__ = [
     "Effects",
+    "FFmpegRuntime",
     "Group",
     "TempoSegment",
     "Track",

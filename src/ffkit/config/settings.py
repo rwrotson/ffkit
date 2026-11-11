@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ffkit.core.audio.runtime import FFmpegRuntime
+
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
@@ -50,6 +52,7 @@ class Settings(BaseSettings):
     )
 
     log: LogSettings = Field(default_factory=LogSettings)
+    ffmpeg: FFmpegRuntime = Field(default_factory=FFmpegRuntime)
 
 
 def nested_model(field: FieldInfo) -> type[BaseModel] | None:

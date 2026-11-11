@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from ffkit import FFmpegRuntime
 from ffkit.config import LogSettings, Settings, load_settings
 from ffkit.config.settings import env_fields
 
@@ -25,6 +26,23 @@ def test_nested_environment_variables(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
     assert settings.log.level == "WARNING"
     assert settings.log.dir == tmp_path
+
+
+def test_ffmpeg_section_loads_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FFKIT_FFMPEG__FFMPEG_PATH", "/opt/ffmpeg/bin/ffmpeg")
+    monkeypatch.setenv("FFKIT_FFMPEG__PROCESS_TIMEOUT", "60")
+
+    settings = load_settings()
+
+    assert settings.ffmpeg == FFmpegRuntime(
+        ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=60
+    )
+
+
+def test_ffmpeg_section_validates_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FFKIT_FFMPEG__STREAM_IDLE_TIMEOUT", "0")
+    with pytest.raises(ValidationError):
+        load_settings()
 
 
 def test_process_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -134,7 +134,7 @@ src/ffkit/cli/         — Optional Typer CLI over the core audio API (`ffkit[cl
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic Settings; audio models use Pydantic; `config` never imports `core` or `utils`; `utils` never imports `core`; `core`, `config`, and `utils` never import `cli`, Typer, or Rich. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic Settings; audio models use Pydantic; `config` may import core models but never `utils`; `utils` never imports `core` directly; `core`, `config`, and `utils` never import `cli`, Typer, or Rich. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
 
 The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
 
@@ -146,7 +146,7 @@ Importing `ffkit` must not read the environment or `.env`, configure logging or 
 
 ### Configuration via Environment Variables
 
-`src/ffkit/config/settings.py` defines `Settings` (Pydantic `BaseSettings`, prefix `FFKIT_`, nested delimiter `__`) with defaults in code and the section `LogSettings` (`FFKIT_LOG__*`). Only `load_settings()` reads the environment and `.env`; empty values use defaults. Library code takes settings objects as arguments instead of loading them.
+`src/ffkit/config/settings.py` defines `Settings` (Pydantic `BaseSettings`, prefix `FFKIT_`, nested delimiter `__`) with defaults in code and the sections `LogSettings` (`FFKIT_LOG__*`) and `ffmpeg` (`FFKIT_FFMPEG__*`, the core `FFmpegRuntime` model). Only `load_settings()` reads the environment and `.env`; empty values use defaults. Library code takes settings objects as arguments instead of loading them.
 
 Every setting needs a `Field(description=...)` and a line in `.env.example`; tests in `tests/config/` enforce both. The docs configuration page is generated from `Settings` by `docs/gen_config_page.py`; do not edit it by hand.
 

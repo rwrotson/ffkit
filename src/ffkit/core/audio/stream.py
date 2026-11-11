@@ -4,11 +4,11 @@ import selectors
 import subprocess
 from collections.abc import Generator
 
-from ffkit.core.audio._ffmpeg import FFMPEG, MP3_ENCODER_ARGS, ffmpeg_number, media_path
+from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, ffmpeg_number, media_path
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Effects, Track
+from ffkit.core.audio.runtime import FFmpegRuntime
 
-STREAM_IDLE_TIMEOUT = 30
 log = logging.getLogger(__name__)
 
 
@@ -32,23 +32,42 @@ def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
 
 
 def stream_mp3(
-    track: Track, gain: float = 0, start: float = 0, limiter_db: float | None = None
+    track: Track,
+    gain: float = 0,
+    start: float = 0,
+    limiter_db: float | None = None,
+    *,
+    runtime: FFmpegRuntime | None = None,
 ) -> Generator[bytes]:
     """Stream original source audio from a position after its trim start."""
     if start < 0:
         raise ValueError("Stream start must not be negative")
-    return _stream(track, gain, start, limiter_db)
+    runtime = runtime or FFmpegRuntime()
+    return _stream(
+        track,
+        gain,
+        start,
+        limiter_db,
+        ffmpeg=runtime.ffmpeg_path,
+        idle_timeout=runtime.stream_idle_timeout,
+    )
 
 
-def _stream(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
-    track: Track, gain: float, start: float, limiter_db: float | None
+def _stream(  # noqa: C901, PLR0913 - Mixtable cleanup paths; receives only the runtime fields it uses.
+    track: Track,
+    gain: float,
+    start: float,
+    limiter_db: float | None,
+    *,
+    ffmpeg: str,
+    idle_timeout: float,
 ) -> Generator[bytes]:
     seeked = _seeked_track(track, start)
     if seeked is None:
         return
     snapshot, source_offset = seeked
     command = [
-        FFMPEG,
+        ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
@@ -73,7 +92,7 @@ def _stream(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
             raise RuntimeError("FFmpeg stdout is unavailable")
         with selectors.DefaultSelector() as selector:
             selector.register(stdout, selectors.EVENT_READ)
-            while selector.select(STREAM_IDLE_TIMEOUT):
+            while selector.select(idle_timeout):
                 chunk = os.read(stdout.fileno(), 8192)
                 if not chunk:
                     break
