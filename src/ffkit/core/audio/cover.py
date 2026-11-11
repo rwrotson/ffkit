@@ -3,8 +3,7 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import media_path
-from ffkit.core.audio.analysis import PROCESS_TIMEOUT
+from ffkit.core.audio._ffmpeg import PROCESS_TIMEOUT, media_path
 from ffkit.core.audio.models import Track
 
 

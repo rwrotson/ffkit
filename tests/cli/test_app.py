@@ -116,8 +116,14 @@ def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
     assert json.loads(loudness.stdout) == {"loudness_lufs": -14.2, "true_peak_db": -1.1}
     assert "Start: 1.0 s" in bounds.stdout
-    invalid = runner.invoke(app, ["audio", "trim-bounds", str(source), "--min-duration", "0"])
-    assert invalid.exit_code == 2
+    for option, value in [
+        ("--min-duration", "0"),
+        ("--min-duration", "11"),
+        ("--threshold-db", "1"),
+    ]:
+        invalid = runner.invoke(app, ["audio", "trim-bounds", str(source), option, value])
+        assert invalid.exit_code == 2
+        assert option in invalid.output
 
 
 def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

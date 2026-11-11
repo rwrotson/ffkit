@@ -4,7 +4,7 @@ import selectors
 import subprocess
 from collections.abc import Generator
 
-from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
+from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, ffmpeg_number, media_path
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Effects, Track
 
@@ -53,7 +53,7 @@ def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
     filters = audio_filters(snapshot, gain, streaming=True, limiter_db=limiter_db)
     if filters:
         command += ["-af", ",".join(filters)]
-    command += ["-codec:a", "libmp3lame", "-b:a", "320k", "-f", "mp3", "pipe:1"]
+    command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]
     process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
         command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
     )

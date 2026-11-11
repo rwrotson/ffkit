@@ -299,7 +299,7 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     result = subprocess.CompletedProcess(
-        [], 0, stderr="silence_start: 0\nsilence_end: 2\nsilence_start: 2"
+        [], 0, stderr=b"silence_start: 0\nsilence_end: 2\nsilence_start: 2"
     )
     monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
     with pytest.raises(ValueError, match="no audible audio"):

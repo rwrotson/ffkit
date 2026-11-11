@@ -1,5 +1,13 @@
 from pathlib import Path
 
+PROCESS_TIMEOUT = 900
+SILENCE_THRESHOLD_DB = -50
+DEFAULT_TARGET_LUFS = -14
+DEFAULT_PEAK_CEILING_DB = -1
+LOUDNORM_TRUE_PEAK_DB = -1
+LOUDNORM_RANGE = 11
+MP3_ENCODER_ARGS = ("-codec:a", "libmp3lame", "-b:a", "320k")
+
 
 def ffmpeg_number(value: float) -> str:
     """Format a number in fixed notation; FFmpeg rejects exponents in durations."""

@@ -12,6 +12,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.audio.models` | Define audio track, effects, and group data |
 | `ffkit.core.audio.normalization` | Calculate gain for processed audio |
 | `ffkit.core.audio.render` | Render non-destructive MP3 output |
+| `ffkit.core.audio.silence` | Parse FFmpeg silence detection and find trailing silence |
 | `ffkit.core.audio.stream` | Stream MP3 audio from a playback position |
 | `ffkit.config.settings` | Define and load library settings |
 | `ffkit.utils.log` | Configure console and file logging for applications |

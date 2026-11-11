@@ -201,6 +201,7 @@ src/
     │       ├── models.py        # track, effects, and group models
     │       ├── normalization.py # processed-track gain calculation
     │       ├── render.py        # non-destructive MP3 rendering
+    │       ├── silence.py       # silence detection parsing
     │       └── stream.py        # MP3 playback stream
     ├── config/
     │   └── settings.py      # Settings with the log section

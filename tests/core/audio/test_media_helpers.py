@@ -237,7 +237,10 @@ def test_calculate_normalization_gain_rejects_all_silence(
     source.touch()
     track = Track(path=str(source))
     track.effects.trim_silence = True
-    monkeypatch.setattr(normalization_module, "_trailing_silence_end", lambda *args: 0.0)
+    monkeypatch.setattr(normalization_module, "trailing_silence_end", lambda *args: 0.0)
+    monkeypatch.setattr(
+        normalization_module, "probe", lambda track: Track(path=track.path, duration=1.0)
+    )
     with pytest.raises(ValueError, match="no audible audio"):
         calculate_normalization_gain(track)
 

@@ -1,6 +1,7 @@
 import importlib
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import BinaryIO
 
@@ -9,6 +10,7 @@ import pytest
 from ffkit import Group, Track, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.core.audio.render")
+silence_module = importlib.import_module("ffkit.core.audio.silence")
 
 
 def make_tone(path: Path, *, gain: int = 0) -> None:
@@ -130,10 +132,12 @@ def test_render_trims_edges_without_reversing_audio(
 def test_trailing_silence_scan_handles_no_silence_and_empty_trim(tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    track = Track(path=str(source))
-    assert render_module._trailing_silence_end(track, source, None) is None
-    track.effects.trim_start = 2
-    assert render_module._trailing_silence_end(track, source, None) is None
+    effects = Track(path=str(source)).effects
+    assert silence_module.trailing_silence_end(effects, source, 1.0) is None
+    effects.trim_start = 2
+    assert silence_module.trailing_silence_end(effects, source, 1.0) is None
+    with pytest.raises(ValueError, match="duration is unavailable"):
+        silence_module.trailing_silence_end(effects, source, None)
 
 
 def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
@@ -162,26 +166,28 @@ def test_trailing_silence_scan_respects_cancellation(tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
     with pytest.raises(RuntimeError, match="Export cancelled"):
-        render_module._trailing_silence_end(Track(path=str(source)), source, lambda: True)
+        silence_module.trailing_silence_end(
+            Track(path=str(source)).effects, source, 1.0, lambda: True
+        )
 
 
 def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with pytest.raises(subprocess.CalledProcessError):
-        render_module._scan_silence(
+        silence_module.scan_silence(
             ["ffmpeg", "-v", "error", "-i", "missing.wav", "-f", "null", "-"], None
         )
-    monkeypatch.setattr(render_module, "PROCESS_TIMEOUT", 0)
+    monkeypatch.setattr(silence_module, "PROCESS_TIMEOUT", 0)
     with pytest.raises(subprocess.TimeoutExpired):
-        render_module._scan_silence([sys.executable, "-c", "import time; time.sleep(10)"], None)
+        silence_module.scan_silence([sys.executable, "-c", "import time; time.sleep(10)"], None)
 
 
 def test_trailing_silence_scan_bounds_error_output() -> None:
     command = [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(2)"]
     with pytest.raises(subprocess.CalledProcessError) as error:
-        render_module._scan_silence(command, None)
-    assert len(error.value.stderr) == render_module.SCAN_ERROR_LIMIT
+        silence_module.scan_silence(command, None)
+    assert len(error.value.stderr) == silence_module.ERROR_TAIL_LIMIT
 
 
 def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
@@ -238,16 +244,14 @@ def test_render_retries_from_source(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     target = tmp_path / "out.mp3"
     measured = iter([(None, 0.0), (None, -2.0)])
     monkeypatch.setattr(render_module, "measure_loudness", lambda path: next(measured))
-    original_run = subprocess.run
+    original_popen = subprocess.Popen
     commands: list[list[str]] = []
 
-    def record(
-        command: list[str], *, check: bool, stdout: int, stderr: BinaryIO, timeout: int
-    ) -> subprocess.CompletedProcess[bytes]:
+    def record(command: list[str], *, stdout: int, stderr: BinaryIO) -> subprocess.Popen[bytes]:
         commands.append(command)
-        return original_run(command, check=check, stdout=stdout, stderr=stderr, timeout=timeout)
+        return original_popen(command, stdout=stdout, stderr=stderr)
 
-    monkeypatch.setattr(subprocess, "run", record)
+    monkeypatch.setattr(subprocess, "Popen", record)
     render(Track(path=str(source)), target, limiter_db=-1)
     assert len(commands) == 2
     assert all(str(source) in command for command in commands)
@@ -259,8 +263,9 @@ def test_render_retries_from_source(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert target.read_bytes() == b"existing"
 
 
-def test_render_cancelable_drains_large_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("cancelled", [None, lambda: False])
+def test_render_keeps_only_error_tail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cancelled: Callable[[], bool] | None
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
@@ -277,34 +282,30 @@ def test_render_cancelable_drains_large_error(
 
     monkeypatch.setattr(subprocess, "Popen", noisy_process)
     with pytest.raises(subprocess.CalledProcessError) as error:
-        render(Track(path=str(source)), tmp_path / "out.mp3", cancelled=lambda: False)
+        render(Track(path=str(source)), tmp_path / "out.mp3", cancelled=cancelled)
     assert error.value.returncode == 7
-    assert len(error.value.stderr) == 1000
+    assert len(error.value.stderr) == silence_module.ERROR_TAIL_LIMIT
 
 
-def test_render_without_cancel_keeps_only_error_tail(
+def test_render_encoder_timeout_kills_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
-    original_run = subprocess.run
+    original_popen = subprocess.Popen
 
-    def noisy_run(
-        _command: list[str], *, check: bool, stdout: int, stderr: BinaryIO, timeout: int
-    ) -> subprocess.CompletedProcess[bytes]:
-        return original_run(
-            [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(7)"],
-            check=check,
-            stdout=stdout,
-            stderr=stderr,
-            timeout=timeout,
+    def slow_process(
+        _command: list[str], *, stdout: int, stderr: BinaryIO
+    ) -> subprocess.Popen[bytes]:
+        return original_popen(
+            [sys.executable, "-c", "import time; time.sleep(10)"], stdout=stdout, stderr=stderr
         )
 
-    monkeypatch.setattr(subprocess, "run", noisy_run)
-    with pytest.raises(subprocess.CalledProcessError) as error:
+    monkeypatch.setattr(subprocess, "Popen", slow_process)
+    monkeypatch.setattr(render_module, "PROCESS_TIMEOUT", 0.2)
+    with pytest.raises(subprocess.TimeoutExpired):
         render(Track(path=str(source)), tmp_path / "out.mp3")
-    assert error.value.returncode == 7
-    assert len(error.value.stderr) == 1000
+    assert not list(tmp_path.glob("*.tmp.mp3"))
 
 
 def test_render_cover_choices(tmp_path: Path) -> None:

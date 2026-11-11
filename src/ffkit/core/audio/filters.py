@@ -1,7 +1,14 @@
 import math
 from pathlib import Path
 
-from ffkit.core.audio._ffmpeg import ffmpeg_number
+from ffkit.core.audio._ffmpeg import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_TARGET_LUFS,
+    LOUDNORM_RANGE,
+    LOUDNORM_TRUE_PEAK_DB,
+    SILENCE_THRESHOLD_DB,
+    ffmpeg_number,
+)
 from ffkit.core.audio.models import Track
 
 
@@ -21,7 +28,10 @@ def audio_filters(
             trim += f":end={ffmpeg_number(effects.trim_end)}"
         filters.extend([trim, "asetpts=PTS-STARTPTS"])
     if effects.trim_silence:
-        edge_trim = "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB"
+        edge_trim = (
+            "silenceremove=start_periods=1:start_duration=0:"
+            f"start_threshold={SILENCE_THRESHOLD_DB}dB"
+        )
         filters.append(edge_trim)
         if not streaming:
             filters.extend(["areverse", edge_trim, "areverse"])
@@ -29,7 +39,10 @@ def audio_filters(
     if total_gain:
         filters.append(f"volume={ffmpeg_number(total_gain)}dB")
     if effects.normalize_lufs is not None:
-        filters.append(f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}:TP=-1:LRA=11")
+        filters.append(
+            f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}"
+            f":TP={LOUDNORM_TRUE_PEAK_DB}:LRA={LOUDNORM_RANGE}"
+        )
     ceiling = effects.limiter_ceiling_db if effects.limiter_ceiling_db is not None else limiter_db
     if ceiling is not None:
         filters.append(f"alimiter=limit={10 ** (ceiling / 20):.8f}:level=false:latency=true")
@@ -51,7 +64,10 @@ def safe_name(track: Track, index: int, width: int) -> str:
 
 
 def normalization_gain(
-    lufs: float | None, peak: float | None, target: float = -14, ceiling: float = -1
+    lufs: float | None,
+    peak: float | None,
+    target: float = DEFAULT_TARGET_LUFS,
+    ceiling: float = DEFAULT_PEAK_CEILING_DB,
 ) -> float:
     """Return a fixed gain, keeping the measured true peak below the ceiling."""
     if lufs is None or not math.isfinite(lufs):

@@ -1,11 +1,9 @@
 import json
-import os
 import subprocess
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated, Any
-from uuid import uuid4
 
 import typer
 from pydantic import ValidationError
@@ -62,8 +60,6 @@ class CLIGroup(TyperGroup):
 app = typer.Typer(cls=CLIGroup, help="FFmpeg audio helpers.", invoke_without_command=True)
 audio = typer.Typer(help="Inspect and process audio files.")
 app.add_typer(audio, name="audio")
-MIN_THRESHOLD_DB = -100
-MAX_MIN_DURATION = 10
 
 
 @app.callback()
@@ -153,12 +149,12 @@ def loudness_command(ctx: typer.Context, source: Path) -> None:
 def trim_bounds_command(
     ctx: typer.Context,
     source: Path,
-    threshold_db: Annotated[float, typer.Option("--threshold-db")] = -50,
-    min_duration: Annotated[float, typer.Option("--min-duration")] = 0.1,
+    threshold_db: Annotated[float, typer.Option("--threshold-db", min=-100, max=0)] = -50,
+    min_duration: Annotated[float, typer.Option("--min-duration", min=0, max=10)] = 0.1,
 ) -> None:
     """Find audible start and end positions."""
-    if not MIN_THRESHOLD_DB <= threshold_db <= 0 or not 0 < min_duration <= MAX_MIN_DURATION:
-        raise ValueError("Threshold must be -100..0 dB and minimum duration 0..10 s")
+    if min_duration == 0:
+        raise typer.BadParameter("must be greater than 0", param_hint="'--min-duration'")
     start, end = detect_trim_bounds(
         input_file(source), threshold_db=threshold_db, min_duration=min_duration
     )
@@ -203,13 +199,6 @@ def extract_cover_command(
     """Extract an embedded cover as JPEG."""
     source = input_file(source)
     destination = output_file(destination, force)
-    if source == destination:
-        raise ValueError("Output path must differ from source audio")
-    temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.jpg")
-    try:
-        if extract_cover(Track(path=str(source)), temporary) is None:
-            raise RuntimeError("No embedded cover found")
-        os.replace(temporary, destination)
-    finally:
-        temporary.unlink(missing_ok=True)
+    if extract_cover(Track(path=str(source)), destination) is None:
+        raise RuntimeError("No embedded cover found")
     emit(ctx, {"path": str(destination)}, [str(destination)])

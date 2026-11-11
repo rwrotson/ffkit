@@ -3,6 +3,12 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ffkit.core.audio._ffmpeg import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_TARGET_LUFS,
+    SILENCE_THRESHOLD_DB,
+)
+
 
 class TempoSegment(BaseModel):
     """A timed BPM estimate."""
@@ -101,12 +107,12 @@ class Group(BaseModel):
     normalization_target: float | None = None
     normalization_gain_db: float = 0
     gain_db: float = Field(default=0, ge=-12, le=12)
-    normalize_target_lufs: float = Field(default=-14, ge=-30, le=0)
-    normalize_peak_ceiling_db: float = Field(default=-1, ge=-20, le=-0.1)
-    trim_threshold_db: float = Field(default=-50, ge=-100, le=0)
+    normalize_target_lufs: float = Field(default=DEFAULT_TARGET_LUFS, ge=-30, le=0)
+    normalize_peak_ceiling_db: float = Field(default=DEFAULT_PEAK_CEILING_DB, ge=-20, le=-0.1)
+    trim_threshold_db: float = Field(default=SILENCE_THRESHOLD_DB, ge=-100, le=0)
     trim_min_duration: float = Field(default=0.1, gt=0, le=10)
     limiter_enabled: bool = True
-    limiter_ceiling_db: float = Field(default=-1, ge=-20, le=-0.1)
+    limiter_ceiling_db: float = Field(default=DEFAULT_PEAK_CEILING_DB, ge=-20, le=-0.1)
     tracks: list[Track] = Field(default_factory=list)
 
     @property

@@ -3,7 +3,6 @@ import json
 import math
 import mmap
 import os
-import re
 import selectors
 import subprocess
 import tempfile
@@ -12,12 +11,20 @@ from collections.abc import Iterator
 from pathlib import Path
 from statistics import median
 
-from ffkit.core.audio._ffmpeg import media_path
+from ffkit.core.audio._ffmpeg import (
+    DEFAULT_TARGET_LUFS,
+    LOUDNORM_RANGE,
+    LOUDNORM_TRUE_PEAK_DB,
+    PROCESS_TIMEOUT,
+    ffmpeg_number,
+    media_path,
+)
 from ffkit.core.audio.models import TempoSegment, Track
+from ffkit.core.audio.silence import SilenceScan
 
-PROCESS_TIMEOUT = 900
 TRIM_EDGE_TOLERANCE = 0.1
-TRIM_END_TOLERANCE = 0.001
+WAVEFORM_BINS = 400
+PEAK_OVERSAMPLING = 4
 TEMPO_MAX_CHANGE = 8
 TEMPO_MIN_CHANGE = 12
 TEMPO_WINDOW = 300
@@ -86,18 +93,6 @@ def probe(track: Track) -> Track:
     return track
 
 
-def _trailing_trim_end(stderr: str, starts: list[float], ends: list[float]) -> float | None:
-    if not starts:
-        return None
-    if len(starts) > len(ends):
-        return starts[-1]
-    decoded_times = re.findall(r"^out_time_us=(\d+)$", stderr, re.MULTILINE)
-    if not decoded_times:
-        raise RuntimeError("FFmpeg did not report decoded duration")
-    decoded_end = int(decoded_times[-1]) / 1_000_000
-    return starts[-1] if ends[-1] >= decoded_end - TRIM_END_TOLERANCE else None
-
-
 def detect_trim_bounds(
     path: Path, duration: float | None = None, threshold_db: float = -50, min_duration: float = 0.1
 ) -> tuple[float, float | None]:
@@ -116,7 +111,7 @@ def detect_trim_bounds(
             "0:a:0",
             "-vn",
             "-af",
-            f"silencedetect=noise={threshold_db}dB:d={min_duration}",
+            f"silencedetect=noise={ffmpeg_number(threshold_db)}dB:d={ffmpeg_number(min_duration)}",
             "-progress",
             "pipe:2",
             "-f",
@@ -124,14 +119,13 @@ def detect_trim_bounds(
             "-",
         ],
         capture_output=True,
-        text=True,
         check=True,
         timeout=PROCESS_TIMEOUT,
     )
-    starts = [float(value) for value in re.findall(r"silence_start: ([-\d.]+)", result.stderr)]
-    ends = [float(value) for value in re.findall(r"silence_end: ([-\d.]+)", result.stderr)]
-    start = ends[0] if starts and starts[0] <= TRIM_EDGE_TOLERANCE and ends else 0.0
-    end = _trailing_trim_end(result.stderr, starts, ends)
+    scan = SilenceScan.from_lines(result.stderr.splitlines())
+    leading = scan.first_start is not None and scan.first_start <= TRIM_EDGE_TOLERANCE
+    start = scan.first_end if leading and scan.first_end is not None else 0.0
+    end = scan.trailing_start()
     if end is not None and end <= start:
         raise ValueError("Track contains no audible audio")
     return round(start, 3), round(end, 3) if end is not None else None
@@ -164,9 +158,9 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     )
     stream = json.loads(info.stdout)["streams"][0]
     channels = int(stream["channels"])
-    rate = int(stream["sample_rate"]) * 4
-    frames_per_bin = max(1, math.ceil(duration * rate / 400))
-    peaks = [0.0] * 400
+    rate = int(stream["sample_rate"]) * PEAK_OVERSAMPLING
+    frames_per_bin = max(1, math.ceil(duration * rate / WAVEFORM_BINS))
+    peaks = [0.0] * WAVEFORM_BINS
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
             "ffmpeg",
@@ -201,8 +195,10 @@ def analyze_peak_waveform(track: Track) -> list[float]:
                 values = array.array("f")
                 values.frombytes(pending[:size])
                 pending = pending[size:]
-                bin_index = min(399, frame_index // frames_per_bin)
-                peaks[bin_index] = max(peaks[bin_index], *(abs(value) for value in values))
+                bin_index = min(WAVEFORM_BINS - 1, frame_index // frames_per_bin)
+                # Builtin max/min over the array run in C; per-sample abs() in Python is slow.
+                loudest, quietest = max(values), min(values)
+                peaks[bin_index] = max(peaks[bin_index], loudest, -quietest)
                 frame_index += count
     finally:
         if process.poll() is None:
@@ -274,7 +270,7 @@ def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR09
         with mmap.mmap(energy_file.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
             energy = memoryview(mapped).cast("d")
             try:
-                width = max(1, math.ceil(energy_count / 400))
+                width = max(1, math.ceil(energy_count / WAVEFORM_BINS))
                 track.waveform = [
                     round(max(energy[pos : pos + width]) / (peak or 1), 3)
                     for pos in range(0, energy_count, width)
@@ -336,7 +332,11 @@ def measure_loudness(
     path: Path, filters: list[str] | None = None
 ) -> tuple[float | None, float | None]:
     """Measure integrated LUFS and true peak from ffmpeg's loudnorm report."""
-    chain = [*(filters or []), "loudnorm=I=-14:TP=-1:LRA=11:print_format=json"]
+    chain = [
+        *(filters or []),
+        f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
+        f":LRA={LOUDNORM_RANGE}:print_format=json",
+    ]
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
             "ffmpeg",
