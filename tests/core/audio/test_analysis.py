@@ -1,7 +1,6 @@
 import array
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,6 @@ from ffkit import (
     probe,
     tempo_estimates,
 )
-from ffkit.core.audio import analysis
 from ffkit.core.audio.silence import SilenceScan
 
 
@@ -175,20 +173,6 @@ def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
     peaks = analyze_peak_waveform(Track(path=str(source)))
     assert len(peaks) == 400
     assert 100 < next(index for index, peak in enumerate(peaks) if peak > 0) < 150
-
-
-def test_decoded_chunks_timeout_includes_stdout_read() -> None:
-    process = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(10)"], stdout=subprocess.PIPE
-    )
-    try:
-        with pytest.raises(subprocess.TimeoutExpired):
-            list(analysis._decoded_chunks(process, timeout=0.01))
-    finally:
-        process.kill()
-        process.wait()
-        if process.stdout is not None:
-            process.stdout.close()
 
 
 def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:

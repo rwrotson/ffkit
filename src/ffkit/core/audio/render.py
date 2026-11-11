@@ -5,15 +5,14 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import IO
 from uuid import uuid4
 
 from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, media_path
+from ffkit.core.audio._process import error_tail, stop
 from ffkit.core.audio.analysis import measure_loudness, trailing_trim_end
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
 from ffkit.core.audio.runtime import FFmpegRuntime
-from ffkit.core.audio.silence import ERROR_TAIL_LIMIT
 from ffkit.core.errors import CancelledError
 
 log = logging.getLogger(__name__)
@@ -58,12 +57,6 @@ def _command_parts(track: Track, source: Path, *, ffmpeg: str) -> tuple[list[str
     return inputs, outputs
 
 
-def _error_tail(errors: IO[bytes]) -> str:
-    errors.seek(0, os.SEEK_END)
-    errors.seek(max(0, errors.tell() - ERROR_TAIL_LIMIT))
-    return errors.read().decode(errors="replace")
-
-
 def _run_encoder(
     command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
 ) -> None:
@@ -88,12 +81,10 @@ def _run_encoder(
                     continue
             if process.returncode:
                 raise subprocess.CalledProcessError(
-                    process.returncode, command, stderr=_error_tail(errors)
+                    process.returncode, command, stderr=error_tail(errors)
                 )
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
+            stop(process)
 
 
 def _check_cancelled(cancelled: Callable[[], bool] | None) -> None:

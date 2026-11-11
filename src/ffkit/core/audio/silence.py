@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Self
 
 from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
+from ffkit.core.audio._process import ERROR_TAIL_LIMIT, stop
 from ffkit.core.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB
 from ffkit.core.audio.models import Effects
 from ffkit.core.errors import CancelledError
 
-ERROR_TAIL_LIMIT = 1000
 END_TOLERANCE = 0.001
 MIN_TRAILING_SILENCE = 0.01
 _EVENT = re.compile(rb"silence_(start|end): ([-\d.]+)")
@@ -127,11 +127,7 @@ def scan_silence(
             )
         return scan
     finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
-        if process.stderr is not None:
-            process.stderr.close()
+        stop(process)
 
 
 def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.

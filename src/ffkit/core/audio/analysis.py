@@ -2,12 +2,9 @@ import array
 import json
 import math
 import mmap
-import os
-import selectors
 import subprocess
 import tempfile
-import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from statistics import median
 
@@ -18,6 +15,7 @@ from ffkit.core.audio._ffmpeg import (
     media_path,
     source_fingerprint,
 )
+from ffkit.core.audio._process import stdout_chunks, stop
 from ffkit.core.audio.defaults import (
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
@@ -35,25 +33,6 @@ TEMPO_MIN_CHANGE = 12
 TEMPO_WINDOW = 300
 TEMPO_MIN_WINDOW = 160
 TEMPO_MIN_CONFIDENCE = 0.1
-
-
-def _decoded_chunks(process: subprocess.Popen[bytes], *, timeout: float) -> Iterator[bytes]:
-    deadline = time.monotonic() + timeout
-    if process.stdout is None:
-        raise RuntimeError("FFmpeg stdout is unavailable")
-    with selectors.DefaultSelector() as selector:
-        selector.register(process.stdout, selectors.EVENT_READ)
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0 or not selector.select(remaining):
-                raise subprocess.TimeoutExpired(process.args, timeout)
-            chunk = os.read(process.stdout.fileno(), 65536)
-            if not chunk:
-                break
-            yield chunk
-    remaining = max(0, deadline - time.monotonic())
-    if process.wait(timeout=remaining):
-        raise subprocess.CalledProcessError(process.returncode, process.args)
 
 
 def probe(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
@@ -222,7 +201,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None)
     frame_index = 0
     pending = b""
     try:
-        for chunk in _decoded_chunks(process, timeout=runtime.process_timeout):
+        for chunk in stdout_chunks(process, timeout=runtime.process_timeout):
             pending += chunk
             while len(pending) >= frame_bytes:
                 boundary = frames_per_bin - frame_index % frames_per_bin
@@ -237,15 +216,11 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None)
                 peaks[bin_index] = max(peaks[bin_index], loudest, -quietest)
                 frame_index += count
     finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
-        if process.stdout is not None:
-            process.stdout.close()
+        stop(process)
     return [round(value, 5) for value in peaks]
 
 
-def analyze_waveform_tempo(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable streaming analysis.
+def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Preserve Mixtable streaming analysis.
     track: Track, *, runtime: FFmpegRuntime | None = None
 ) -> Track:
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
@@ -279,7 +254,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable 
         try:
             if process.stdout is None:
                 raise RuntimeError("FFmpeg stdout is unavailable")
-            for chunk in _decoded_chunks(process, timeout=runtime.process_timeout):
+            for chunk in stdout_chunks(process, timeout=runtime.process_timeout):
                 data = remaining_bytes + chunk
                 complete = len(data) // (hop * 2) * (hop * 2)
                 for offset in range(0, complete, hop * 2):
@@ -298,11 +273,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable 
                 energy_count += 1
                 peak = max(peak, value)
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-            if process.stdout is not None:
-                process.stdout.close()
+            stop(process)
         if not energy_count:
             return track
         energy_file.flush()

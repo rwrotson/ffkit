@@ -254,7 +254,7 @@ layers = [
     "analysis",
     "silence : filters : formats",
     "models : runtime",
-    "defaults | _ffmpeg",
+    "defaults | _ffmpeg | _process",
 ]
 exhaustive = true
 

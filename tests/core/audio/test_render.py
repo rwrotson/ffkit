@@ -17,6 +17,7 @@ from ffkit import (
     probe,
     render,
 )
+from ffkit.core.audio._process import ERROR_TAIL_LIMIT
 
 render_module = importlib.import_module("ffkit.core.audio.render")
 silence_module = importlib.import_module("ffkit.core.audio.silence")
@@ -196,7 +197,7 @@ def test_trailing_silence_scan_bounds_error_output() -> None:
     command = [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(2)"]
     with pytest.raises(subprocess.CalledProcessError) as error:
         silence_module.scan_silence(command, None, timeout=30)
-    assert len(error.value.stderr) == silence_module.ERROR_TAIL_LIMIT
+    assert len(error.value.stderr) == ERROR_TAIL_LIMIT
 
 
 def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
@@ -293,7 +294,7 @@ def test_render_keeps_only_error_tail(
     with pytest.raises(subprocess.CalledProcessError) as error:
         render(Track(path=str(source)), tmp_path / "out.mp3", cancelled=cancelled)
     assert error.value.returncode == 7
-    assert len(error.value.stderr) == silence_module.ERROR_TAIL_LIMIT
+    assert len(error.value.stderr) == ERROR_TAIL_LIMIT
 
 
 def test_render_encoder_timeout_kills_process(
@@ -361,6 +362,8 @@ def test_render_cancellation_preserves_output(
 
     class PendingProcess:
         returncode = 0
+        stdout = None
+        stderr = None
 
         def poll(self) -> None:
             return None
@@ -407,6 +410,8 @@ def test_render_cancellation_after_encoding(
 
     class CompletedProcess:
         returncode = 0
+        stdout = None
+        stderr = None
 
         def poll(self) -> int:
             return 0
@@ -427,6 +432,8 @@ def test_render_cancellation_before_replace_without_limiter(
 
     class CompletedProcess:
         returncode = 0
+        stdout = None
+        stderr = None
 
         def poll(self) -> int:
             return 0

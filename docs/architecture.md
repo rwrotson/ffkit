@@ -42,7 +42,7 @@ modules joined by `|` may not:
 | Measurement | `analysis` |
 | Primitives | `silence : filters : formats` |
 | Models | `models : runtime` |
-| Constants | `defaults \| _ffmpeg` |
+| Constants | `defaults \| _ffmpeg \| _process` |
 
 Every module in `core.audio` must belong to one of these layers.
 

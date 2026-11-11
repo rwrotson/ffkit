@@ -5,6 +5,7 @@ import subprocess
 from collections.abc import Generator
 
 from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, ffmpeg_number, media_path
+from ffkit.core.audio._process import stop
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Effects, Track
 from ffkit.core.audio.runtime import FFmpegRuntime
@@ -53,7 +54,7 @@ def stream_mp3(
     )
 
 
-def _stream(  # noqa: C901, PLR0913 - Mixtable cleanup paths; receives only the runtime fields it uses.
+def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
     track: Track,
     gain: float,
     start: float,
@@ -105,12 +106,4 @@ def _stream(  # noqa: C901, PLR0913 - Mixtable cleanup paths; receives only the 
         log.exception("audio_stream_failed track=%s", track.id)
         raise
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=2)
-        if process.stdout is not None:
-            process.stdout.close()
+        stop(process, grace=2)
