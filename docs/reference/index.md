@@ -16,7 +16,8 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.audio.runtime` | Define FFmpeg executables and process time limits |
 | `ffkit.core.audio.silence` | Parse FFmpeg silence detection and find trailing silence |
 | `ffkit.core.audio.stream` | Stream MP3 audio from a playback position |
-| `ffkit.config.settings` | Define and load library settings |
+| `ffkit.logs.settings` | Define logging settings |
 | `ffkit.logs.setup` | Configure console and file logging for applications |
 | `ffkit.cli.app` | Provide the optional Typer audio commands |
+| `ffkit.cli.settings` | Define and load `FFKIT_*` settings of the command |
 | `ffkit.main` | Start the optional CLI |

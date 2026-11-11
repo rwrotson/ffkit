@@ -19,11 +19,11 @@ The base install provides the audio API and depends only on Pydantic. Extras add
 
 | Extra | Adds | Packages |
 | --- | --- | --- |
-| `app` | `ffkit.config` settings and `ffkit.logs.setup_logging()` | Pydantic Settings, structlog |
-| `cli` | The `ffkit` command; includes `app` | Typer, Rich |
+| `logs` | `ffkit.logs`: `LogSettings` and `setup_logging()` | structlog |
+| `cli` | The `ffkit` command and its `FFKIT_*` settings; includes `logs` | Pydantic Settings, Typer, Rich |
 
 ```bash
-pip install "ffkit[app] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
+pip install "ffkit[logs] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
 ```
 
 For development in a clone of the repository:
@@ -110,11 +110,10 @@ callers pass to the corresponding functions themselves.
 `analyze_loudness()` stores source loudness, true peak, and the file fingerprint on the track;
 `calculate_normalization_gain()` reuses them while no filters apply and the file is unchanged.
 
-Configure logging in the application, or use the bundled helper from the `app` extra:
+Configure logging in the application, or use the bundled helper from the `logs` extra:
 
 ```python
-from ffkit.config import LogSettings
-from ffkit.logs import setup_logging
+from ffkit.logs import LogSettings, setup_logging
 
 setup_logging(LogSettings(level="DEBUG"))
 ```
@@ -165,7 +164,7 @@ Add audio operations under `ffkit.core.audio`, export supported names from `ffki
 
 ## Configuration
 
-`load_settings()` and `setup_logging()` without arguments read environment variables or a `.env` file. Sections are nested with `__`:
+The `ffkit` command reads `FFKIT_*` environment variables or a `.env` file. Sections are nested with `__`:
 
 | Prefix | Controls |
 |--------|----------|
@@ -178,7 +177,22 @@ FFKIT_LOG__FORMAT=json
 FFKIT_FFMPEG__PROCESS_TIMEOUT=3600
 ```
 
-The CLI passes `FFKIT_FFMPEG__*` values to the audio functions. Library code does not read them;
-`load_settings().ffmpeg` is an `FFmpegRuntime` that an application passes as `runtime=`.
+The library does not read environment variables. An application composes its own settings from
+`LogSettings` and `FFmpegRuntime` and passes them as `setup_logging(settings.log)` and
+`runtime=settings.ffmpeg`:
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from ffkit import FFmpegRuntime
+from ffkit.logs import LogSettings
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="MYAPP_", env_nested_delimiter="__")
+
+    log: LogSettings = LogSettings()
+    ffmpeg: FFmpegRuntime = FFmpegRuntime()
+```
 
 All variables are listed on the [configuration page](configuration.md).

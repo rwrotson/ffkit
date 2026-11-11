@@ -30,8 +30,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = ["pydantic-settings>=2.15.0", "structlog>=26.1.0"]
-cli = ["ffkit[app]", "rich>=15.0.0", "typer>=0.27.3"]
+logs = ["structlog>=26.1.0"]
+cli = ["ffkit[logs]", "pydantic-settings>=2.15.0", "rich>=15.0.0", "typer>=0.27.3"]
 
 [project.scripts]
 ffkit = "ffkit.main:main"
@@ -236,7 +236,7 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Package layers"
 type = "layers"
-layers = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.config", "ffkit.core"]
+layers = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.core"]
 
 [[tool.importlinter.contracts]]
 name = "Core layers"
@@ -261,7 +261,7 @@ exhaustive = true
 [[tool.importlinter.contracts]]
 name = "Other layers use the core only through the ffkit public API"
 type = "forbidden"
-source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.config"]
+source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs"]
 forbidden_modules = ["ffkit.core", "ffkit.core.**"]
 # The ffkit package itself re-exports the core.
 allow_indirect_imports = true
@@ -273,16 +273,10 @@ source_modules = ["ffkit.core"]
 forbidden_modules = ["pydantic_settings", "structlog", "typer", "rich"]
 
 [[tool.importlinter.contracts]]
-name = "Configuration does not use logging or CLI packages"
-type = "forbidden"
-source_modules = ["ffkit.config"]
-forbidden_modules = ["structlog", "typer", "rich"]
-
-[[tool.importlinter.contracts]]
-name = "Logging setup does not use CLI packages"
+name = "Logging setup does not use settings loading or CLI packages"
 type = "forbidden"
 source_modules = ["ffkit.logs"]
-forbidden_modules = ["typer", "rich"]
+forbidden_modules = ["pydantic_settings", "typer", "rich"]
 
 
 # POETHEPOET -------------------------------------------------------------------

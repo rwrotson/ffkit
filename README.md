@@ -6,7 +6,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 - Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, normalization, MP3 rendering and streaming, and cover extraction; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
-- An opt-in `ffkit.logs.setup_logging()` for applications (`ffkit[app]` extra): structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
+- An opt-in `ffkit.logs.setup_logging()` for applications (`ffkit[logs]` extra): structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with nested `FFKIT_LOG__*` and `FFKIT_FFMPEG__*` sections, a test that keeps `.env.example` in sync, and a generated configuration page
 - import-linter contracts that keep the core API independent of configuration and logging setup
 - Strict MyPy with the Pydantic plugin, Ruff, pytest in parallel and random order with a 95% branch coverage gate, poethepoet tasks, pre-commit hooks, Commitizen
@@ -15,7 +15,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 ## Stack
 
 - **[structlog](https://www.structlog.org/)** — structured logging with context binding; dev console output or JSON for aggregators
-- **[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)** — environment-based configuration
+- **[Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)** — environment-based CLI configuration
 - **[uv](https://docs.astral.sh/uv/)** — package management and build backend
 - **[Ruff](https://docs.astral.sh/ruff/)** — linting and formatting
 - **[MyPy](https://mypy.readthedocs.io/)** — strict type checking
@@ -43,11 +43,11 @@ The base install provides the audio API and depends only on Pydantic. Extras add
 
 | Extra | Adds | Packages |
 | --- | --- | --- |
-| `app` | `ffkit.config` settings and `ffkit.logs.setup_logging()` | Pydantic Settings, structlog |
-| `cli` | The `ffkit` command; includes `app` | Typer, Rich |
+| `logs` | `ffkit.logs`: `LogSettings` and `setup_logging()` | structlog |
+| `cli` | The `ffkit` command and its `FFKIT_*` settings; includes `logs` | Pydantic Settings, Typer, Rich |
 
 ```bash
-pip install "ffkit[app] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
+pip install "ffkit[logs] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
 ```
 
 For development in a clone of the repository:
@@ -152,14 +152,13 @@ would otherwise be exceeded. `calculate_normalization_gain()` reuses `Track.loud
 file's `(st_size, st_mtime_ns, st_ctime_ns)`. `analyze_loudness()` measures the source and fills
 all three fields.
 
-The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application with the `app` extra can use the bundled helper:
+The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application with the `logs` extra can use the bundled helper:
 
 ```python
-from ffkit.config import LogSettings
-from ffkit.logs import setup_logging
+from ffkit.logs import LogSettings, setup_logging
 
 setup_logging(LogSettings(level="DEBUG", format="json"))
-setup_logging()  # or read FFKIT_LOG__* variables and .env
+setup_logging()  # defaults: INFO to stderr, no log file
 ```
 
 ## Development
@@ -205,7 +204,7 @@ Bump type is inferred automatically: `fix:` → patch, `feat:` → minor, `feat!
 
 ## Configuration
 
-`ffkit.config.Settings` defines defaults in code. `load_settings()` and `setup_logging()` without arguments read `FFKIT_*` environment variables and `.env`; the process environment wins. Sections are nested with `__`:
+The `ffkit` command reads `FFKIT_*` environment variables and `.env`; the process environment wins. Defaults live in `ffkit.cli.settings.Settings`. Sections are nested with `__`:
 
 | Prefix | Controls |
 |--------|----------|
@@ -222,8 +221,22 @@ FFKIT_FFMPEG__FFMPEG_PATH=/opt/ffmpeg/bin/ffmpeg
 See `.env.example` and the generated configuration page in the documentation site.
 `FFKIT_LOG__FILE_NAME` must be a filename without directory separators; `FFKIT_LOG__DIR`
 selects its directory.
-The library does not read `FFKIT_FFMPEG__*`; `load_settings().ffmpeg` is an `FFmpegRuntime` that an
-application passes as `runtime=`, as the CLI does.
+The library does not read environment variables. An application composes its own settings from the
+library models and passes them on: `setup_logging(settings.log)` and `runtime=settings.ffmpeg`.
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from ffkit import FFmpegRuntime
+from ffkit.logs import LogSettings
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="MYAPP_", env_nested_delimiter="__")
+
+    log: LogSettings = LogSettings()
+    ffmpeg: FFmpegRuntime = FFmpegRuntime()
+```
 
 ## Project Structure
 
@@ -246,12 +259,12 @@ src/
     │       ├── runtime.py       # FFmpegRuntime: executables and time limits
     │       ├── silence.py       # silence detection parsing
     │       └── stream.py        # MP3 playback stream
-    ├── config/
-    │   └── settings.py      # Settings with the log and ffmpeg sections (ffkit[app])
     ├── logs/
-    │   └── setup.py         # opt-in setup_logging() for applications (ffkit[app])
+    │   ├── settings.py      # LogSettings (ffkit[logs])
+    │   └── setup.py         # opt-in setup_logging() for applications (ffkit[logs])
     ├── cli/
-    │   └── app.py           # optional Typer commands (ffkit[cli])
+    │   ├── app.py           # optional Typer commands (ffkit[cli])
+    │   └── settings.py      # FFKIT_* settings of the command
     └── main.py              # ffkit console script entry point
 tests/                       # mirrors the package; test_package.py checks import-time behaviour
 ```

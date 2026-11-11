@@ -2,8 +2,6 @@ import logging
 import subprocess
 import sys
 
-import pytest
-
 import ffkit
 
 
@@ -38,15 +36,8 @@ def test_import_does_not_require_app_extra() -> None:
     assert result.stdout.split() == ["False", "False"]
 
 
-@pytest.mark.parametrize(
-    ("package", "missing"),
-    [
-        ("ffkit.config", "pydantic_settings"),
-        ("ffkit.logs", "pydantic_settings"),
-        ("ffkit.logs", "structlog"),
-    ],
-)
-def test_app_packages_report_missing_extra(package: str, missing: str) -> None:
+def test_logs_package_reports_missing_extra() -> None:
+    package, missing = "ffkit.logs", "structlog"
     # A None entry in sys.modules makes the import fail as if the package were not installed.
     code = (
         f"import sys; sys.modules[{missing!r}] = None\n"
@@ -57,4 +48,4 @@ def test_app_packages_report_missing_extra(package: str, missing: str) -> None:
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )
     assert result.stdout.startswith(f"{missing} ")
-    assert "ffkit[app]" in result.stdout
+    assert "ffkit[logs]" in result.stdout

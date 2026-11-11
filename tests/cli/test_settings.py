@@ -5,8 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from ffkit import FFmpegRuntime
-from ffkit.config import LogSettings, Settings, load_settings
-from ffkit.config.settings import env_fields
+from ffkit.cli.settings import Settings, env_fields, load_settings
 
 ENV_EXAMPLE = Path(__file__).parents[2] / ".env.example"
 
@@ -64,14 +63,6 @@ def test_invalid_level_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FFKIT_LOG__LEVEL", "LOUD")
     with pytest.raises(ValidationError):
         load_settings()
-
-
-@pytest.mark.parametrize(
-    "name", ["", ".", "..", "../outside.log", "sub/log", "..\\outside.log", "/outside.log"]
-)
-def test_log_file_name_must_be_basename(name: str) -> None:
-    with pytest.raises(ValidationError, match="basename"):
-        LogSettings(file_name=name)
 
 
 def test_env_example_parses_to_defaults() -> None:

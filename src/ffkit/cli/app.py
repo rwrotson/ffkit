@@ -26,7 +26,7 @@ from ffkit import (
     probe,
     render,
 )
-from ffkit.config import load_settings
+from ffkit.cli.settings import load_settings
 from ffkit.logs import setup_logging
 
 

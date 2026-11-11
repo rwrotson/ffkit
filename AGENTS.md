@@ -4,7 +4,7 @@ This file describes repository conventions for coding agents.
 
 ## Project Overview
 
-A typed Python library of FFmpeg audio helpers, with room for future video helpers, optional structlog-based application logging, and Pydantic Settings-based configuration.
+A typed Python library of FFmpeg audio helpers, with room for future video helpers, optional structlog-based application logging, and an optional CLI configured through Pydantic Settings.
 
 Distribution name: `ffkit` | Python package: `ffkit` | Environment prefix: `FFKIT_`
 
@@ -54,7 +54,7 @@ uv run --group docs properdocs build --strict
 
 ## Dependencies
 
-- Put runtime imports needed by the core in `[project].dependencies` and those of outer layers in their extra (`app`, `cli`); also list extra packages in the `dev` group so tests can import them. Put development tools in the `dev` group, and documentation tools in the `docs` group.
+- Put runtime imports needed by the core in `[project].dependencies` and those of outer layers in their extra (`logs`, `cli`); also list extra packages in the `dev` group so tests can import them. Put development tools in the `dev` group, and documentation tools in the `docs` group.
 - Keep runtime dependencies minimal and lower bounds wide enough for library consumers; they share one environment with the application.
 - Change dependencies through uv (`uv add`, `uv remove`) so `pyproject.toml` and `uv.lock` change together. Verify the lock with `uv sync --locked --all-groups`.
 - Raise a direct dependency's lower bound when code needs a newer API. The locked environment does not check lower bounds; the CI `lowest` job does.
@@ -120,7 +120,7 @@ Internal imports use the `ffkit.` prefix. Ruff bans relative imports except in p
 
 ```python
 from ffkit.core.errors import InvalidInputError
-from ffkit.config import LogSettings
+from ffkit.logs import LogSettings
 ```
 
 ### Layers & Public API
@@ -128,13 +128,12 @@ from ffkit.config import LogSettings
 ```
 src/ffkit/__init__.py  — Public API re-exported with __all__; NullHandler on the "ffkit" logger
 src/ffkit/core/        — Audio helpers under core/audio/, public defaults, and the FFKitError hierarchy
-src/ffkit/config/      — Settings (Pydantic Settings) for applications (`ffkit[app]` extra)
-src/ffkit/logs/        — Opt-in setup_logging() for applications (`ffkit[app]` extra)
-src/ffkit/cli/         — Typer CLI and composition root over the core audio API (`ffkit[cli]` extra)
+src/ffkit/logs/        — LogSettings and opt-in setup_logging() for applications (`ffkit[logs]` extra)
+src/ffkit/cli/         — Typer CLI, its FFKIT_* settings, and composition root (`ffkit[cli]` extra)
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `config`, and `core`; a layer imports only layers below it. Outside the core, import core names only from `ffkit`. Import `_`-prefixed modules only within their package. The core uses only Pydantic among third-party packages; `config` adds Pydantic Settings, `logs` adds structlog, and `cli` adds Typer and Rich. Inside `core.audio`, every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, and `core`; a layer imports only layers below it. Outside the core, import core names only from `ffkit`. Import `_`-prefixed modules only within their package. The core uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `core.audio`, every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
 
 The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
 
@@ -144,11 +143,11 @@ To add functionality: put audio code in `src/ffkit/core/audio/`, add a new modul
 
 Importing `ffkit` must not read the environment or `.env`, configure logging or structlog, add handlers outside the `ffkit` logger, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
 
-### Configuration via Environment Variables
+### CLI Configuration via Environment Variables
 
-`src/ffkit/config/settings.py` defines `Settings` (Pydantic `BaseSettings`, prefix `FFKIT_`, nested delimiter `__`) with defaults in code and the sections `LogSettings` (`FFKIT_LOG__*`) and `ffmpeg` (`FFKIT_FFMPEG__*`, the core `FFmpegRuntime` model). Only `load_settings()` reads the environment and `.env`; empty values use defaults. Library code takes settings objects as arguments instead of loading them.
+`src/ffkit/cli/settings.py` defines the command's `Settings` (Pydantic `BaseSettings`, prefix `FFKIT_`, nested delimiter `__`) from library models: `log` is `LogSettings` (`FFKIT_LOG__*`) and `ffmpeg` is `FFmpegRuntime` (`FFKIT_FFMPEG__*`). Only `load_settings()` in the CLI reads the environment and `.env`; empty values use defaults. Library code never reads the environment and takes settings objects as arguments.
 
-Every setting needs a `Field(description=...)` and a line in `.env.example`; tests in `tests/config/` enforce both. The docs configuration page is generated from `Settings` by `docs/gen_config_page.py`; do not edit it by hand.
+Every setting needs a `Field(description=...)` and a line in `.env.example`; tests in `tests/cli/test_settings.py` enforce both. The docs configuration page is generated from `Settings` by `docs/gen_config_page.py`; do not edit it by hand.
 
 ### Logging
 
@@ -162,7 +161,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 ### Testing
 
-`tests/` mirrors the package (`core/`, `config/`, `logs/`, `cli/`); `tests/test_package.py` covers the public API and import-time behaviour.
+`tests/` mirrors the package (`core/`, `logs/`, `cli/`); `tests/test_package.py` covers the public API and import-time behaviour.
 
 Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `FFKIT_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 
