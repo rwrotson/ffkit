@@ -117,7 +117,14 @@ differ from the source audio file.
 
 `analyze_peak_waveform()` reads the source duration when the track has not been probed.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
-FFmpeg analysis and cover extraction have a 15-minute processing deadline.
+Each FFmpeg or FFprobe run for probing, analysis, silence scanning, rendering, and cover extraction
+has a 15-minute processing deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
+when the encoder produces no output for 30 seconds.
+`Group` holds shared settings for an application. The library reads only `gain_db`,
+`normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
+`limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
+`normalize_peak_ceiling_db`, `trim_threshold_db`, and `trim_min_duration` are application state that
+callers pass to the corresponding functions themselves.
 Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
 would otherwise be exceeded. `calculate_normalization_gain()` reuses `Track.loudness_lufs` and
 `Track.true_peak_db` only when no filters apply and `Track.analysis_source_stat` matches the source

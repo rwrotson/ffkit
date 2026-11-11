@@ -79,6 +79,14 @@ Older Track JSON without these fields cannot distinguish source tags from explic
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.
 Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
+Each FFmpeg or FFprobe run for probing, analysis, silence scanning, rendering, and cover extraction
+has a 15-minute processing deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
+when the encoder produces no output for 30 seconds.
+`Group` holds shared settings for an application. The library reads only `gain_db`,
+`normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
+`limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
+`normalize_peak_ceiling_db`, `trim_threshold_db`, and `trim_min_duration` are application state that
+callers pass to the corresponding functions themselves.
 `analyze_loudness()` stores source loudness, true peak, and the file fingerprint on the track;
 `calculate_normalization_gain()` reuses them while no filters apply and the file is unchanged.
 
