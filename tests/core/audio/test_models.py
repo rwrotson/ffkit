@@ -12,7 +12,7 @@ from ffkit import (
 from ffkit.core.errors import CancelledError, FFKitError, InvalidInputError
 
 
-def test_audio_models_preserve_mixtable_defaults_and_validation() -> None:
+def test_audio_models_preserve_defaults_and_validation() -> None:
     track = Track(path="song.flac")
     group = Group(name="Mix", tracks=[track])
     assert track.effects == Effects()

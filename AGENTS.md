@@ -135,7 +135,7 @@ src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 
 Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, and `core`; a layer imports only layers below it. Outside the core, import core names only from `ffkit`. Import `_`-prefixed modules only within their package and its subpackages. The core uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `core.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
 
-The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
+The `FFKitError` hierarchy is available for future APIs. Existing audio helpers raise built-in and subprocess exceptions.
 
 To add functionality: put measurement code in `src/ffkit/core/audio/analysis/`, output code in `src/ffkit/core/audio/processing/`, shared audio helpers in `src/ffkit/core/audio/`, and media-independent FFmpeg helpers in `src/ffkit/core/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `core/audio/__init__.py` (subpackage `__init__.py` files stay empty) up to `ffkit/__init__.py`; test it in the mirrored path under `tests/core/audio/`; and list it in `docs/reference/index.md`.
 

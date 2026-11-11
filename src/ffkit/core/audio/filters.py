@@ -13,7 +13,7 @@ def audio_filters(
     streaming: bool = False,
     limiter_db: float | None = None,
 ) -> list[str]:
-    """Build the Mixtable FFmpeg audio filter chain."""
+    """Build the FFmpeg audio filter chain for a track."""
     effects = track.effects
     filters: list[str] = []
     if effects.trim_start or effects.trim_end is not None:

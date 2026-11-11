@@ -14,7 +14,7 @@ def test_filters_use_fixed_notation_for_small_values() -> None:
     ]
 
 
-def test_filters_keep_mixtable_order_and_stream_rule() -> None:
+def test_filters_keep_order_and_stream_rule() -> None:
     track = Track(path="song.flac")
     assert audio_filters(track) == []
     track.effects = Effects(

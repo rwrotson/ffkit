@@ -96,7 +96,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None)
     return [round(value, 5) for value in peaks]
 
 
-def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Preserve Mixtable streaming analysis.
+def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analysis.
     track: Track, *, runtime: FFmpegRuntime | None = None
 ) -> Track:
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
