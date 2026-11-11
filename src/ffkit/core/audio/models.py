@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ffkit.core.audio._ffmpeg import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
     SILENCE_THRESHOLD_DB,
 )
 
@@ -50,6 +51,10 @@ class Effects(BaseModel):
             if start is not None and end is not None and end <= start:
                 raise ValueError("Trim end must be later than start")
         return values
+
+    def effective_limiter_db(self, default: float | None) -> float | None:
+        """Return the track limiter ceiling, or the default when the track sets none."""
+        return self.limiter_ceiling_db if self.limiter_ceiling_db is not None else default
 
 
 class Track(BaseModel):
@@ -110,7 +115,7 @@ class Group(BaseModel):
     normalize_target_lufs: float = Field(default=DEFAULT_TARGET_LUFS, ge=-30, le=0)
     normalize_peak_ceiling_db: float = Field(default=DEFAULT_PEAK_CEILING_DB, ge=-20, le=-0.1)
     trim_threshold_db: float = Field(default=SILENCE_THRESHOLD_DB, ge=-100, le=0)
-    trim_min_duration: float = Field(default=0.1, gt=0, le=10)
+    trim_min_duration: float = Field(default=DEFAULT_TRIM_MIN_DURATION, gt=0, le=10)
     limiter_enabled: bool = True
     limiter_ceiling_db: float = Field(default=DEFAULT_PEAK_CEILING_DB, ge=-20, le=-0.1)
     tracks: list[Track] = Field(default_factory=list)
@@ -122,6 +127,6 @@ class Group(BaseModel):
 
     def limiter_for(self, track: Track) -> float | None:
         """Return the track override or enabled group ceiling."""
-        if track.effects.limiter_ceiling_db is not None:
-            return track.effects.limiter_ceiling_db
-        return self.limiter_ceiling_db if self.limiter_enabled else None
+        return track.effects.effective_limiter_db(
+            self.limiter_ceiling_db if self.limiter_enabled else None
+        )

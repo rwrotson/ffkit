@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import IO
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, PROCESS_TIMEOUT, media_path
-from ffkit.core.audio.analysis import measure_loudness, probe
+from ffkit.core.audio._ffmpeg import FFMPEG, MP3_ENCODER_ARGS, PROCESS_TIMEOUT, media_path
+from ffkit.core.audio.analysis import measure_loudness, trailing_trim_end
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
-from ffkit.core.audio.silence import ERROR_TAIL_LIMIT, MIN_TRAILING_SILENCE, trailing_silence_end
+from ffkit.core.audio.silence import ERROR_TAIL_LIMIT
 from ffkit.core.errors import CancelledError
 
 log = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ RENDERED_TAGS = frozenset({"title", "artist", "album", "date", "genre", "track"}
 
 def _command_parts(track: Track, source: Path) -> tuple[list[str], list[str]]:
     """Return the FFmpeg arguments before and after the audio filter option."""
-    inputs = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
+    inputs = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
     cover = Path(track.cover_path) if track.cover_path else None
     if track.cover_removed:
         inputs.extend(["-vn", "-map", "0:a:0"])
@@ -108,16 +108,6 @@ def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> 
     return lowered
 
 
-def _trailing_end(track: Track, source: Path, cancelled: Callable[[], bool] | None) -> float | None:
-    if not track.effects.trim_silence:
-        return None
-    duration = probe(Track(path=str(source))).duration
-    trailing_end = trailing_silence_end(track.effects, source, duration, cancelled)
-    if trailing_end is not None and trailing_end <= track.effects.trim_start + MIN_TRAILING_SILENCE:
-        raise ValueError("Track contains no audible audio")
-    return trailing_end
-
-
 def _encode(track: Track, command: list[str], cancelled: Callable[[], bool] | None) -> None:
     try:
         _run_encoder(command, cancelled)
@@ -143,16 +133,12 @@ def render(
         destination.exists() and source.samefile(destination)
     ):
         raise ValueError("Output path must differ from source audio")
-    ceiling = (
-        track.effects.limiter_ceiling_db
-        if track.effects.limiter_ceiling_db is not None
-        else limiter_db
-    )
+    ceiling = track.effects.effective_limiter_db(limiter_db)
     destination.parent.mkdir(parents=True, exist_ok=True)
     inputs, outputs = _command_parts(track, source)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
     try:
-        trailing_end = _trailing_end(track, source, cancelled)
+        trailing_end = trailing_trim_end(track.effects, source, cancelled)
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
             attempt_track = track.model_copy(deep=True)

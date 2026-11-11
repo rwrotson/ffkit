@@ -43,7 +43,7 @@ def audio_filters(
             f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}"
             f":TP={LOUDNORM_TRUE_PEAK_DB}:LRA={LOUDNORM_RANGE}"
         )
-    ceiling = effects.limiter_ceiling_db if effects.limiter_ceiling_db is not None else limiter_db
+    ceiling = effects.effective_limiter_db(limiter_db)
     if ceiling is not None:
         filters.append(f"alimiter=limit={10 ** (ceiling / 20):.8f}:level=false:latency=true")
     return filters

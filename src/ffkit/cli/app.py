@@ -12,6 +12,7 @@ from typer.core import TyperGroup
 
 from ffkit.config import load_settings
 from ffkit.core.audio import Effects, Track, extract_cover, measure_loudness, probe, render
+from ffkit.core.audio._ffmpeg import DEFAULT_TRIM_MIN_DURATION, SILENCE_THRESHOLD_DB
 from ffkit.core.audio.analysis import detect_trim_bounds
 from ffkit.utils.log import setup_logging
 
@@ -153,8 +154,12 @@ def loudness_command(ctx: typer.Context, source: Path) -> None:
 def trim_bounds_command(
     ctx: typer.Context,
     source: Path,
-    threshold_db: Annotated[float, typer.Option("--threshold-db", min=-100, max=0)] = -50,
-    min_duration: Annotated[float, typer.Option("--min-duration", min=0, max=10)] = 0.1,
+    threshold_db: Annotated[
+        float, typer.Option("--threshold-db", min=-100, max=0)
+    ] = SILENCE_THRESHOLD_DB,
+    min_duration: Annotated[
+        float, typer.Option("--min-duration", min=0, max=10)
+    ] = DEFAULT_TRIM_MIN_DURATION,
 ) -> None:
     """Find audible start and end positions."""
     if min_duration == 0:

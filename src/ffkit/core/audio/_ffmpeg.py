@@ -1,7 +1,12 @@
+import os
 from pathlib import Path
 
+# Executables are resolved from PATH.
+FFMPEG = "ffmpeg"
+FFPROBE = "ffprobe"
 PROCESS_TIMEOUT = 900
 SILENCE_THRESHOLD_DB = -50
+DEFAULT_TRIM_MIN_DURATION = 0.1
 DEFAULT_TARGET_LUFS = -14
 DEFAULT_PEAK_CEILING_DB = -1
 LOUDNORM_TRUE_PEAK_DB = -1
@@ -18,3 +23,9 @@ def ffmpeg_number(value: float) -> str:
 def media_path(path: str | Path) -> str:
     """Return an absolute path so FFmpeg never reads a ``name:`` prefix as a protocol."""
     return str(Path(path).absolute())
+
+
+def source_fingerprint(path: Path) -> tuple[int, int, int]:
+    """Return size, mtime, and ctime that identify the current file contents."""
+    stat = os.stat(path)
+    return stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns

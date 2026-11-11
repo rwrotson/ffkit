@@ -6,8 +6,10 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Self
 
 from ffkit.core.audio._ffmpeg import (
+    FFMPEG,
     PROCESS_TIMEOUT,
     SILENCE_THRESHOLD_DB,
     ffmpeg_number,
@@ -35,7 +37,7 @@ class SilenceScan:
     decoded_end: float | None = None
 
     @classmethod
-    def from_lines(cls, lines: Iterable[bytes]) -> SilenceScan:
+    def from_lines(cls, lines: Iterable[bytes]) -> Self:
         """Collect events from complete FFmpeg output lines."""
         scan = cls()
         for line in lines:
@@ -145,7 +147,7 @@ def trailing_silence_end(
     if end <= start:
         return None
     command = [
-        "ffmpeg",
+        FFMPEG,
         "-hide_banner",
         "-nostats",
         "-loglevel",

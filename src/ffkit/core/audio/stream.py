@@ -4,7 +4,7 @@ import selectors
 import subprocess
 from collections.abc import Generator
 
-from ffkit.core.audio._ffmpeg import MP3_ENCODER_ARGS, ffmpeg_number, media_path
+from ffkit.core.audio._ffmpeg import FFMPEG, MP3_ENCODER_ARGS, ffmpeg_number, media_path
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Effects, Track
 
@@ -48,7 +48,7 @@ def _stream(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
         return
     snapshot, source_offset = seeked
     command = [
-        "ffmpeg",
+        FFMPEG,
         "-hide_banner",
         "-loglevel",
         "error",

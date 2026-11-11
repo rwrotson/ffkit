@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import PROCESS_TIMEOUT, media_path
+from ffkit.core.audio._ffmpeg import FFMPEG, PROCESS_TIMEOUT, media_path
 from ffkit.core.audio.models import Track
 
 
@@ -23,8 +23,8 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.jpg")
     try:
         result = subprocess.run(  # noqa: S603 - Fixed FFmpeg command with separate paths.
-            [  # noqa: S607 - FFmpeg is resolved from PATH.
-                "ffmpeg",
+            [
+                FFMPEG,
                 "-v",
                 "error",
                 "-i",

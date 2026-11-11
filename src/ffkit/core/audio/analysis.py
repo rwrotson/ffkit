@@ -7,20 +7,24 @@ import selectors
 import subprocess
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from statistics import median
 
 from ffkit.core.audio._ffmpeg import (
     DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
+    FFMPEG,
+    FFPROBE,
     LOUDNORM_RANGE,
     LOUDNORM_TRUE_PEAK_DB,
     PROCESS_TIMEOUT,
+    SILENCE_THRESHOLD_DB,
     ffmpeg_number,
     media_path,
 )
-from ffkit.core.audio.models import TempoSegment, Track
-from ffkit.core.audio.silence import SilenceScan
+from ffkit.core.audio.models import Effects, TempoSegment, Track
+from ffkit.core.audio.silence import MIN_TRAILING_SILENCE, scan_silence, trailing_silence_end
 
 TRIM_EDGE_TOLERANCE = 0.1
 WAVEFORM_BINS = 400
@@ -58,8 +62,8 @@ def probe(track: Track) -> Track:
         track.error = "Source file is missing"
         return track
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFprobe is resolved on PATH.
-            "ffprobe",
+        [
+            FFPROBE,
             "-v",
             "error",
             "-show_format",
@@ -94,41 +98,56 @@ def probe(track: Track) -> Track:
 
 
 def detect_trim_bounds(
-    path: Path, duration: float | None = None, threshold_db: float = -50, min_duration: float = 0.1
+    path: Path,
+    duration: float | None = None,
+    threshold_db: float = SILENCE_THRESHOLD_DB,
+    min_duration: float = DEFAULT_TRIM_MIN_DURATION,
+    cancelled: Callable[[], bool] | None = None,
 ) -> tuple[float, float | None]:
     """Find audible bounds; retain pauses inside the track."""
     if duration is None:
         duration = probe(Track(path=str(path))).duration
     if not duration or duration <= 0:
         raise ValueError("Track duration is unavailable")
-    result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
-            "ffmpeg",
-            "-hide_banner",
-            "-i",
-            media_path(path),
-            "-map",
-            "0:a:0",
-            "-vn",
-            "-af",
-            f"silencedetect=noise={ffmpeg_number(threshold_db)}dB:d={ffmpeg_number(min_duration)}",
-            "-progress",
-            "pipe:2",
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        check=True,
-        timeout=PROCESS_TIMEOUT,
-    )
-    scan = SilenceScan.from_lines(result.stderr.splitlines())
+    command = [
+        FFMPEG,
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "info",
+        "-i",
+        media_path(path),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-af",
+        f"silencedetect=noise={ffmpeg_number(threshold_db)}dB:d={ffmpeg_number(min_duration)}",
+        "-progress",
+        "pipe:2",
+        "-f",
+        "null",
+        "-",
+    ]
+    scan = scan_silence(command, cancelled)
     leading = scan.first_start is not None and scan.first_start <= TRIM_EDGE_TOLERANCE
     start = scan.first_end if leading and scan.first_end is not None else 0.0
     end = scan.trailing_start()
     if end is not None and end <= start:
         raise ValueError("Track contains no audible audio")
     return round(start, 3), round(end, 3) if end is not None else None
+
+
+def trailing_trim_end(
+    effects: Effects, source: Path, cancelled: Callable[[], bool] | None = None
+) -> float | None:
+    """Return where trailing silence starts when ``trim_silence`` is enabled."""
+    if not effects.trim_silence:
+        return None
+    duration = probe(Track(path=str(source))).duration
+    trailing_end = trailing_silence_end(effects, source, duration, cancelled)
+    if trailing_end is not None and trailing_end <= effects.trim_start + MIN_TRAILING_SILENCE:
+        raise ValueError("Track contains no audible audio")
+    return trailing_end
 
 
 def analyze_peak_waveform(track: Track) -> list[float]:
@@ -139,8 +158,8 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     if duration is None or not math.isfinite(duration) or duration <= 0:
         raise ValueError("Track duration is unavailable")
     info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFprobe is resolved from PATH; each argument is separate.
-            "ffprobe",
+        [
+            FFPROBE,
             "-v",
             "error",
             "-select_streams",
@@ -162,8 +181,8 @@ def analyze_peak_waveform(track: Track) -> list[float]:
     frames_per_bin = max(1, math.ceil(duration * rate / WAVEFORM_BINS))
     peaks = [0.0] * WAVEFORM_BINS
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
-            "ffmpeg",
+        [
+            FFMPEG,
             "-v",
             "error",
             "-i",
@@ -212,8 +231,8 @@ def analyze_peak_waveform(track: Track) -> list[float]:
 def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable streaming analysis.
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFmpeg is resolved on PATH.
-            "ffmpeg",
+        [
+            FFMPEG,
             "-v",
             "error",
             "-i",
@@ -338,8 +357,8 @@ def measure_loudness(
         f":LRA={LOUDNORM_RANGE}:print_format=json",
     ]
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [  # noqa: S607 - FFmpeg is resolved from PATH; each argument is separate.
-            "ffmpeg",
+        [
+            FFMPEG,
             "-hide_banner",
             "-i",
             media_path(path),

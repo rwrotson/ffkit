@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import (
+    CancelledError,
     Track,
     analyze_peak_waveform,
     analyze_waveform_tempo,
@@ -16,6 +17,7 @@ from ffkit import (
     tempo_estimates,
 )
 from ffkit.core.audio import analysis
+from ffkit.core.audio.silence import SilenceScan
 
 
 def make_tone(path: Path) -> None:
@@ -298,12 +300,17 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
-    result = subprocess.CompletedProcess(
-        [], 0, stderr=b"silence_start: 0\nsilence_end: 2\nsilence_start: 2"
-    )
-    monkeypatch.setattr("ffkit.core.audio.analysis.subprocess.run", lambda *args, **kwargs: result)
+    scan = SilenceScan.from_lines([b"silence_start: 0", b"silence_end: 2", b"silence_start: 2"])
+    monkeypatch.setattr("ffkit.core.audio.analysis.scan_silence", lambda *args: scan)
     with pytest.raises(ValueError, match="no audible audio"):
         detect_trim_bounds(Path("silent.wav"), duration=2)
+
+
+def test_trim_bounds_respect_cancellation(tmp_path: Path) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source)
+    with pytest.raises(CancelledError):
+        detect_trim_bounds(source, cancelled=lambda: True)
 
 
 def test_measure_loudness_handles_missing_and_nonfinite_values(
