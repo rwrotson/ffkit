@@ -122,10 +122,9 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     *,
     limiter_db: float | None = None,
     cancelled: Callable[[], bool] | None = None,
-    runtime: FFmpegRuntime | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> None:
     """Apply effects to the original source and render a separate MP3 file."""
-    runtime = runtime or FFmpegRuntime()
     source = Path(track.path)
     if not source.is_file():
         raise FileNotFoundError(source)

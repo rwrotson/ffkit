@@ -190,10 +190,9 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
     cancelled: Callable[[], bool] | None = None,
     *,
-    runtime: FFmpegRuntime | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> tuple[float, float | None]:
     """Find audible bounds; retain pauses inside the track."""
-    runtime = runtime or FFmpegRuntime()
     if duration is None:
         duration = probe(Track(path=str(path)), runtime=runtime).duration
     if not duration or duration <= 0:

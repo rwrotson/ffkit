@@ -39,12 +39,11 @@ def stream_mp3(
     start: float = 0,
     limiter_db: float | None = None,
     *,
-    runtime: FFmpegRuntime | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Generator[bytes]:
     """Stream original source audio from a position after its trim start."""
     if start < 0:
         raise ValueError("Stream start must not be negative")
-    runtime = runtime or FFmpegRuntime()
     return _stream(
         track,
         gain,

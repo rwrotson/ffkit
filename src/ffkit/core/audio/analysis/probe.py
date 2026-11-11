@@ -8,9 +8,8 @@ from ffkit.core.audio.models import Track
 from ffkit.core.runtime import FFmpegRuntime
 
 
-def probe(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
+def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
     """Read duration and tags from the first audio stream."""
-    runtime = runtime or FFmpegRuntime()
     source = Path(track.path)
     if not source.is_file():
         track.error = "Source file is missing"

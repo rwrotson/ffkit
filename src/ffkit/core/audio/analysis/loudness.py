@@ -13,10 +13,9 @@ from ffkit.core.runtime import FFmpegRuntime
 
 
 def measure_loudness(
-    path: Path, filters: list[str] | None = None, *, runtime: FFmpegRuntime | None = None
+    path: Path, filters: list[str] | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> tuple[float | None, float | None]:
     """Measure integrated LUFS and true peak from ffmpeg's loudnorm report."""
-    runtime = runtime or FFmpegRuntime()
     chain = [
         *(filters or []),
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
@@ -59,7 +58,7 @@ def measure_loudness(
     return finite(data.get("input_i")), finite(data.get("input_tp"))
 
 
-def analyze_loudness(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:
+def analyze_loudness(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
     """Measure source loudness and record the file fingerprint for normalization reuse."""
     source = Path(track.path)
     fingerprint = source_fingerprint(source)
@@ -97,14 +96,13 @@ def calculate_normalization_gain(
     target_lufs: float = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
     *,
-    runtime: FFmpegRuntime | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> float:
     """Measure processed audio and calculate a fixed gain within the true peak ceiling.
 
     Stored ``loudness_lufs`` and ``true_peak_db`` are reused instead of measuring only when no
     filters apply and ``analysis_source_stat`` matches the source file's size, mtime, and ctime.
     """
-    runtime = runtime or FFmpegRuntime()
     measured = track.model_copy(deep=True)
     measured.effects.normalize_lufs = None
     measured.effects.limiter_ceiling_db = None

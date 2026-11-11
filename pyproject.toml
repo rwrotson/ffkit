@@ -185,6 +185,10 @@ select = [
     "LOG015"
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+# FFmpegRuntime is a frozen model, safe as a shared default.
+extend-immutable-calls = ["ffkit.core.runtime.FFmpegRuntime"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
     "PLR2004",

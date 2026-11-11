@@ -9,10 +9,9 @@ from ffkit.core.runtime import FFmpegRuntime
 
 
 def extract_cover(
-    track: Track, destination: Path, *, runtime: FFmpegRuntime | None = None
+    track: Track, destination: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> Path | None:
     """Return a custom cover or atomically extract the first embedded image as JPEG."""
-    runtime = runtime or FFmpegRuntime()
     if track.cover_removed:
         return None
     if track.cover_path:

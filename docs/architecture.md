@@ -106,7 +106,7 @@ Existing audio helpers raise built-in and subprocess exceptions, except cancella
   depend on the media type in `core/`. Place a new module in one of the
   layers above, and raise a `FFKitError` subclass for expected failures.
 - Accept values as arguments; do not read the environment.
-- Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime | None`.
+- Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime` that defaults to `FFmpegRuntime()`.
   Internal helpers receive only the fields they use, such as `ffmpeg` or `timeout`.
 - Export public names from the package `__init__.py` files up to `ffkit/__init__.py`, and add them to `__all__`.
 - Put default values that callers may need in `core/audio/defaults.py`.

@@ -21,9 +21,8 @@ TEMPO_MIN_WINDOW = 160
 TEMPO_MIN_CONFIDENCE = 0.1
 
 
-def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None) -> list[float]:
+def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> list[float]:
     """Measure a full-scale peak envelope from four-times oversampled audio."""
-    runtime = runtime or FFmpegRuntime()
     duration = track.duration
     if duration is None:
         duration = probe(Track(path=track.path), runtime=runtime).duration
@@ -97,10 +96,9 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime | None = None)
 
 
 def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analysis.
-    track: Track, *, runtime: FFmpegRuntime | None = None
+    track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> Track:
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
-    runtime = runtime or FFmpegRuntime()
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffmpeg_path,
