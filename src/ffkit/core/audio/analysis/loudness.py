@@ -1,6 +1,7 @@
 import json
 import math
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from ffkit.core._ffmpeg import media_path, source_fingerprint
@@ -13,11 +14,14 @@ from ffkit.core.runtime import FFmpegRuntime
 
 
 def measure_loudness(
-    path: Path, filters: list[str] | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
+    path: Path,
+    *,
+    filters: Sequence[str] = (),
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> tuple[float | None, float | None]:
-    """Measure integrated LUFS and true peak from ffmpeg's loudnorm report."""
+    """Measure integrated LUFS and true peak after applying filters before loudnorm."""
     chain = [
-        *(filters or []),
+        *filters,
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
         f":LRA={LOUDNORM_RANGE}:print_format=json",
     ]
@@ -128,7 +132,7 @@ def calculate_normalization_gain(
     ):
         lufs, peak = track.loudness_lufs, track.true_peak_db
     else:
-        lufs, peak = measure_loudness(source, filters, runtime=runtime)
+        lufs, peak = measure_loudness(source, filters=filters, runtime=runtime)
 
     if source_fingerprint(source) != fingerprint:
         raise ValueError("Source audio changed during normalization")

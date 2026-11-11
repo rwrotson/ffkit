@@ -24,7 +24,7 @@ def test_measure_loudness_on_real_audio(make_tone: Callable[..., None], tmp_path
     lufs, peak = measure_loudness(source)
     assert lufs is not None
     assert peak is not None
-    louder, _ = measure_loudness(source, ["volume=6dB"])
+    louder, _ = measure_loudness(source, filters=["volume=6dB"])
     assert louder is not None
     assert 5 < louder - lufs < 7
 
@@ -88,7 +88,7 @@ def test_calculate_normalization_gain_rejects_changed_source(
     make_tone(source)
     track = Track(path=str(source))
 
-    def change_source(path: Path, filters: list[str], **kwargs: object) -> tuple[float, float]:
+    def change_source(path: Path, **kwargs: object) -> tuple[float, float]:
         path.touch()
         return -18, -5
 
