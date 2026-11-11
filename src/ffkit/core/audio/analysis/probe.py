@@ -3,9 +3,9 @@ import math
 import subprocess
 from pathlib import Path
 
-from ffkit.core.audio._ffmpeg import media_path
+from ffkit.core._ffmpeg import media_path
 from ffkit.core.audio.models import Track
-from ffkit.core.audio.runtime import FFmpegRuntime
+from ffkit.core.runtime import FFmpegRuntime
 
 
 def probe(track: Track, *, runtime: FFmpegRuntime | None = None) -> Track:

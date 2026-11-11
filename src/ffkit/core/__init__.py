@@ -6,7 +6,6 @@ from .audio import (
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
     Effects,
-    FFmpegRuntime,
     Group,
     TempoSegment,
     Track,
@@ -27,6 +26,7 @@ from .audio import (
     tempo_estimates,
 )
 from .errors import CancelledError, FFKitError, InvalidInputError
+from .runtime import FFmpegRuntime
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import CancelledError, Track, detect_trim_bounds, probe
-from ffkit.core.audio._process import ERROR_TAIL_LIMIT
+from ffkit.core._process import ERROR_TAIL_LIMIT
 from ffkit.core.audio.analysis.silence import SilenceScan
 
 silence_module = importlib.import_module("ffkit.core.audio.analysis.silence")

@@ -127,7 +127,7 @@ from ffkit.logs import LogSettings
 
 ```
 src/ffkit/__init__.py  — Public API re-exported with __all__; NullHandler on the "ffkit" logger
-src/ffkit/core/        — Audio helpers under core/audio/, public defaults, and the FFKitError hierarchy
+src/ffkit/core/        — Audio helpers under core/audio/, FFmpegRuntime and shared FFmpeg helpers, and the FFKitError hierarchy
 src/ffkit/logs/        — LogSettings and opt-in setup_logging() for applications (`ffkit[logs]` extra)
 src/ffkit/cli/         — Typer CLI, its FFKIT_* settings, and composition root (`ffkit[cli]` extra)
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
@@ -137,7 +137,7 @@ Follow the layers in `docs/architecture.md`. From top to bottom they are `main`,
 
 The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
 
-To add functionality: put measurement code in `src/ffkit/core/audio/analysis/`, output code in `src/ffkit/core/audio/processing/`, and shared helpers in `src/ffkit/core/audio/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `core/audio/__init__.py` (subpackage `__init__.py` files stay empty) up to `ffkit/__init__.py`; test it in the mirrored path under `tests/core/audio/`; and list it in `docs/reference/index.md`.
+To add functionality: put measurement code in `src/ffkit/core/audio/analysis/`, output code in `src/ffkit/core/audio/processing/`, shared audio helpers in `src/ffkit/core/audio/`, and media-independent FFmpeg helpers in `src/ffkit/core/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `core/audio/__init__.py` (subpackage `__init__.py` files stay empty) up to `ffkit/__init__.py`; test it in the mirrored path under `tests/core/audio/`; and list it in `docs/reference/index.md`.
 
 ### Import-Time Behaviour
 

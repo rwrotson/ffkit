@@ -10,8 +10,8 @@ import pytest
 from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
+from ffkit import FFmpegRuntime, Track
 from ffkit.cli.app import app
-from ffkit.core.audio import FFmpegRuntime, Track
 from ffkit.main import main
 
 runner = CliRunner()

@@ -1,4 +1,5 @@
-from ffkit.core.audio._ffmpeg import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB, ffmpeg_number
+from ffkit.core._ffmpeg import ffmpeg_number
+from ffkit.core.audio._constants import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB
 from ffkit.core.audio.defaults import (
     DEFAULT_SILENCE_THRESHOLD_DB,
 )

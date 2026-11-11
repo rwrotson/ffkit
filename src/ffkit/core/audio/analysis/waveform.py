@@ -6,11 +6,11 @@ import subprocess
 import tempfile
 from statistics import median
 
-from ffkit.core.audio._ffmpeg import media_path
-from ffkit.core.audio._process import stdout_chunks, stop
+from ffkit.core._ffmpeg import media_path
+from ffkit.core._process import stdout_chunks, stop
 from ffkit.core.audio.analysis.probe import probe
 from ffkit.core.audio.models import TempoSegment, Track
-from ffkit.core.audio.runtime import FFmpegRuntime
+from ffkit.core.runtime import FFmpegRuntime
 
 WAVEFORM_BINS = 400
 PEAK_OVERSAMPLING = 4

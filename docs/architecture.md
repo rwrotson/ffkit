@@ -31,8 +31,9 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 
 ### Inside the core
 
-`core.audio` imports `core.errors`; `core.errors` imports nothing from `ffkit`. Future media
-domains, such as `core.video`, are sibling packages that do not import each other.
+Media domains, such as `core.audio` and a future `core.video`, are sibling packages that do not
+import each other. Code they share, such as `FFmpegRuntime` and the FFmpeg and subprocess helpers,
+lives in `core` below them; `core.errors` imports nothing from `ffkit`.
 
 `core.audio` has two subpackages of operations on top of a shared base:
 
@@ -43,11 +44,14 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 
 | Package | Layer | Modules |
 | --- | --- | --- |
+| `core` | Domains | `audio` |
+| | FFmpeg | `runtime \| _process \| _ffmpeg` |
+| | Errors | `errors` |
 | `core.audio` | Processing | `processing` |
 | | Analysis | `analysis` |
 | | Primitives | `filters \| files` |
-| | Models | `models \| runtime \| _process` |
-| | Constants | `defaults \| _ffmpeg` |
+| | Models | `models` |
+| | Constants | `defaults \| _constants` |
 | `core.audio.analysis` | Measurement | `loudness \| waveform` |
 | | Silence | `silence` |
 | | Probe | `probe` |
@@ -98,7 +102,8 @@ Ported Mixtable audio helpers retain their original built-in and subprocess exce
 ## Adding functionality
 
 - Put the code in `core/`: measurement in `core/audio/analysis/`, output in
-  `core/audio/processing/`, and shared helpers in `core/audio/`. Place a new module in one of the
+  `core/audio/processing/`, shared audio helpers in `core/audio/`, and FFmpeg helpers that do not
+  depend on the media type in `core/`. Place a new module in one of the
   layers above, and raise a `FFKitError` subclass for expected failures.
 - Accept values as arguments; do not read the environment.
 - Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime | None`.

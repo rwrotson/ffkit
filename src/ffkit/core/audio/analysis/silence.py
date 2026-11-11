@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
-from ffkit.core.audio._process import ERROR_TAIL_LIMIT, stop
+from ffkit.core._ffmpeg import ffmpeg_number, media_path
+from ffkit.core._process import ERROR_TAIL_LIMIT, stop
 from ffkit.core.audio.analysis.probe import probe
 from ffkit.core.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
 from ffkit.core.audio.models import Effects, Track
-from ffkit.core.audio.runtime import FFmpegRuntime
 from ffkit.core.errors import CancelledError
+from ffkit.core.runtime import FFmpegRuntime
 
 END_TOLERANCE = 0.001
 MIN_TRAILING_SILENCE = 0.01

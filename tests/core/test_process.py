@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from ffkit.core.audio._process import ERROR_TAIL_LIMIT, error_tail, stdout_chunks, stop
+from ffkit.core._process import ERROR_TAIL_LIMIT, error_tail, stdout_chunks, stop
 
 
 def _sleeping(stdout: int | None = None, stderr: int | None = None) -> subprocess.Popen[bytes]:

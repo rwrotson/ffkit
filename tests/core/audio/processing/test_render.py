@@ -17,7 +17,7 @@ from ffkit import (
     probe,
     render,
 )
-from ffkit.core.audio._process import ERROR_TAIL_LIMIT
+from ffkit.core._process import ERROR_TAIL_LIMIT
 
 render_module = importlib.import_module("ffkit.core.audio.processing.render")
 

@@ -242,7 +242,7 @@ layers = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.core"]
 name = "Core layers"
 type = "layers"
 containers = ["ffkit.core"]
-layers = ["audio", "errors"]
+layers = ["audio", "runtime | _process | _ffmpeg", "errors"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
@@ -253,8 +253,8 @@ layers = [
     "processing",
     "analysis",
     "filters | files",
-    "models | runtime | _process",
-    "defaults | _ffmpeg",
+    "models",
+    "defaults | _constants",
 ]
 exhaustive = true
 

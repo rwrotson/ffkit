@@ -5,11 +5,11 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | Module | Purpose |
 |--------|---------|
 | `ffkit.core.errors` | Define the library error hierarchy |
+| `ffkit.core.runtime` | Define FFmpeg executables and process time limits |
 | `ffkit.core.audio.defaults` | Define default values for audio functions and CLI options |
 | `ffkit.core.audio.files` | Discover supported audio inputs and build export names |
 | `ffkit.core.audio.filters` | Build the FFmpeg audio filter chain |
 | `ffkit.core.audio.models` | Define audio track, effects, and group data |
-| `ffkit.core.audio.runtime` | Define FFmpeg executables and process time limits |
 | `ffkit.core.audio.analysis.probe` | Read duration and tags |
 | `ffkit.core.audio.analysis.silence` | Detect silence and trim bounds |
 | `ffkit.core.audio.analysis.loudness` | Measure loudness and calculate normalization gain |

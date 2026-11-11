@@ -19,7 +19,6 @@ from .models import Effects, Group, TempoSegment, Track
 from .processing.cover import extract_cover
 from .processing.render import render
 from .processing.stream import stream_mp3
-from .runtime import FFmpegRuntime
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",
@@ -27,7 +26,6 @@ __all__ = [
     "DEFAULT_TARGET_LUFS",
     "DEFAULT_TRIM_MIN_DURATION",
     "Effects",
-    "FFmpegRuntime",
     "Group",
     "TempoSegment",
     "Track",

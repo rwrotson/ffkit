@@ -3,9 +3,9 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core.audio._ffmpeg import media_path
+from ffkit.core._ffmpeg import media_path
 from ffkit.core.audio.models import Track
-from ffkit.core.audio.runtime import FFmpegRuntime
+from ffkit.core.runtime import FFmpegRuntime
 
 
 def extract_cover(
