@@ -12,7 +12,11 @@ def calculate_normalization_gain(
     target_lufs: float = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
 ) -> float:
-    """Measure processed audio and calculate a fixed gain within the true peak ceiling."""
+    """Measure processed audio and calculate a fixed gain within the true peak ceiling.
+
+    Stored ``loudness_lufs`` and ``true_peak_db`` are reused instead of measuring only when no
+    filters apply and ``analysis_source_stat`` matches the source file's size, mtime, and ctime.
+    """
     measured = track.model_copy(deep=True)
     measured.effects.normalize_lufs = None
     measured.effects.limiter_ceiling_db = None

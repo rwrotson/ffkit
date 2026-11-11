@@ -113,7 +113,9 @@ differ from the source audio file.
 `Effects` validates trim bounds when they are changed as well as when the model is created.
 FFmpeg analysis and cover extraction have a 15-minute processing deadline.
 Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
-would otherwise be exceeded.
+would otherwise be exceeded. `calculate_normalization_gain()` reuses `Track.loudness_lufs` and
+`Track.true_peak_db` only when no filters apply and `Track.analysis_source_stat` matches the source
+file's `(st_size, st_mtime_ns, st_ctime_ns)`; the library does not fill these fields itself.
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
 
@@ -205,9 +207,11 @@ src/
     │       └── stream.py        # MP3 playback stream
     ├── config/
     │   └── settings.py      # Settings with the log section
-    └── utils/
-        ├── log.py           # opt-in setup_logging() for applications
-        └── misc.py          # find_project_root()
+    ├── utils/
+    │   └── log.py           # opt-in setup_logging() for applications
+    ├── cli/
+    │   └── app.py           # optional Typer commands (ffkit[cli])
+    └── main.py              # ffkit console script entry point
 tests/                       # mirrors the package; test_package.py checks import-time behaviour
 ```
 

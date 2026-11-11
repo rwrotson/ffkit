@@ -1,5 +1,5 @@
 site_name: ffkit
-site_description: Typed FFmpeg helpers for audio and video
+site_description: Typed FFmpeg helpers for audio processing
 repo_url: https://github.com/rwrotson/ffkit
 repo_name: rwrotson/ffkit
 

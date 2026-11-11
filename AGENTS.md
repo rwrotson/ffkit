@@ -129,10 +129,12 @@ from ffkit.config import LogSettings
 src/ffkit/__init__.py  — Public API re-exported with __all__; NullHandler on the "ffkit" logger
 src/ffkit/core/        — Audio helpers under core/audio/ and the FFKitError hierarchy
 src/ffkit/config/      — Settings (Pydantic Settings) for applications that configure the library
-src/ffkit/utils/       — Optional helpers: setup_logging(), find_project_root()
+src/ffkit/utils/       — Optional application helper: setup_logging()
+src/ffkit/cli/         — Optional Typer CLI over the core audio API (`ffkit[cli]` extra)
+src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic Settings; audio models use Pydantic; `config` never imports `core` or `utils`; `utils` never imports `core`. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`: `core` never imports `config`, `utils`, structlog, or Pydantic Settings; audio models use Pydantic; `config` never imports `core` or `utils`; `utils` never imports `core`; `core`, `config`, and `utils` never import `cli`, Typer, or Rich. import-linter contracts in `pyproject.toml` enforce the boundaries (`uv run poe lint-imports`).
 
 The `FFKitError` hierarchy is available for future APIs. Ported Mixtable audio helpers retain their original built-in and subprocess exceptions.
 
@@ -160,7 +162,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 ### Testing
 
-`tests/` mirrors the package (`core/`, `config/`, `utils/`); `tests/test_package.py` covers the public API and import-time behaviour.
+`tests/` mirrors the package (`core/`, `config/`, `utils/`, `cli/`); `tests/test_package.py` covers the public API and import-time behaviour.
 
 Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `FFKIT_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 

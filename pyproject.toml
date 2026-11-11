@@ -2,7 +2,7 @@
 [project]
 name = "ffkit"
 version = "0.1.0"
-description = "Typed FFmpeg helpers for audio and video"
+description = "Typed FFmpeg helpers for audio processing"
 authors = [
     { name = "Igor Lashkov", email = "rwrotson@yandex.ru" },
 ]
@@ -10,15 +10,10 @@ maintainers = []
 keywords = [
     "ffmpeg",
     "audio",
-    "video",
-    "structlog",
-    "pydantic-settings",
-    "uv",
-    "pytest",
-    "ruff",
-    "mypy",
-    "precommit",
-    "properdocs",
+    "loudness",
+    "normalization",
+    "mp3",
+    "waveform",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

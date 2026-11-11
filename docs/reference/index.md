@@ -16,6 +16,5 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.audio.stream` | Stream MP3 audio from a playback position |
 | `ffkit.config.settings` | Define and load library settings |
 | `ffkit.utils.log` | Configure console and file logging for applications |
-| `ffkit.utils.misc` | Locate the project root |
 | `ffkit.cli.app` | Provide the optional Typer audio commands |
 | `ffkit.main` | Start the optional CLI |

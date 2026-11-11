@@ -1,5 +1,3 @@
-"""Audio input discovery for the HTTP API."""
-
 from pathlib import Path
 
 EXTENSIONS = frozenset({".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus"})
