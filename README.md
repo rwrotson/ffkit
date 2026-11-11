@@ -57,10 +57,15 @@ ffkit audio probe song.flac
 ffkit --output-format json audio loudness song.flac
 ffkit audio trim-bounds song.flac --threshold-db -45
 ffkit audio render song.flac song.mp3 --gain-db 3 --target-lufs -14
+ffkit audio render song.flac song.mp3 --tag title=Intro --cover cover.jpg
+ffkit audio normalization-gain song.flac --target-lufs -14 --peak-ceiling-db -1
 ffkit audio extract-cover song.flac cover.jpg
 ```
 
 `render` and `extract-cover` require `--force` to replace an existing output file.
+`render` embeds the source cover unless `--cover PATH` replaces it or `--no-cover` drops it;
+`--tag KEY=VALUE` sets a tag and may be repeated. `normalization-gain` prints the fixed gain that
+reaches the target loudness without exceeding the true-peak ceiling.
 `ffmpeg` and `ffprobe` must be available on `PATH` for the corresponding operations.
 
 

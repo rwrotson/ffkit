@@ -11,8 +11,21 @@ from rich.console import Console
 from typer.core import TyperGroup
 
 from ffkit.config import load_settings
-from ffkit.core.audio import Effects, Track, extract_cover, measure_loudness, probe, render
-from ffkit.core.audio._ffmpeg import DEFAULT_TRIM_MIN_DURATION, SILENCE_THRESHOLD_DB
+from ffkit.core.audio import (
+    Effects,
+    Track,
+    calculate_normalization_gain,
+    extract_cover,
+    measure_loudness,
+    probe,
+    render,
+)
+from ffkit.core.audio._ffmpeg import (
+    DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_TARGET_LUFS,
+    DEFAULT_TRIM_MIN_DURATION,
+    SILENCE_THRESHOLD_DB,
+)
 from ffkit.core.audio.analysis import detect_trim_bounds
 from ffkit.utils.log import setup_logging
 
@@ -115,6 +128,17 @@ def input_file(path: Path) -> Path:
     return path
 
 
+def parse_tags(values: list[str]) -> dict[str, str]:
+    """Parse repeated KEY=VALUE tag options."""
+    tags: dict[str, str] = {}
+    for value in values:
+        key, separator, text = value.partition("=")
+        if not separator or not key.strip():
+            raise typer.BadParameter(f"expected KEY=VALUE, got {value!r}", param_hint="'--tag'")
+        tags[key.strip()] = text
+    return tags
+
+
 def output_file(path: Path, force: bool) -> Path:
     """Resolve an output path and enforce overwrite protection."""
     path = path.expanduser().resolve()
@@ -181,10 +205,23 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     trim_end: Annotated[float | None, typer.Option("--trim-end")] = None,
     trim_silence: Annotated[bool, typer.Option("--trim-silence")] = False,
     limiter_ceiling_db: Annotated[float | None, typer.Option("--limiter-ceiling-db")] = None,
+    cover: Annotated[
+        Path | None, typer.Option("--cover", help="Image to embed instead of the source cover.")
+    ] = None,
+    no_cover: Annotated[
+        bool, typer.Option("--no-cover", help="Do not embed a cover image.")
+    ] = False,
+    tag: Annotated[
+        list[str] | None, typer.Option("--tag", help="Set a KEY=VALUE tag; repeatable.")
+    ] = None,
     force: Annotated[bool, typer.Option("--force")] = False,
 ) -> None:
     """Render audio as an MP3 with optional effects."""
+    if cover is not None and no_cover:
+        raise typer.BadParameter("cannot be combined with --no-cover", param_hint="'--cover'")
+    tags = parse_tags(tag or [])
     source = input_file(source)
+    cover_path = None if cover is None else str(input_file(cover))
     destination = output_file(destination, force)
     effects = Effects(
         gain_db=gain_db,
@@ -194,8 +231,33 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         trim_silence=trim_silence,
         limiter_ceiling_db=limiter_ceiling_db,
     )
-    render(Track(path=str(source), effects=effects), destination)
+    track = Track(
+        path=str(source),
+        effects=effects,
+        tags=tags,
+        cover_path=cover_path,
+        cover_removed=no_cover,
+    )
+    render(track, destination)
     emit(ctx, {"path": str(destination)}, [str(destination)])
+
+
+@audio.command("normalization-gain")
+def normalization_gain_command(
+    ctx: typer.Context,
+    source: Path,
+    target_lufs: Annotated[
+        float, typer.Option("--target-lufs", min=-30, max=0)
+    ] = DEFAULT_TARGET_LUFS,
+    peak_ceiling_db: Annotated[
+        float, typer.Option("--peak-ceiling-db", min=-20, max=-0.1)
+    ] = DEFAULT_PEAK_CEILING_DB,
+) -> None:
+    """Calculate a fixed gain that reaches the target loudness within the peak ceiling."""
+    gain = calculate_normalization_gain(
+        Track(path=str(input_file(source))), target_lufs, peak_ceiling_db
+    )
+    emit(ctx, {"gain_db": gain}, [f"Gain: {gain} dB"])
 
 
 @audio.command("extract-cover")

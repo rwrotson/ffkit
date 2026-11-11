@@ -245,3 +245,62 @@ def test_cover_source_matches_destination(tmp_path: Path) -> None:
     source.touch()
     result = runner.invoke(app, ["audio", "extract-cover", str(source), str(source), "--force"])
     assert result.exit_code == 2
+
+
+def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    image = tmp_path / "cover.jpg"
+    source.touch()
+    image.touch()
+    rendered: list[Track] = []
+    monkeypatch.setattr(cli_app, "render", lambda track, path: rendered.append(track))
+    base = ["audio", "render", str(source)]
+    result = runner.invoke(
+        app,
+        [
+            *base,
+            str(tmp_path / "a.mp3"),
+            "--cover",
+            str(image),
+            "--tag",
+            "title=A=B",
+            "--tag",
+            "x=",
+        ],
+    )
+    assert result.exit_code == 0
+    assert rendered[-1].cover_path == str(image)
+    assert rendered[-1].tags == {"title": "A=B", "x": ""}
+    result = runner.invoke(app, [*base, str(tmp_path / "b.mp3"), "--no-cover"])
+    assert result.exit_code == 0
+    assert rendered[-1].cover_removed
+    for options in (["--tag", "title"], ["--tag", "=x"], ["--cover", str(image), "--no-cover"]):
+        invalid = runner.invoke(app, [*base, str(tmp_path / "c.mp3"), *options])
+        assert invalid.exit_code == 2
+    missing = runner.invoke(app, [*base, str(tmp_path / "d.mp3"), "--cover", "missing.jpg"])
+    assert missing.exit_code == 2
+    assert len(rendered) == 2
+
+
+def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    calls: list[tuple[float, float]] = []
+
+    def fake_gain(track: Track, target: float, ceiling: float) -> float:
+        calls.append((target, ceiling))
+        return 2.5
+
+    monkeypatch.setattr(cli_app, "calculate_normalization_gain", fake_gain)
+    result = runner.invoke(
+        app,
+        ["-f", "json", "audio", "normalization-gain", str(source), "--target-lufs", "-16"],
+    )
+    assert json.loads(result.stdout) == {"gain_db": 2.5}
+    assert calls == [(-16, -1)]
+    text = runner.invoke(app, ["audio", "normalization-gain", str(source)])
+    assert "Gain: 2.5 dB" in text.stdout
+    invalid = runner.invoke(
+        app, ["audio", "normalization-gain", str(source), "--peak-ceiling-db", "0"]
+    )
+    assert invalid.exit_code == 2

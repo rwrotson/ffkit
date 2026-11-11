@@ -35,7 +35,8 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 ## Optional CLI
 
 Install with `pip install "ffkit[cli] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"`, then run `ffkit audio --help`.
-The `audio` group includes `probe`, `loudness`, `trim-bounds`, `render`, and `extract-cover`.
+The `audio` group includes `probe`, `loudness`, `trim-bounds`, `normalization-gain`, `render`, and
+`extract-cover`. `render` accepts `--cover PATH`, `--no-cover`, and repeated `--tag KEY=VALUE`.
 Use `--output-format json` before `audio` for machine-readable output. Output files are protected
 against replacement unless `--force` is passed.
 Library `extract_cover()` replaces its destination only after successful extraction and keeps the
