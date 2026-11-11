@@ -4,6 +4,7 @@ from pathlib import Path
 # Executables are resolved from PATH.
 FFMPEG = "ffmpeg"
 FFPROBE = "ffprobe"
+
 PROCESS_TIMEOUT = 900
 SILENCE_THRESHOLD_DB = -50
 DEFAULT_TRIM_MIN_DURATION = 0.1
