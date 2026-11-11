@@ -6,6 +6,7 @@ import pytest
 
 from ffkit import (
     Track,
+    analyze_loudness,
     audio_filters,
     calculate_normalization_gain,
     extract_cover,
@@ -298,3 +299,37 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
     seeked = len(pcm(b"".join(stream_mp3(track, start=1.2))))
     expected = len(pcm(b"".join(stream_mp3(plain, start=1.2))))
     assert abs(seeked - expected) < 12000
+
+
+def test_analyze_loudness_fills_normalization_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.wav"
+    tone(source)
+    track = analyze_loudness(Track(path=str(source)))
+    assert track.loudness_lufs is not None
+    assert track.true_peak_db is not None
+    stat = source.stat()
+    assert track.analysis_source_stat == (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    expected = calculate_normalization_gain(track.model_copy(update={"loudness_lufs": None}))
+
+    def unexpected(*args: object) -> None:
+        raise AssertionError("measure_loudness should not run")
+
+    monkeypatch.setattr(normalization_module, "measure_loudness", unexpected)
+    assert calculate_normalization_gain(track) == expected
+
+
+def test_analyze_loudness_rejects_changed_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.wav"
+    tone(source)
+
+    def change_source(path: Path) -> tuple[float, float]:
+        source.write_bytes(source.read_bytes() + b"x")
+        return -20.0, -3.0
+
+    monkeypatch.setattr(analysis_module, "measure_loudness", change_source)
+    with pytest.raises(ValueError, match="changed during loudness analysis"):
+        analyze_loudness(Track(path=str(source)))

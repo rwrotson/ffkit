@@ -1,4 +1,5 @@
 from .analysis import (
+    analyze_loudness,
     analyze_peak_waveform,
     analyze_waveform_tempo,
     detect_trim_bounds,
@@ -19,6 +20,7 @@ __all__ = [
     "Group",
     "TempoSegment",
     "Track",
+    "analyze_loudness",
     "analyze_peak_waveform",
     "analyze_waveform_tempo",
     "audio_files",

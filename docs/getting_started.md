@@ -78,6 +78,8 @@ Older Track JSON without these fields cannot distinguish source tags from explic
 `Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
 duration has not yet been populated by `probe()`.
 Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
+`analyze_loudness()` stores source loudness, true peak, and the file fingerprint on the track;
+`calculate_normalization_gain()` reuses them while no filters apply and the file is unchanged.
 
 Configure logging in the application, or use the bundled helper:
 

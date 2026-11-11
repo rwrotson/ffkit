@@ -22,6 +22,7 @@ from ffkit.core.audio._ffmpeg import (
     SILENCE_THRESHOLD_DB,
     ffmpeg_number,
     media_path,
+    source_fingerprint,
 )
 from ffkit.core.audio.models import Effects, TempoSegment, Track
 from ffkit.core.audio.silence import MIN_TRAILING_SILENCE, scan_silence, trailing_silence_end
@@ -391,3 +392,16 @@ def measure_loudness(
             return None
 
     return finite(data.get("input_i")), finite(data.get("input_tp"))
+
+
+def analyze_loudness(track: Track) -> Track:
+    """Measure source loudness and record the file fingerprint for normalization reuse."""
+    source = Path(track.path)
+    fingerprint = source_fingerprint(source)
+    lufs, peak = measure_loudness(source)
+    if source_fingerprint(source) != fingerprint:
+        raise ValueError("Source audio changed during loudness analysis")
+    track.loudness_lufs = lufs
+    track.true_peak_db = peak
+    track.analysis_source_stat = fingerprint
+    return track

@@ -116,7 +116,8 @@ FFmpeg analysis and cover extraction have a 15-minute processing deadline.
 Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
 would otherwise be exceeded. `calculate_normalization_gain()` reuses `Track.loudness_lufs` and
 `Track.true_peak_db` only when no filters apply and `Track.analysis_source_stat` matches the source
-file's `(st_size, st_mtime_ns, st_ctime_ns)`; the library does not fill these fields itself.
+file's `(st_size, st_mtime_ns, st_ctime_ns)`. `analyze_loudness()` measures the source and fills
+all three fields.
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application can use the bundled helper:
 
