@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
+from ffkit.core.audio._ffmpeg import media_path
 from ffkit.core.audio.analysis import PROCESS_TIMEOUT
 from ffkit.core.audio.models import Track
 
@@ -28,13 +29,13 @@ def extract_cover(track: Track, destination: Path) -> Path | None:
                 "-v",
                 "error",
                 "-i",
-                track.path,
+                media_path(track.path),
                 "-map",
                 "0:v:0",
                 "-frames:v",
                 "1",
                 "-y",
-                str(temporary),
+                media_path(temporary),
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

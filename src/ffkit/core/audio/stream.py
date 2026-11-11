@@ -4,8 +4,9 @@ import selectors
 import subprocess
 from collections.abc import Generator
 
+from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
 from ffkit.core.audio.filters import audio_filters
-from ffkit.core.audio.models import Track
+from ffkit.core.audio.models import Effects, Track
 
 STREAM_IDLE_TIMEOUT = 30
 log = logging.getLogger(__name__)
@@ -14,11 +15,17 @@ log = logging.getLogger(__name__)
 def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
     snapshot = track.model_copy(deep=True)
     source_offset = start + snapshot.effects.trim_start
-    if snapshot.effects.trim_end is not None:
-        if source_offset >= snapshot.effects.trim_end:
-            return None
-        snapshot.effects.trim_end -= source_offset
-    snapshot.effects.trim_start = 0
+    trim_end = snapshot.effects.trim_end
+    if trim_end is not None and source_offset >= trim_end:
+        return None
+    # Replace both bounds at once; assigning them separately can fail interval validation.
+    snapshot.effects = Effects.model_validate(
+        {
+            **snapshot.effects.model_dump(),
+            "trim_start": 0,
+            "trim_end": None if trim_end is None else trim_end - source_offset,
+        }
+    )
     return snapshot, source_offset
 
 
@@ -36,9 +43,9 @@ def stream_mp3(  # noqa: C901 - Preserve Mixtable's streaming cleanup paths.
         "-loglevel",
         "error",
         "-ss",
-        str(source_offset),
+        ffmpeg_number(source_offset),
         "-i",
-        snapshot.path,
+        media_path(snapshot.path),
         "-vn",
         "-map",
         "0:a:0",

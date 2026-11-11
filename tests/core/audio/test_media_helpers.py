@@ -75,6 +75,17 @@ def test_stream_renders_and_seeks(tmp_path: Path) -> None:
     assert track.effects.trim_end == 1.5
 
 
+def test_stream_seeks_within_late_trim_interval(tmp_path: Path) -> None:
+    source = tmp_path / "source.wav"
+    tone(source)
+    track = Track(path=str(source))
+    track.effects.trim_end = 1.5
+    track.effects.trim_start = 1.0
+    assert b"".join(stream_mp3(track)).startswith(b"ID3")
+    assert track.effects.trim_start == 1.0
+    assert track.effects.trim_end == 1.5
+
+
 def test_stream_stops_at_trim_end(tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     tone(source)

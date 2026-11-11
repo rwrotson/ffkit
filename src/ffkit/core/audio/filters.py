@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 
+from ffkit.core.audio._ffmpeg import ffmpeg_number
 from ffkit.core.audio.models import Track
 
 
@@ -15,9 +16,9 @@ def audio_filters(
     effects = track.effects
     filters: list[str] = []
     if effects.trim_start or effects.trim_end is not None:
-        trim = f"atrim=start={effects.trim_start}"
+        trim = f"atrim=start={ffmpeg_number(effects.trim_start)}"
         if effects.trim_end is not None:
-            trim += f":end={effects.trim_end}"
+            trim += f":end={ffmpeg_number(effects.trim_end)}"
         filters.extend([trim, "asetpts=PTS-STARTPTS"])
     if effects.trim_silence:
         edge_trim = "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB"
@@ -26,9 +27,9 @@ def audio_filters(
             filters.extend(["areverse", edge_trim, "areverse"])
     total_gain = effects.gain_db + group_gain_db
     if total_gain:
-        filters.append(f"volume={total_gain}dB")
+        filters.append(f"volume={ffmpeg_number(total_gain)}dB")
     if effects.normalize_lufs is not None:
-        filters.append(f"loudnorm=I={effects.normalize_lufs}:TP=-1:LRA=11")
+        filters.append(f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}:TP=-1:LRA=11")
     ceiling = effects.limiter_ceiling_db if effects.limiter_ceiling_db is not None else limiter_db
     if ceiling is not None:
         filters.append(f"alimiter=limit={10 ** (ceiling / 20):.8f}:level=false:latency=true")

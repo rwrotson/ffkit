@@ -12,6 +12,16 @@ class TempoSegment(BaseModel):
     confidence: float | None = Field(default=None, ge=0, le=1)
 
 
+def _as_float(value: object) -> float | None:
+    """Coerce like lax field validation; field validators report values that do not convert."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(str(value))
+    except ValueError:
+        return None
+
+
 class Effects(BaseModel):
     """Audio processing options applied to the original source."""
 
@@ -29,9 +39,9 @@ class Effects(BaseModel):
     def valid_trim(cls, values: object) -> object:
         """Reject trim bounds that would produce an empty interval."""
         if isinstance(values, dict):
-            start = values.get("trim_start", 0)
-            end = values.get("trim_end")
-            if isinstance(start, (int, float)) and isinstance(end, (int, float)) and end <= start:
+            start = _as_float(values.get("trim_start", 0))
+            end = _as_float(values.get("trim_end"))
+            if start is not None and end is not None and end <= start:
                 raise ValueError("Trim end must be later than start")
         return values
 

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -49,6 +50,32 @@ def test_effects_reject_invalid_trim_assignment_without_mutation() -> None:
     assert effects.trim_end == 4
 
 
+@pytest.mark.parametrize(
+    "data",
+    [{"trim_start": "5", "trim_end": "3"}, {"trim_start": 5, "trim_end": "5.0"}],
+)
+def test_effects_reject_invalid_trim_from_strings(data: dict[str, object]) -> None:
+    with pytest.raises(ValidationError, match="Trim end must be later"):
+        Effects.model_validate(data)
+    with pytest.raises(ValidationError, match="Trim end must be later"):
+        Effects.model_validate_json(json.dumps(data))
+
+
+def test_effects_report_unconvertible_trim_as_field_error() -> None:
+    with pytest.raises(ValidationError, match="trim_end") as error:
+        Effects.model_validate({"trim_start": 1, "trim_end": "later"})
+    assert "Trim end must be later" not in str(error.value)
+
+
+def test_filters_use_fixed_notation_for_small_values() -> None:
+    track = Track(path="song.flac", effects=Effects(trim_start=1e-5, gain_db=1e-5))
+    assert audio_filters(track) == [
+        "atrim=start=0.00001",
+        "asetpts=PTS-STARTPTS",
+        "volume=0.00001dB",
+    ]
+
+
 def test_filters_keep_mixtable_order_and_stream_rule() -> None:
     track = Track(path="song.flac")
     assert audio_filters(track) == []
@@ -74,7 +101,7 @@ def test_filters_keep_mixtable_order_and_stream_rule() -> None:
         == "alimiter=limit=0.70794578:level=false:latency=true"
     )
     track.effects = Effects(trim_end=4)
-    assert audio_filters(track)[:2] == ["atrim=start=0:end=4.0", "asetpts=PTS-STARTPTS"]
+    assert audio_filters(track)[:2] == ["atrim=start=0.0:end=4.0", "asetpts=PTS-STARTPTS"]
 
 
 def test_normalization_gain_limits_peak() -> None:

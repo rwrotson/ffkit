@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from statistics import median
 
+from ffkit.core.audio._ffmpeg import media_path
 from ffkit.core.audio.models import TempoSegment, Track
 
 PROCESS_TIMEOUT = 900
@@ -50,7 +51,16 @@ def probe(track: Track) -> Track:
         track.error = "Source file is missing"
         return track
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(source)],  # noqa: S607 - FFprobe is resolved on PATH.
+        [  # noqa: S607 - FFprobe is resolved on PATH.
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_format",
+            "-show_streams",
+            "-of",
+            "json",
+            media_path(source),
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -101,7 +111,10 @@ def detect_trim_bounds(
             "ffmpeg",
             "-hide_banner",
             "-i",
-            str(path),
+            media_path(path),
+            "-map",
+            "0:a:0",
+            "-vn",
             "-af",
             f"silencedetect=noise={threshold_db}dB:d={min_duration}",
             "-progress",
@@ -142,7 +155,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
             "stream=sample_rate,channels",
             "-of",
             "json",
-            track.path,
+            media_path(track.path),
         ],
         capture_output=True,
         text=True,
@@ -160,7 +173,7 @@ def analyze_peak_waveform(track: Track) -> list[float]:
             "-v",
             "error",
             "-i",
-            track.path,
+            media_path(track.path),
             "-map",
             "0:a:0",
             "-vn",
@@ -203,7 +216,23 @@ def analyze_peak_waveform(track: Track) -> list[float]:
 def analyze_waveform_tempo(track: Track) -> Track:  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable streaming analysis.
     """Build a compact waveform and rough tempo segments from decoded mono audio."""
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        ["ffmpeg", "-v", "error", "-i", track.path, "-ac", "1", "-ar", "2000", "-f", "s16le", "-"],  # noqa: S607 - FFmpeg is resolved on PATH.
+        [  # noqa: S607 - FFmpeg is resolved on PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            media_path(track.path),
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "2000",
+            "-f",
+            "s16le",
+            "-",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
@@ -313,7 +342,7 @@ def measure_loudness(
             "ffmpeg",
             "-hide_banner",
             "-i",
-            str(path),
+            media_path(path),
             "-map",
             "0:a:0",
             "-vn",

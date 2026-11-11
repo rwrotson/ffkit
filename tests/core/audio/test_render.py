@@ -67,6 +67,23 @@ def test_render_mp3_with_trim_tags_and_gain(tmp_path: Path) -> None:
     assert not list(target.parent.glob("*.tmp.mp3"))
 
 
+def test_render_relative_colon_path_and_tag_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    source = Path("Song: Live.wav")
+    make_tone(tmp_path / source)
+    track = probe(Track(path=str(source), tags={"album_artist": "Band"}))
+    track.tags["comment"] = "kept"
+    track.tag_overrides["comment"] = "kept"
+    target = Path("Out: Live.mp3")
+    render(track, target)
+    output = probe(Track(path=str(target)))
+    assert output.duration is not None
+    assert output.tags["album_artist"] == "Band"
+    assert output.tags["comment"] == "kept"
+
+
 def test_render_trims_edges_without_reversing_audio(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
+from ffkit.core.audio._ffmpeg import ffmpeg_number, media_path
 from ffkit.core.audio.analysis import PROCESS_TIMEOUT, measure_loudness, probe
 from ffkit.core.audio.filters import audio_filters
 from ffkit.core.audio.models import Track
@@ -20,6 +21,7 @@ MIN_CEILING_DB = -20
 MIN_TRAILING_SILENCE = 0.01
 SCAN_ERROR_LIMIT = 1000
 SCAN_END_TOLERANCE = 0.001
+RENDERED_TAGS = frozenset({"title", "artist", "album", "date", "genre", "track"})
 
 
 @dataclass
@@ -116,11 +118,11 @@ def _trailing_silence_end(
         "-loglevel",
         "info",
         "-ss",
-        str(start),
+        ffmpeg_number(start),
         "-i",
-        str(source),
+        media_path(source),
         "-t",
-        str(end - start),
+        ffmpeg_number(end - start),
         "-map",
         "0:a:0",
         "-vn",
@@ -167,7 +169,7 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
         else limiter_db
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
-    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source)]
+    command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
     cover = Path(track.cover_path) if track.cover_path else None
     if track.cover_removed:
         command.extend(["-vn", "-map", "0:a:0"])
@@ -175,7 +177,7 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
         command.extend(
             [
                 "-i",
-                str(cover),
+                media_path(cover),
                 "-map",
                 "0:a:0",
                 "-map",
@@ -192,8 +194,10 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
         )
     filter_position = len(command)
     command.extend(["-codec:a", "libmp3lame", "-b:a", "320k", "-map_metadata", "0"])
+    # Unprobed tracks hold only explicit tags; probed ones record explicit tags as overrides.
+    explicit = track.tags if track.probed_source_tags is None else track.tag_overrides
     for key, value in track.tags.items():
-        if key in {"title", "artist", "album", "date", "genre", "track"}:
+        if key in RENDERED_TAGS or key in explicit:
             command.extend(["-metadata", f"{key}={value}"])
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
     try:
@@ -215,7 +219,7 @@ def render(  # noqa: C901, PLR0912, PLR0915 - Preserve Mixtable render and retry
             current = command[:filter_position]
             if filters:
                 current.extend(["-af", ",".join(filters)])
-            current.extend([*command[filter_position:], str(temporary)])
+            current.extend([*command[filter_position:], media_path(temporary)])
             if cancelled is None:
                 with tempfile.TemporaryFile() as errors:
                     try:
