@@ -17,6 +17,7 @@ def test_filters_use_fixed_notation_for_small_values() -> None:
 def test_filters_keep_order_and_stream_rule() -> None:
     track = Track(path="song.flac")
     assert audio_filters(track) == []
+
     track.effects = Effects(
         trim_start=1, trim_end=4, trim_silence=True, gain_db=2, normalize_lufs=-14
     )
@@ -31,12 +32,15 @@ def test_filters_keep_order_and_stream_rule() -> None:
         "loudnorm=I=-14.0:TP=-1:LRA=11",
         "alimiter=limit=0.89125094:level=false:latency=true",
     ]
+
     assert audio_filters(track, 3, limiter_db=-1) == expected
     assert audio_filters(track, 3, streaming=True, limiter_db=-1) == [*expected[:3], *expected[6:]]
+
     track.effects.limiter_ceiling_db = -3
     assert (
         audio_filters(track, limiter_db=-1)[-1]
         == "alimiter=limit=0.70794578:level=false:latency=true"
     )
+
     track.effects = Effects(trim_end=4)
     assert audio_filters(track)[:2] == ["atrim=start=0.0:end=4.0", "asetpts=PTS-STARTPTS"]

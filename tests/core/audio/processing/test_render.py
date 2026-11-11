@@ -29,15 +29,18 @@ def test_render_protects_source_and_existing_output(
     make_tone(source, duration=1)
     alias = tmp_path / "alias.wav"
     alias.symlink_to(source)
+
     with pytest.raises(FileNotFoundError):
         render(Track(path=str(tmp_path / "missing.wav")), tmp_path / "out.mp3")
     for destination in (source, alias):
         with pytest.raises(ValueError, match="Output path must differ"):
             render(Track(path=str(source)), destination)
+
     broken = tmp_path / "broken.mp3"
     broken.write_bytes(b"invalid")
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
+
     with pytest.raises(subprocess.CalledProcessError):
         render(Track(path=str(broken)), target)
     assert target.read_bytes() == b"existing"
@@ -51,8 +54,10 @@ def test_render_mp3_with_trim_tags_and_gain(make_tone: Callable[..., None], tmp_
     track.effects.trim_start = 0.2
     track.effects.trim_end = 0.8
     track.effects.gain_db = 2
+
     target = tmp_path / "nested" / "out.mp3"
     render(track, target, group_gain_db=1)
+
     output = probe(Track(path=str(target)))
     assert output.duration is not None
     assert 0.5 < output.duration < 0.8
@@ -70,8 +75,10 @@ def test_render_relative_colon_path_and_tag_overrides(
     track = probe(Track(path=str(source), tags={"album_artist": "Band"}))
     track.tags["comment"] = "kept"
     track.tag_overrides["comment"] = "kept"
+
     target = Path("Out: Live.mp3")
     render(track, target)
+
     output = probe(Track(path=str(target)))
     assert output.duration is not None
     assert output.tags["album_artist"] == "Band"
@@ -114,8 +121,10 @@ def test_render_trims_edges_without_reversing_audio(
         return filters
 
     monkeypatch.setattr(render_module, "audio_filters", checked_filters)
+
     target = tmp_path / "trimmed.mp3"
     render(track, target)
+
     duration = probe(Track(path=str(target))).duration
     assert duration is not None
     assert 2.9 < duration < 3.2
@@ -137,8 +146,10 @@ def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     track = Track(path=str(source))
     track.effects.trim_silence = True
+
     with pytest.raises(ValueError, match="no audible audio"):
         render(track, tmp_path / "out.mp3")
 
@@ -169,10 +180,13 @@ def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     track = Track(path=str(source))
     track.effects.trim_silence = True
+
     target = tmp_path / "rendered.mp3"
     render(track, target)
+
     duration = probe(Track(path=str(target))).duration
     assert duration is not None
     assert 2.0 < duration < 2.15
@@ -184,8 +198,10 @@ def test_render_limiter_checks_encoded_peak(make_tone: Callable[..., None], tmp_
     track = Track(path=str(source))
     track.effects.gain_db = 6
     group = Group(name="Mix", tracks=[track])
+
     target = tmp_path / "limited.mp3"
     render(track, target, limiter_db=group.limiter_for(track))
+
     _, peak = measure_loudness(target)
     assert peak is not None
     assert peak <= -0.99
@@ -207,10 +223,12 @@ def test_render_retries_from_source(
         return original_popen(command, stdout=stdout, stderr=stderr)
 
     monkeypatch.setattr(subprocess, "Popen", record)
+
     render(Track(path=str(source)), target, limiter_db=-1)
     assert len(commands) == 2
     assert all(str(source) in command for command in commands)
     assert target.exists()
+
     target.write_bytes(b"existing")
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 0.0))
     with pytest.raises(RuntimeError, match="exceeds"):
@@ -236,6 +254,7 @@ def test_render_keeps_only_error_tail(
         )
 
     monkeypatch.setattr(subprocess, "Popen", noisy_process)
+
     with pytest.raises(subprocess.CalledProcessError) as error:
         render(Track(path=str(source)), tmp_path / "out.mp3", cancelled=cancelled)
     assert error.value.returncode == 7
@@ -263,6 +282,7 @@ def test_render_encoder_timeout_kills_process(
             tmp_path / "out.mp3",
             runtime=FFmpegRuntime(process_timeout=0.2),
         )
+
     assert not list(tmp_path.glob("*.tmp.mp3"))
 
 
@@ -286,10 +306,12 @@ def test_render_cover_choices(make_tone: Callable[..., None], tmp_path: Path) ->
         ],
         check=True,
     )
+
     track = Track(path=str(source), cover_path=str(cover))
     with_cover = tmp_path / "with-cover.mp3"
     render(track, with_cover)
     assert with_cover.exists()
+
     track.cover_removed = True
     without_cover = tmp_path / "without-cover.mp3"
     render(track, without_cover)
@@ -335,10 +357,12 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
     make_tone(source, duration=1)
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
+
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, None))
     with pytest.raises(RuntimeError, match="Could not measure encoded true peak"):
         render(Track(path=str(source)), target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
+
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 30.0))
     with pytest.raises(RuntimeError, match="ceiling could not be reached"):
         render(Track(path=str(source)), target, limiter_db=-1)

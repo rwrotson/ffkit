@@ -59,6 +59,7 @@ def _prepare_handlers(
         for handler in prepared:
             handler.close()
         raise
+
     return prepared
 
 
@@ -96,6 +97,7 @@ def setup_logging(config: LogSettings | None = None, *, console: bool = True) ->
         if isinstance(handler, (_AppFileHandler, _AppConsoleHandler, _AppNullHandler)):
             root_logger.removeHandler(handler)
             handler.close()
+
     for handler in prepared:
         root_logger.addHandler(handler)
     root_logger.setLevel(config.level)

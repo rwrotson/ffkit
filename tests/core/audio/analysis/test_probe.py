@@ -42,6 +42,7 @@ def test_probe_reads_audio_stream_tags(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     assert probe(Track(path=str(source))).tags["title"] == "Stream title"
 
 
@@ -56,6 +57,7 @@ def test_probe_tag_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(
         "ffkit.core.audio.analysis.probe.subprocess.run", lambda *args, **kwargs: result
     )
+
     tags = probe(Track(path=str(source), tags={"artist": "Custom"})).tags
     assert tags == {"title": "Stream", "artist": "Custom", "album": "Album"}
 
@@ -84,9 +86,11 @@ def test_reprobe_refreshes_source_tags_and_keeps_overrides(
     track = Track(path=str(source), tags={"artist": "Artist"})
     probe(track)
     assert track.tags == {"title": "Old", "artist": "Artist", "album": "Old album"}
+
     track.tags["genre"] = "Custom genre"
     probe(track)
     assert track.tags == {"title": "New", "artist": "Artist", "genre": "Custom genre"}
+
     del track.tags["artist"]
     track.tags["title"] = "Edited title"
     probe(track)
@@ -121,6 +125,7 @@ def test_reprobe_after_json_round_trip_refreshes_source_tags(
 def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:
     missing = probe(Track(path=str(tmp_path / "missing.wav")))
     assert missing.error == "Source file is missing"
+
     broken = tmp_path / "broken.wav"
     broken.write_bytes(b"invalid")
     with pytest.raises(subprocess.CalledProcessError):
@@ -140,6 +145,7 @@ def test_probe_rejects_missing_audio_stream(
     monkeypatch.setattr(
         "ffkit.core.audio.analysis.probe.subprocess.run", lambda *args, **kwargs: result
     )
+
     with pytest.raises(ValueError, match="no decodable audio"):
         probe(Track(path=str(source)))
 
@@ -155,5 +161,6 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         "ffkit.core.audio.analysis.probe.subprocess.run", lambda *args, **kwargs: result
     )
+
     with pytest.raises(ValueError, match="measurable audio duration"):
         probe(Track(path=str(source)))

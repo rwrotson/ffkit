@@ -91,6 +91,7 @@ class Track(BaseModel):
                 for key, value in self.tags.items()
                 if key not in self.tag_overrides and self.probed_source_tags.get(key) != value
             )
+
         self.probed_source_tags = source_tags.copy()
         self.tag_overrides = overrides
         self.tags = {**source_tags, **overrides}

@@ -28,6 +28,7 @@ def safe_name(track: Track, index: int, width: int) -> str:
     title = track.tags.get("title") or Path(track.path).stem
     name = f"{artist} - {title}" if artist else title
     name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
+
     prefix = f"{index + 1:0{width}d}. "
     suffix = ".mp3"
     # APFS limits a single UTF-8 filename to 255 bytes.

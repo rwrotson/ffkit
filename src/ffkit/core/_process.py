@@ -20,6 +20,7 @@ def stdout_chunks(process: subprocess.Popen[bytes], *, timeout: float) -> Iterat
     deadline = time.monotonic() + timeout
     if process.stdout is None:
         raise RuntimeError("FFmpeg stdout is unavailable")
+
     with selectors.DefaultSelector() as selector:
         selector.register(process.stdout, selectors.EVENT_READ)
         while True:
@@ -30,6 +31,7 @@ def stdout_chunks(process: subprocess.Popen[bytes], *, timeout: float) -> Iterat
             if not chunk:
                 break
             yield chunk
+
     remaining = max(0, deadline - time.monotonic())
     if process.wait(timeout=remaining):
         raise subprocess.CalledProcessError(process.returncode, process.args)
@@ -52,6 +54,7 @@ def stop(process: subprocess.Popen[bytes], *, grace: float | None = None) -> Non
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=grace)
+
     for pipe in (process.stdout, process.stderr):
         if pipe is not None:
             pipe.close()

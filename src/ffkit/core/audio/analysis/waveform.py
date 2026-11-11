@@ -28,6 +28,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
         duration = probe(Track(path=track.path), runtime=runtime).duration
     if duration is None or not math.isfinite(duration) or duration <= 0:
         raise ValueError("Track duration is unavailable")
+
     info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffprobe_path,
@@ -46,11 +47,13 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
         check=True,
         timeout=runtime.process_timeout,
     )
+
     stream = json.loads(info.stdout)["streams"][0]
     channels = int(stream["channels"])
     rate = int(stream["sample_rate"]) * PEAK_OVERSAMPLING
     frames_per_bin = max(1, math.ceil(duration * rate / WAVEFORM_BINS))
     peaks = [0.0] * WAVEFORM_BINS
+
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffmpeg_path,
@@ -72,6 +75,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
+
     frame_bytes = channels * 4
     frame_index = 0
     pending = b""
@@ -92,6 +96,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
                 frame_index += count
     finally:
         stop(process)
+
     return [round(value, 5) for value in peaks]
 
 
@@ -120,6 +125,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
     )
+
     hop = 200
     with tempfile.TemporaryFile() as energy_file:
         remaining_bytes = b""
@@ -139,6 +145,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
                     energy_count += 1
                     peak = max(peak, value)
                 remaining_bytes = data[complete:]
+
             if remaining_bytes:
                 samples = array.array("h")
                 samples.frombytes(remaining_bytes)
@@ -148,6 +155,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
                 peak = max(peak, value)
         finally:
             stop(process)
+
         if not energy_count:
             return track
         energy_file.flush()
@@ -162,7 +170,9 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
                 estimates = tempo_estimates(energy)
             finally:
                 energy.release()
+
     track.waveform_peak = analyze_peak_waveform(track, runtime=runtime)
+
     segments: list[TempoSegment] = []
     if estimates:
         smoothed = [
@@ -170,6 +180,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
             for i in range(len(estimates))
         ]
         segments.append(TempoSegment(start=0, bpm=smoothed[0], confidence=estimates[0][2]))
+
         for index in range(1, len(estimates) - 1):
             bpm = smoothed[index]
             previous = segments[-1].bpm
@@ -185,6 +196,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
                 segments.append(
                     TempoSegment(start=estimates[index][0], bpm=bpm, confidence=estimates[index][2])
                 )
+
     track.tempo = segments
     return track
 
@@ -193,6 +205,7 @@ def tempo_estimates(energy: memoryview[float]) -> list[tuple[float, float, float
     """Measure tempo from one short onset window at a time."""
     estimates: list[tuple[float, float, float]] = []
     section: list[float] = []
+
     for pos in range(1, len(energy)):
         section.append(max(0.0, energy[pos] - energy[pos - 1]))
         if len(section) < TEMPO_WINDOW and pos != len(energy) - 1:
@@ -209,4 +222,5 @@ def tempo_estimates(energy: memoryview[float]) -> list[tuple[float, float, float
                 start = pos - len(section)
                 estimates.append((start / 10, round(600 / lag), round(confidence, 2)))
         section = []
+
     return estimates

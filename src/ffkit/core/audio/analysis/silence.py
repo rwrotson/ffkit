@@ -56,6 +56,7 @@ class SilenceScan:
                 self.last_end = value
                 if self.first_end is None:
                     self.first_end = value
+
         decoded = _DECODED.match(line.strip())
         if decoded:
             self.decoded_end = int(decoded.group(1)) / 1_000_000
@@ -91,6 +92,7 @@ def _read_scan_stream(
     scan = SilenceScan()
     pending = b""
     tail = b""
+
     if process.stderr is None:
         raise RuntimeError("FFmpeg stderr is unavailable")
     deadline = time.monotonic() + timeout
@@ -109,6 +111,7 @@ def _read_scan_stream(
                     continue
                 tail = (tail + chunk)[-ERROR_TAIL_LIMIT:]
                 pending = _consume_scan_chunk(scan, pending, chunk)
+
     if pending:
         scan.read_line(pending)
     return scan, tail
@@ -145,10 +148,12 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
     """Return the source position where trailing silence in the trimmed range starts."""
     if duration is None:
         raise ValueError("Track duration is unavailable")
+
     start = effects.trim_start
     end = min(effects.trim_end or duration, duration)
     if end <= start:
         return None
+
     command = [
         ffmpeg,
         "-hide_banner",
@@ -172,6 +177,7 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
         "null",
         "-",
     ]
+
     scan = scan_silence(command, cancelled, timeout=timeout)
     trailing = scan.trailing_start()
     if trailing is None:
@@ -197,6 +203,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
         duration = probe(Track(path=str(path)), runtime=runtime).duration
     if not duration or duration <= 0:
         raise ValueError("Track duration is unavailable")
+
     command = [
         runtime.ffmpeg_path,
         "-hide_banner",
@@ -216,6 +223,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
         "null",
         "-",
     ]
+
     scan = scan_silence(command, cancelled, timeout=runtime.process_timeout)
     leading = scan.first_start is not None and scan.first_start <= TRIM_EDGE_TOLERANCE
     start = scan.first_end if leading and scan.first_end is not None else 0.0
@@ -235,6 +243,7 @@ def trailing_trim_end(
     """Return where trailing silence starts when ``trim_silence`` is enabled."""
     if not effects.trim_silence:
         return None
+
     duration = probe(Track(path=str(source)), runtime=runtime).duration
     trailing_end = trailing_silence_end(
         effects,
@@ -244,6 +253,7 @@ def trailing_trim_end(
         ffmpeg=runtime.ffmpeg_path,
         timeout=runtime.process_timeout,
     )
+
     if trailing_end is not None and trailing_end <= effects.trim_start + MIN_TRAILING_SILENCE:
         raise ValueError("Track contains no audible audio")
     return trailing_end

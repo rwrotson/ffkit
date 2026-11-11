@@ -18,17 +18,21 @@ def test_audio_models_preserve_defaults_and_validation() -> None:
     assert track.effects == Effects()
     assert group.effective_gain_db == 0
     assert group.limiter_for(track) == -1
+
     group.limiter_enabled = False
     assert group.limiter_for(track) is None
     track.effects.limiter_ceiling_db = -3
     assert group.limiter_for(track) == -3
+
     group.normalization_gain_db = 2
     group.gain_db = 3
     assert group.effective_gain_db == 5
+
     assert issubclass(InvalidInputError, FFKitError)
     assert issubclass(InvalidInputError, ValueError)
     assert issubclass(CancelledError, FFKitError)
     assert issubclass(CancelledError, RuntimeError)
+
     with pytest.raises(ValidationError):
         Track(path="song.flac", effects=Effects(trim_start=2, trim_end=1))
     with pytest.raises(ValidationError):

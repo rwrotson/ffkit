@@ -29,11 +29,13 @@ def default_value(field: FieldInfo) -> str:
 def table(rows: Iterator[tuple[str, FieldInfo]]) -> list[str]:
     """Build a configuration table from setting fields."""
     lines = ["| Variable | Type | Default | Description |", "| --- | --- | --- | --- |"]
+
     for variable, field in rows:
         description = field.description or ""
         lines.append(
             f"| `{variable}` | {type_name(field)} | {default_value(field)} | {description} |"
         )
+
     return lines
 
 
@@ -45,6 +47,7 @@ lines = [
     "environment wins. The library itself does not read them. "
     f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`. Empty values use the default.",
 ]
+
 top_level = [
     (variable, field)
     for variable, field in env_fields()
@@ -52,6 +55,7 @@ top_level = [
 ]
 if top_level:
     lines += ["", "## Application", "", *table(iter(top_level))]
+
 for name, field in Settings.model_fields.items():
     section = nested_model(field)
     if section is None:

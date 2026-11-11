@@ -183,4 +183,5 @@ MyPy runs with `strict = true` and the Pydantic plugin over `src/`, `tests/`, an
 - Add docstrings to protected or private objects only when they explain behavior that is not clear from code.
 - Keep inline comments only for non-obvious behavior or decisions. Put a short comment on the relevant line when it fits; otherwise place it immediately above. Retain necessary tool directives such as `# noqa` and `# type: ignore`.
 - A comment placed above a group of lines applies only to that group. Separate the group from the next unrelated lines with a blank line so the comment's scope is clear.
+- In long functions, methods, and tests, separate logical steps (input validation, setup, command building, execution, result handling; arrange, act, assert) with a single blank line. Do not add comments to label the steps. Keep short functions compact.
 - Prefer clearer names and more precise types over comments that restate code.

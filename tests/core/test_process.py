@@ -82,8 +82,10 @@ def test_stop_kills_after_grace_expires() -> None:
         ],
         stdout=subprocess.PIPE,
     )
+
     assert process.stdout is not None
     process.stdout.readline()  # The handler is installed once the first line is printed.
+
     stop(process, grace=0.1)
     assert process.returncode == -9
 

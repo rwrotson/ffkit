@@ -42,11 +42,14 @@ def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path
     track.effects.trim_start = 0.2
     track.effects.trim_end = 1.5
     track.effects.gain_db = 2
+
     rendered = tmp_path / "rendered.mp3"
     render(track, rendered)
+
     streamed = b"".join(stream_mp3(track))
     assert streamed.startswith(b"ID3")
     assert abs(len(pcm(streamed)) - len(pcm(rendered.read_bytes()))) < 12000
+
     seeked = b"".join(stream_mp3(track, start=0.7))
     assert seeked.startswith(b"ID3")
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
@@ -104,6 +107,7 @@ def test_stream_reports_failed_encoder_and_closes_early(
     missing = Track(path=str(tmp_path / "missing.wav"))
     with pytest.raises(RuntimeError, match="Audio encoder exited"):
         b"".join(stream_mp3(missing))
+
     source = tmp_path / "source.wav"
     make_tone(source)
     stream = stream_mp3(Track(path=str(source)))
@@ -146,9 +150,11 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     track = Track(path=str(source))
     track.effects.trim_silence = True
     plain = Track(path=str(source))
+
     seeked = len(pcm(b"".join(stream_mp3(track, start=1.2))))
     expected = len(pcm(b"".join(stream_mp3(plain, start=1.2))))
     assert abs(seeked - expected) < 12000

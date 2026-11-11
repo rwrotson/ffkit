@@ -50,6 +50,7 @@ def _command_parts(track: Track, source: Path, *, ffmpeg: str) -> tuple[list[str
         inputs.extend(
             ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"]
         )
+
     outputs = [*MP3_ENCODER_ARGS, "-map_metadata", "0"]
     # Unprobed tracks hold only explicit tags; probed ones record explicit tags as overrides.
     explicit = track.tags if track.probed_source_tags is None else track.tag_overrides
@@ -76,11 +77,13 @@ def _run_encoder(
                     process.terminate()
                     process.wait()
                     raise CancelledError("Export cancelled")
+
                 wait = remaining if cancelled is None else min(CANCEL_POLL_INTERVAL, remaining)
                 try:
                     process.wait(timeout=wait)
                 except subprocess.TimeoutExpired:
                     continue
+
             if process.returncode:
                 raise subprocess.CalledProcessError(
                     process.returncode, command, stderr=error_tail(errors)
@@ -132,18 +135,22 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
         destination.exists() and source.samefile(destination)
     ):
         raise ValueError("Output path must differ from source audio")
+
     ceiling = track.effects.effective_limiter_db(limiter_db)
     destination.parent.mkdir(parents=True, exist_ok=True)
     inputs, outputs = _command_parts(track, source, ffmpeg=runtime.ffmpeg_path)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
+
     try:
         trailing_end = trailing_trim_end(track.effects, source, cancelled, runtime=runtime)
+
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
             attempt_track = track.model_copy(deep=True)
             attempt_track.effects.limiter_ceiling_db = effective_ceiling
             if trailing_end is not None:
                 attempt_track.effects.trim_end = trailing_end
+
             filters = audio_filters(attempt_track, group_gain_db, streaming=True)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             _encode(
@@ -152,6 +159,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
                 cancelled,
                 timeout=runtime.process_timeout,
             )
+
             if ceiling is None or effective_ceiling is None:
                 break
             _check_cancelled(cancelled)
@@ -161,6 +169,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             if peak <= ceiling:
                 break
             effective_ceiling = _next_ceiling(effective_ceiling, ceiling, peak, attempt)
+
         _check_cancelled(cancelled)
         os.replace(temporary, destination)
     finally:

@@ -42,10 +42,12 @@ def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     start, end = detect_trim_bounds(source)
     assert 0.9 < start < 1.1
     assert end is not None
     assert 3.9 < end < 4.1
+
     duration = probe(Track(path=str(source))).duration
     assert duration is not None
     assert detect_trim_bounds(source, duration) == (start, end)
@@ -77,6 +79,7 @@ def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
         ],
         check=True,
     )
+
     duration = probe(Track(path=str(source))).duration
     assert duration is not None
     assert detect_trim_bounds(source) == (0.0, None)

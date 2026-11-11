@@ -14,6 +14,7 @@ def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
     if not source.is_file():
         track.error = "Source file is missing"
         return track
+
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffprobe_path,
@@ -30,6 +31,7 @@ def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
         check=True,
         timeout=runtime.process_timeout,
     )
+
     report = json.loads(result.stdout)
     audio_stream = next(
         (stream for stream in report.get("streams", []) if stream.get("codec_type") == "audio"),
@@ -37,10 +39,12 @@ def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
     )
     if audio_stream is None:
         raise ValueError("File has no decodable audio stream")
+
     info = report["format"]
     track.duration = float(info.get("duration", 0))
     if not math.isfinite(track.duration) or track.duration <= 0:
         raise ValueError("File has no measurable audio duration")
+
     format_tags = {str(key).lower(): str(value) for key, value in info.get("tags", {}).items()}
     stream_tags = {
         str(key).lower(): str(value) for key, value in audio_stream.get("tags", {}).items()

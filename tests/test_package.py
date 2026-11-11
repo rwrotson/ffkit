@@ -44,8 +44,10 @@ def test_logs_package_reports_missing_extra() -> None:
         f"try:\n    import {package}\n"
         "except ModuleNotFoundError as error:\n    print(error.name, error)"
     )
+
     result = subprocess.run(  # noqa: S603
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )
+
     assert result.stdout.startswith(f"{missing} ")
     assert "ffkit[logs]" in result.stdout

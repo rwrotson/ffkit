@@ -44,9 +44,11 @@ def test_json_processing_failure_has_one_error_object(
     source = tmp_path / "broken.wav"
     source.write_bytes(b"invalid audio")
     monkeypatch.setenv("FFKIT_LOG__DIR", str(tmp_path / "logs"))
+
     result = runner.invoke(
         app, ["--output-format", "json", "audio", "render", str(source), str(tmp_path / "out.mp3")]
     )
+
     assert result.exit_code == 1
     assert result.stdout == ""
     assert json.loads(result.stderr)["error"]["type"] == "CalledProcessError"
@@ -68,6 +70,7 @@ def test_filesystem_errors_use_json_output(tmp_path: Path, monkeypatch: pytest.M
     source.touch()
     occupied = tmp_path / "occupied"
     occupied.write_text("file")
+
     result = runner.invoke(
         app, ["--output-format", "json", "audio", "render", str(source), str(occupied / "out.mp3")]
     )
@@ -119,10 +122,12 @@ def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     source.touch()
     monkeypatch.setattr(cli_app, "measure_loudness", lambda path, *, runtime: (-14.2, -1.1))
     monkeypatch.setattr(cli_app, "detect_trim_bounds", lambda path, **kwargs: (1.0, 9.0))
+
     loudness = runner.invoke(app, ["--output-format", "json", "audio", "loudness", str(source)])
     bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
     assert json.loads(loudness.stdout) == {"loudness_lufs": -14.2, "true_peak_db": -1.1}
     assert "Start: 1.0 s" in bounds.stdout
+
     for option, value in [
         ("--min-duration", "0"),
         ("--min-duration", "11"),
@@ -175,6 +180,7 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     )
     assert result.exit_code == 0
     assert destination.read_bytes() == b"cover"
+
     monkeypatch.setattr(cli_app, "extract_cover", lambda track, path, *, runtime: None)
     failed = runner.invoke(
         app, ["audio", "extract-cover", str(source), str(destination), "--force"]
@@ -222,6 +228,7 @@ def test_invalid_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(app, ["audio", "probe", "missing.mp3"])
     assert result.exit_code == 2
     assert "Invalid configuration" in result.stderr
+
     json_result = runner.invoke(app, ["--output-format", "json", "audio", "probe", "missing.mp3"])
     assert json_result.exit_code == 2
     assert json.loads(json_result.stderr)["error"]["type"] == "ValidationError"
@@ -255,6 +262,7 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     image.touch()
     rendered: list[Track] = []
     monkeypatch.setattr(cli_app, "render", lambda track, path, *, runtime: rendered.append(track))
+
     base = ["audio", "render", str(source)]
     result = runner.invoke(
         app,
@@ -272,9 +280,11 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert result.exit_code == 0
     assert rendered[-1].cover_path == str(image)
     assert rendered[-1].tags == {"title": "A=B", "x": ""}
+
     result = runner.invoke(app, [*base, str(tmp_path / "b.mp3"), "--no-cover"])
     assert result.exit_code == 0
     assert rendered[-1].cover_removed
+
     for options in (["--tag", "title"], ["--tag", "=x"], ["--cover", str(image), "--no-cover"]):
         invalid = runner.invoke(app, [*base, str(tmp_path / "c.mp3"), *options])
         assert invalid.exit_code == 2
@@ -299,6 +309,7 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     )
     assert json.loads(result.stdout) == {"gain_db": 2.5}
     assert calls == [(-16, -1)]
+
     text = runner.invoke(app, ["audio", "normalization-gain", str(source)])
     assert "Gain: 2.5 dB" in text.stdout
     invalid = runner.invoke(

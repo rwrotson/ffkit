@@ -20,6 +20,7 @@ def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
     trim_end = snapshot.effects.trim_end
     if trim_end is not None and source_offset >= trim_end:
         return None
+
     # Replace both bounds at once; assigning them separately can fail interval validation.
     snapshot.effects = Effects.model_validate(
         {
@@ -30,6 +31,7 @@ def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
             "trim_silence": snapshot.effects.trim_silence and start == 0,
         }
     )
+
     return snapshot, source_offset
 
 
@@ -67,6 +69,7 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
     if seeked is None:
         return
     snapshot, source_offset = seeked
+
     command = [
         ffmpeg,
         "-hide_banner",
@@ -80,10 +83,12 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         "-map",
         "0:a:0",
     ]
+
     filters = audio_filters(snapshot, gain, streaming=True, limiter_db=limiter_db)
     if filters:
         command += ["-af", ",".join(filters)]
     command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]
+
     process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
         command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
     )
@@ -100,6 +105,7 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
                 yield chunk
             else:
                 raise TimeoutError("Audio stream stopped responding")
+
         if process.wait(timeout=5):
             raise RuntimeError(f"Audio encoder exited with status {process.returncode}")
     except Exception:

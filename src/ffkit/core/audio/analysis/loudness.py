@@ -21,6 +21,7 @@ def measure_loudness(
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
         f":LRA={LOUDNORM_RANGE}:print_format=json",
     ]
+
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffmpeg_path,
@@ -41,6 +42,7 @@ def measure_loudness(
         check=True,
         timeout=runtime.process_timeout,
     )
+
     marker = result.stderr.rfind('"input_i"')
     if marker < 0:
         return None, None
@@ -65,6 +67,7 @@ def analyze_loudness(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) 
     lufs, peak = measure_loudness(source, runtime=runtime)
     if source_fingerprint(source) != fingerprint:
         raise ValueError("Source audio changed during loudness analysis")
+
     track.loudness_lufs = lufs
     track.true_peak_db = peak
     track.analysis_source_stat = fingerprint
@@ -85,6 +88,7 @@ def normalization_gain(
         if not math.isfinite(peak):
             raise ValueError("Cannot measure track true peak")
         gain = min(gain, ceiling - peak)
+
     rounded = round(gain, 1)
     if peak is not None and rounded > ceiling - peak:
         rounded = round(rounded - 0.1, 1)
@@ -107,12 +111,14 @@ def calculate_normalization_gain(
     measured.effects.normalize_lufs = None
     measured.effects.limiter_ceiling_db = None
     measured.effects.gain_db = 0
+
     source = Path(measured.path)
     fingerprint = source_fingerprint(source)
     trailing_end = trailing_trim_end(measured.effects, source, runtime=runtime)
     if trailing_end is not None:
         measured.effects.trim_end = trailing_end
     filters = audio_filters(measured, streaming=True, limiter_db=None)
+
     lufs: float | None
     peak: float | None
     if (
@@ -123,6 +129,7 @@ def calculate_normalization_gain(
         lufs, peak = track.loudness_lufs, track.true_peak_db
     else:
         lufs, peak = measure_loudness(source, filters, runtime=runtime)
+
     if source_fingerprint(source) != fingerprint:
         raise ValueError("Source audio changed during normalization")
     return normalization_gain(lufs, peak, target_lufs, peak_ceiling_db)

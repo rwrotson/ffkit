@@ -45,10 +45,12 @@ def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path / "working", level="WARNING"))
     original_handlers = _app_handlers(clean_root_logger)
+
     occupied = tmp_path / "occupied"
     occupied.write_text("file")
     with pytest.raises(FileExistsError):
         setup_logging(LogSettings(dir=occupied, level="DEBUG"))
+
     assert _app_handlers(clean_root_logger) == original_handlers
     assert clean_root_logger.level == logging.WARNING
     clean_root_logger.error("still active")

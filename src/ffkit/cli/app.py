@@ -72,9 +72,11 @@ class CLIGroup(TyperGroup):
                 state.runtime.ffmpeg_path,
                 state.runtime.ffprobe_path,
             }
+
             code = (
                 2 if isinstance(error, (ValueError, FileNotFoundError)) and not missing_tool else 1
             )
+
             if state.output_format == OutputFormat.json:
                 typer.echo(
                     json.dumps({"error": {"type": type(error).__name__, "message": str(error)}}),
@@ -103,10 +105,12 @@ def root(
     if show_version:
         typer.echo(f"ffkit {version('ffkit')}")
         raise typer.Exit()
+
     if ctx.invoked_subcommand is None:
         # A missing command is a usage error, as in Click groups without this callback.
         typer.echo(ctx.get_help())
         raise typer.Exit(2)
+
     ctx.obj = CLIState(output_format)
     try:
         settings = load_settings()
@@ -119,6 +123,7 @@ def root(
         else:
             typer.echo(f"Invalid configuration: {error}", err=True)
         raise typer.Exit(2) from error
+
     if verbose:
         settings.log.level = "DEBUG"
     setup_logging(settings.log, console=output_format != OutputFormat.json)
@@ -203,6 +208,7 @@ def trim_bounds_command(
     """Find audible start and end positions."""
     if min_duration == 0:
         raise typer.BadParameter("must be greater than 0", param_hint="'--min-duration'")
+
     start, end = detect_trim_bounds(
         input_file(source),
         threshold_db=threshold_db,
@@ -237,10 +243,12 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     """Render audio as an MP3 with optional effects."""
     if cover is not None and no_cover:
         raise typer.BadParameter("cannot be combined with --no-cover", param_hint="'--cover'")
+
     tags = parse_tags(tag or [])
     source = input_file(source)
     cover_path = None if cover is None else str(input_file(cover))
     destination = output_file(destination, force)
+
     effects = Effects(
         gain_db=gain_db,
         normalize_lufs=target_lufs,
@@ -256,6 +264,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         cover_path=cover_path,
         cover_removed=no_cover,
     )
+
     render(track, destination, runtime=cli_state(ctx).runtime)
     emit(ctx, {"path": str(destination)}, [str(destination)])
 
