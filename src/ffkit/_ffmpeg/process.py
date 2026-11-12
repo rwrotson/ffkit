@@ -98,6 +98,7 @@ def iter_output(  # noqa: C901 - One loop handles deadlines, idle time, and canc
         try:
             # The selected pipe was opened with PIPE above.
             output = cast(IO[bytes], process.stdout if pipe == "stdout" else process.stderr)
+
             tail = b""
             idle_since = time.monotonic()
 

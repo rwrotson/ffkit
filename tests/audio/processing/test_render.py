@@ -364,6 +364,7 @@ def test_render_cancellation_after_encoding(
 
     # Encoding finishes without output; cancellation is noticed afterwards.
     monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
+
     with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, effects=LIMITED, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
@@ -379,6 +380,7 @@ def test_render_cancellation_before_replace_without_limiter(
 
     # Encoding finishes without output; cancellation is noticed afterwards.
     monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
+
     with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"

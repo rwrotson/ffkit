@@ -16,8 +16,10 @@ from ffkit.runtime import FFmpegRuntime
 
 # BS.1770 absolute gate; ebur128 reports it when no block passes the gates.
 ABSOLUTE_GATE_LUFS = -70.0
+
 # ebur128 prints linear true peaks with three decimals, which loses precision below this level.
 MIN_LINEAR_PEAK = 0.1
+
 _INTEGRATED = re.compile(rb"lavfi\.r128\.I=(\S+)")
 _LINEAR_PEAK = re.compile(rb"lavfi\.r128\.true_peak=(\S+)")
 _SUMMARY_PEAK = re.compile(rb"^\s*Peak:\s+(\S+) dBFS")

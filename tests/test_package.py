@@ -25,6 +25,7 @@ def test_import_leaves_global_logging_unconfigured() -> None:
     result = subprocess.run(  # noqa: S603
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )
+
     assert result.stdout.split() == ["0", "False"]
 
 
