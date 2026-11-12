@@ -13,11 +13,13 @@ from typer.core import TyperGroup
 from ffkit import FFKitError, FFmpegRuntime
 from ffkit.audio import (
     DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_PADDING,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
     Effects,
     Mp3Encoding,
+    SilenceReference,
     detect_trim_bounds,
     estimate_tempo,
     extract_cover,
@@ -37,6 +39,19 @@ class OutputFormat(StrEnum):
 
     text = "text"
     json = "json"
+
+
+class ThresholdReference(StrEnum):
+    """Level that a silence threshold is relative to."""
+
+    full_scale = "full_scale"
+    peak = "peak"
+
+
+SILENCE_REFERENCES: dict[ThresholdReference, SilenceReference] = {
+    ThresholdReference.full_scale: "full_scale",
+    ThresholdReference.peak: "peak",
+}
 
 
 @dataclass(frozen=True)
@@ -189,7 +204,7 @@ def loudness_command(ctx: typer.Context, source: Path) -> None:
 
 
 @audio.command("trim-bounds")
-def trim_bounds_command(
+def trim_bounds_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a user option.
     ctx: typer.Context,
     source: Path,
     threshold_db: Annotated[
@@ -198,6 +213,13 @@ def trim_bounds_command(
     min_duration: Annotated[
         float, typer.Option("--min-duration", min=0, max=10)
     ] = DEFAULT_TRIM_MIN_DURATION,
+    threshold_reference: Annotated[
+        ThresholdReference,
+        typer.Option("--threshold-reference", help="Full scale or the loudest window."),
+    ] = ThresholdReference.full_scale,
+    padding: Annotated[
+        float, typer.Option("--padding", min=0, max=1, help="Silence kept at trimmed edges.")
+    ] = DEFAULT_SILENCE_PADDING,
 ) -> None:
     """Find audible start and end positions."""
     if min_duration == 0:
@@ -206,7 +228,9 @@ def trim_bounds_command(
     bounds = detect_trim_bounds(
         input_file(source),
         threshold_db=threshold_db,
+        threshold_reference=SILENCE_REFERENCES[threshold_reference],
         min_duration=min_duration,
+        padding=padding,
         runtime=cli_state(ctx).runtime,
     )
     emit(
@@ -229,6 +253,14 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     silence_threshold_db: Annotated[
         float, typer.Option("--silence-threshold-db", help="Level used by --trim-silence.")
     ] = DEFAULT_SILENCE_THRESHOLD_DB,
+    silence_threshold_reference: Annotated[
+        ThresholdReference,
+        typer.Option("--silence-threshold-reference", help="Reference of --silence-threshold-db."),
+    ] = ThresholdReference.full_scale,
+    silence_padding: Annotated[
+        float,
+        typer.Option("--silence-padding", min=0, max=1, help="Silence kept by --trim-silence."),
+    ] = DEFAULT_SILENCE_PADDING,
     limiter_ceiling_db: Annotated[float | None, typer.Option("--limiter-ceiling-db")] = None,
     cover: Annotated[
         Path | None, typer.Option("--cover", help="Image to embed instead of the source cover.")
@@ -266,6 +298,8 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         trim_end=trim_end,
         trim_silence=trim_silence,
         silence_threshold_db=silence_threshold_db,
+        silence_threshold_reference=SILENCE_REFERENCES[silence_threshold_reference],
+        silence_padding=silence_padding,
         limiter_ceiling_db=limiter_ceiling_db,
     )
     encoding = Mp3Encoding(bitrate_kbps=bitrate_kbps, vbr_quality=vbr_quality)

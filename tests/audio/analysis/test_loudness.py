@@ -174,7 +174,10 @@ def test_measure_normalization_gain_rejects_all_silence(
     source = tmp_path / "silent.wav"
     source.touch()
 
-    monkeypatch.setattr(silence_module, "trailing_silence_end", lambda *args, **kwargs: 0.0)
+    def silent(*args: object, **kwargs: object) -> tuple[float, float | None]:
+        raise SilentAudioError("Track contains no audible audio")
+
+    monkeypatch.setattr(silence_module, "_silence_edges", silent)
     monkeypatch.setattr(silence_module, "probe", lambda path, **kwargs: ONE_SECOND)
 
     with pytest.raises(SilentAudioError, match="no audible audio"):

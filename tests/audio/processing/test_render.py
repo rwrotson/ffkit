@@ -125,11 +125,9 @@ def test_render_trims_edges_without_reversing_audio(
     )
     effects = Effects(trim_start=0.5, trim_end=4.5, trim_silence=True)
 
-    def checked_filters(current: Effects, *, streaming: bool) -> list[str]:
-        assert streaming is True
-        filters = audio_filters(current, streaming=streaming)
-        assert "areverse" not in filters
-        return filters
+    def checked_filters(current: Effects) -> list[str]:
+        assert not current.trim_silence
+        return audio_filters(current)
 
     monkeypatch.setattr(render_module, "audio_filters", checked_filters)
 
@@ -138,7 +136,8 @@ def test_render_trims_edges_without_reversing_audio(
 
     duration = probe(target).duration
     assert duration is not None
-    assert 2.9 < duration < 3.2
+    # 3 s of audio plus 0.05 s of padding at each edge.
+    assert 3.05 < duration < 3.2
 
 
 def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:

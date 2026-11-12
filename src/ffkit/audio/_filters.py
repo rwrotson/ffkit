@@ -3,8 +3,8 @@ from ffkit.audio.defaults import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB
 from ffkit.audio.effects import Effects
 
 
-def audio_filters(effects: Effects, *, streaming: bool = False) -> list[str]:
-    """Build the FFmpeg audio filter chain for effects."""
+def audio_filters(effects: Effects) -> list[str]:
+    """Build the FFmpeg audio filter chain for effects; ``trim_silence`` must be resolved first."""
     filters: list[str] = []
 
     if effects.trim_start or effects.trim_end is not None:
@@ -12,15 +12,6 @@ def audio_filters(effects: Effects, *, streaming: bool = False) -> list[str]:
         if effects.trim_end is not None:
             trim += f":end={ffmpeg_number(effects.trim_end)}"
         filters.extend([trim, "asetpts=PTS-STARTPTS"])
-
-    if effects.trim_silence:
-        edge_trim = (
-            "silenceremove=start_periods=1:start_duration=0:"
-            f"start_threshold={ffmpeg_number(effects.silence_threshold_db)}dB"
-        )
-        filters.append(edge_trim)
-        if not streaming:
-            filters.extend(["areverse", edge_trim, "areverse"])
 
     if effects.gain_db:
         filters.append(f"volume={ffmpeg_number(effects.gain_db)}dB")

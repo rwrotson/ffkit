@@ -140,19 +140,30 @@ def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         "measure_loudness",
         lambda path, *, runtime: Loudness(lufs=-14.2, true_peak_db=-1.1),
     )
-    monkeypatch.setattr(
-        cli_app, "detect_trim_bounds", lambda path, **kwargs: TrimBounds(start=1.0, end=9.0)
-    )
+    calls: list[dict[str, object]] = []
+
+    def fake_bounds(path: Path, **kwargs: object) -> TrimBounds:
+        calls.append(kwargs)
+        return TrimBounds(start=1.0, end=9.0)
+
+    monkeypatch.setattr(cli_app, "detect_trim_bounds", fake_bounds)
 
     loudness = runner.invoke(app, ["--output-format", "json", "audio", "loudness", str(source)])
-    bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
+    bounds = runner.invoke(
+        app,
+        ["audio", "trim-bounds", str(source), "--threshold-reference", "peak", "--padding", "0"],
+    )
     assert json.loads(loudness.stdout) == {"lufs": -14.2, "true_peak_db": -1.1}
     assert "Start: 1.0 s" in bounds.stdout
+    assert calls[0]["threshold_reference"] == "peak"
+    assert calls[0]["padding"] == 0
 
     for option, value in [
         ("--min-duration", "0"),
         ("--min-duration", "11"),
         ("--threshold-db", "1"),
+        ("--padding", "-1"),
+        ("--threshold-reference", "loudest"),
     ]:
         invalid = runner.invoke(app, ["audio", "trim-bounds", str(source), option, value])
         assert invalid.exit_code == 2
@@ -406,7 +417,18 @@ def test_render_encoding_and_silence_options(
 
     result = runner.invoke(
         app,
-        [*base, str(tmp_path / "out.mp3"), "--vbr-quality", "2", "--silence-threshold-db", "-40"],
+        [
+            *base,
+            str(tmp_path / "out.mp3"),
+            "--vbr-quality",
+            "2",
+            "--silence-threshold-db",
+            "-40",
+            "--silence-threshold-reference",
+            "peak",
+            "--silence-padding",
+            "0.2",
+        ],
     )
 
     assert result.exit_code == 0
@@ -414,6 +436,8 @@ def test_render_encoding_and_silence_options(
     effects = calls[0]["effects"]
     assert isinstance(effects, Effects)
     assert effects.silence_threshold_db == -40
+    assert effects.silence_threshold_reference == "peak"
+    assert effects.silence_padding == 0.2
     for option, value in [("--vbr-quality", "10"), ("--bitrate-kbps", "8")]:
         invalid = runner.invoke(app, [*base, str(tmp_path / "bad.mp3"), option, value])
         assert invalid.exit_code == 2

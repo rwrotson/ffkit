@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ffkit._ffmpeg.args import StrPath, media_path, source_fingerprint
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
-from ffkit.audio.analysis.silence import trailing_trim_end
+from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.defaults import DEFAULT_PEAK_CEILING_DB, DEFAULT_TARGET_LUFS
 from ffkit.audio.effects import Effects
 from ffkit.errors import SilentAudioError, SourceChangedError
@@ -172,10 +172,8 @@ def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmp
     )
 
     fingerprint = source_fingerprint(source)
-    trailing_end = trailing_trim_end(measured, source, cancelled, runtime=runtime)
-    if trailing_end is not None:
-        measured = measured.replace(trim_end=trailing_end)
-    filters = audio_filters(measured, streaming=True)
+    measured = resolve_silence_trim(measured, source, cancelled, runtime=runtime)
+    filters = audio_filters(measured)
 
     if not filters and known is not None and known.fingerprint == fingerprint:
         loudness = known

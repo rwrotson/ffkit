@@ -66,7 +66,7 @@ Run `ffkit --help` and `ffkit audio --help` to see the commands:
 ```bash
 ffkit audio probe song.flac
 ffkit --output-format json audio loudness song.flac
-ffkit audio trim-bounds song.flac --threshold-db -45
+ffkit audio trim-bounds song.flac --threshold-db -60 --threshold-reference peak
 ffkit audio render song.flac song.mp3 --gain-db 3 --target-lufs -14
 ffkit audio render song.flac song.mp3 --tag title=Intro --cover cover.jpg
 ffkit audio normalization-gain song.flac --target-lufs -14 --peak-ceiling-db -1
@@ -131,11 +131,15 @@ covers, and analysis results, in its own models.
   effects twice.
 - `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
   checked together. Trim bounds are positions in the original file.
-- `trim_silence` removes leading and trailing silence below `silence_threshold_db`. Rendering and
-  normalization find trailing silence with a separate scan, so long tracks are not buffered in
-  memory, and an audible ending after a pause is kept.
-- `stream(start=...)` seeks from `trim_start` before applying the remaining effects; leading silence
-  removal applies only from `start=0`.
+- `trim_silence` removes leading and trailing silence below `silence_threshold_db`, measured as
+  20 ms RMS windows of the loudest channel. The threshold is relative to full scale or, with
+  `silence_threshold_reference="peak"`, to the loudest window. Edge silence shorter than 0.1 s is
+  kept, `silence_padding` seconds (0.05 by default) are kept at trimmed edges, and pauses inside the
+  track stay. Rendering, normalization, and streaming find the bounds with a separate decode of the
+  trimmed range, so long tracks are not buffered in memory.
+- `stream(start=...)` resolves silence bounds first and then seeks from the audible start;
+  `trim_silence` scans the range before the first chunk, so a player that seeks often can pass
+  bounds from `detect_trim_bounds()` as `trim_start` and `trim_end` instead.
 - `render()` and `stream()` encode with `encoding=`, which defaults to `Mp3Encoding()` (LAME,
   320 kbit/s CBR; set `vbr_quality` for VBR).
 - `render()` writes to a temporary file and replaces the destination only on success. It copies
@@ -155,8 +159,8 @@ covers, and analysis results, in its own models.
   `measure_normalization_gain(known=...)` reuses it only while no filters apply and the fingerprint
   matches. `gain_for_target()` calculates the gain from a `Loudness` without running FFmpeg. Gains
   use 0.1 dB steps and round toward attenuation to stay below the true-peak ceiling.
-- `detect_trim_bounds()` returns the audible `TrimBounds` and keeps short tails after an internal
-  pause.
+- `detect_trim_bounds()` returns the audible `TrimBounds` with the same detector, padding, and
+  threshold reference options as `trim_silence`, and keeps short tails after an internal pause.
 - `waveform()` returns up to 400 loudness values scaled to the loudest point, `peak_envelope()` 400
   full-scale peaks from oversampled audio, and `estimate_tempo()` rough `TempoSegment`s; each
   decodes the source once.

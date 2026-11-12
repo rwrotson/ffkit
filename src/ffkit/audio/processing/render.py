@@ -8,7 +8,7 @@ from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.loudness import measure_loudness
-from ffkit.audio.analysis.silence import trailing_trim_end
+from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
 from ffkit.errors import (
@@ -126,15 +126,12 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{encoding.extension}")
 
     try:
-        trailing_end = trailing_trim_end(effects, source, cancelled, runtime=runtime)
+        effects = resolve_silence_trim(effects, source, cancelled, runtime=runtime)
 
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
-            attempt_effects = effects.replace(
-                limiter_ceiling_db=effective_ceiling,
-                trim_end=effects.trim_end if trailing_end is None else trailing_end,
-            )
-            filters = audio_filters(attempt_effects, streaming=True)
+            attempt_effects = effects.replace(limiter_ceiling_db=effective_ceiling)
+            filters = audio_filters(attempt_effects)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             _encode(
                 source,

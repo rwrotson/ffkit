@@ -87,6 +87,9 @@ render("song.flac", "song-quiet.mp3", effects=effects.replace(gain_db=-3), runti
   cover), `False`, or an image path.
 - `measure_loudness()` records the file fingerprint for unfiltered measurements, and
   `measure_normalization_gain(known=...)` reuses that result while the file is unchanged.
+- `trim_silence` and `detect_trim_bounds()` share one detector: 20 ms RMS windows of the loudest
+  channel against a threshold relative to full scale or to the loudest window, with padding kept at
+  trimmed edges. Pass bounds from `detect_trim_bounds()` as trims to avoid a scan per `stream()`.
 - `detect_trim_bounds()` and `peak_envelope()` accept an earlier `AudioInfo` as `info=` instead of
   probing again.
 - FFmpeg runs have a 15-minute deadline by default (`process_timeout`); `stream()` instead fails

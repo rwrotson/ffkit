@@ -66,19 +66,16 @@ def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path
     assert b"".join(stream(source, effects=effects, start=0.8)) == b""
 
 
-def test_stream_uses_streaming_filters(
+def test_stream_resolves_silence_trim(
     make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
     effects = Effects(trim_silence=True)
-    original = audio_filters
 
-    def check_filters(current: Effects, *, streaming: bool) -> list[str]:
-        assert streaming is True
-        filters = original(current, streaming=streaming)
-        assert "areverse" not in filters
-        return filters
+    def check_filters(current: Effects) -> list[str]:
+        assert not current.trim_silence
+        return audio_filters(current)
 
     monkeypatch.setattr(stream_module, "audio_filters", check_filters)
     assert b"".join(stream(source, effects=effects))
@@ -139,3 +136,33 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
     seeked = len(pcm(b"".join(stream(source, effects=effects, start=1.2))))
     expected = len(pcm(b"".join(stream(source, effects=plain_effects, start=1.2))))
     assert abs(seeked - expected) < 12000
+
+
+def test_stream_seek_trims_silent_edges(tmp_path: Path) -> None:
+    source = tmp_path / "edges.wav"
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=44100:cl=mono:d=1",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=44100:duration=1",
+            "-filter_complex",
+            "[0][1][0]concat=n=3:v=0:a=1",
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+
+    effects = Effects(trim_silence=True, silence_padding=0)
+    samples = len(pcm(b"".join(stream(source, effects=effects, start=0.5)))) // 2
+
+    # The seek starts 0.5 s after the audible start and stops at the audible end.
+    assert 0.45 * 44100 < samples < 0.6 * 44100

@@ -14,11 +14,12 @@ from .analysis.tempo import TempoSegment, estimate_tempo
 from .analysis.waveform import peak_envelope, waveform
 from .defaults import (
     DEFAULT_PEAK_CEILING_DB,
+    DEFAULT_SILENCE_PADDING,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
 )
-from .effects import Effects
+from .effects import Effects, SilenceReference
 from .encoding import Encoding, Mp3Encoding
 from .processing.extract import extract_cover
 from .processing.render import render
@@ -26,6 +27,7 @@ from .processing.stream import stream
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",
+    "DEFAULT_SILENCE_PADDING",
     "DEFAULT_SILENCE_THRESHOLD_DB",
     "DEFAULT_TARGET_LUFS",
     "DEFAULT_TRIM_MIN_DURATION",
@@ -34,6 +36,7 @@ __all__ = [
     "Encoding",
     "Loudness",
     "Mp3Encoding",
+    "SilenceReference",
     "TempoSegment",
     "TrimBounds",
     "detect_trim_bounds",

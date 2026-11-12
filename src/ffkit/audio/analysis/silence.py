@@ -1,23 +1,26 @@
-import re
-from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Self
+import math
 
+import numpy as np
+import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import AudioInfo, probe
-from ffkit.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
-from ffkit.audio.effects import Effects
-from ffkit.errors import FFmpegError, SilentAudioError
+from ffkit.audio.defaults import (
+    DEFAULT_SILENCE_PADDING,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TRIM_MIN_DURATION,
+)
+from ffkit.audio.effects import Effects, SilenceReference
+from ffkit.errors import InvalidInputError, SilentAudioError
 from ffkit.runtime import FFmpegRuntime
 
-END_TOLERANCE = 0.001
-MIN_TRAILING_SILENCE = 0.01
-_EVENT = re.compile(rb"silence_(start|end): ([-\d.]+)")
-TRIM_EDGE_TOLERANCE = 0.1
-_DECODED = re.compile(rb"^out_time_us=(\d+)$")
+# Levels are 20 ms RMS windows made of two 10 ms blocks, so windows advance by 10 ms.
+BLOCKS_PER_SECOND = 100
+WINDOW_BLOCKS = 2
+
+type Levels = npt.NDArray[np.float64]
 
 
 class TrimBounds(BaseModel):
@@ -29,122 +32,154 @@ class TrimBounds(BaseModel):
     end: float | None = Field(default=None, gt=0)
 
 
-@dataclass
-class SilenceScan:
-    """Silence events and decoded duration reported by FFmpeg silencedetect and progress."""
+class _LevelMeter:
+    """Mean-square level per window, as the loudest channel, from interleaved float32 PCM."""
 
-    first_start: float | None = None
-    first_end: float | None = None
-    last_start: float | None = None
-    last_end: float | None = None
-    last_event: str | None = None
-    decoded_end: float | None = None
+    def __init__(self, sample_rate: int, channels: int) -> None:
+        self.block_frames = max(1, round(sample_rate / BLOCKS_PER_SECOND))
+        self.block_seconds = self.block_frames / sample_rate
+        self.channels = channels
+        self.frames = 0
+        self._block_bytes = self.block_frames * channels * 4
+        self._pending = b""
+        self._windows: list[npt.NDArray[np.float64]] = []
 
-    @classmethod
-    def from_lines(cls, lines: Iterable[bytes]) -> Self:
-        """Collect events from complete FFmpeg output lines."""
-        scan = cls()
-        for line in lines:
-            scan.read_line(line)
-        return scan
+        # Per-channel sum of squares of the last block, paired with the next block's first window.
+        self._previous: npt.NDArray[np.float64] | None = None
 
-    def read_line(self, line: bytes) -> None:
-        """Record one FFmpeg output line."""
-        event = _EVENT.search(line)
-        if event:
-            self.last_event = event.group(1).decode()
-            value = float(event.group(2))
-            if self.last_event == "start":
-                self.last_start = value
-                if self.first_start is None:
-                    self.first_start = value
-            else:
-                self.last_end = value
-                if self.first_end is None:
-                    self.first_end = value
+    def feed(self, data: bytes) -> None:
+        """Add PCM bytes; a partial block waits for the next call."""
+        data = self._pending + data
+        complete = len(data) // self._block_bytes * self._block_bytes
+        self._pending = data[complete:]
+        if complete:
+            self._add(np.frombuffer(data[:complete], dtype="<f4"))
 
-        decoded = _DECODED.match(line.strip())
-        if decoded:
-            self.decoded_end = int(decoded.group(1)) / 1_000_000
+    def finish(self) -> Levels:
+        """Return window levels; a trailing partial block is divided by the full block size."""
+        frame_bytes = self.channels * 4
+        complete = len(self._pending) // frame_bytes * frame_bytes
+        if complete:
+            samples = np.frombuffer(self._pending[:complete], dtype="<f4")
+            padding = self.block_frames * self.channels - len(samples)
+            self._add(np.concatenate([samples, np.zeros(padding, dtype="<f4")]))
+            self.frames -= padding // self.channels
+        self._pending = b""
 
-    def trailing_start(self) -> float | None:
-        """Return where silence that lasts until the end of decoded audio begins."""
-        if self.last_start is None:
-            return None
-        if self.last_event == "start":
-            return self.last_start
-        if self.decoded_end is None:
-            raise FFmpegError("FFmpeg did not report decoded duration")
-        if self.last_end is not None and self.last_end >= self.decoded_end - END_TOLERANCE:
-            return self.last_start
-        return None
+        if not self._windows:
+            if self._previous is None:
+                return np.zeros(0)
+            # A source shorter than one window has a single, one-block window.
+            return np.asarray([self._previous.max() / self.block_frames])
+        return np.concatenate(self._windows)
 
-
-def scan_silence(command: list[str], cancelled: Cancelled | None, *, timeout: float) -> SilenceScan:
-    """Run an FFmpeg silencedetect command and parse its stderr with bounded memory."""
-    scan = SilenceScan()
-    pending = b""
-    for chunk in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
-        pending += chunk
-        while b"\n" in pending:
-            line, pending = pending.split(b"\n", 1)
-            scan.read_line(line)
-        # Bound memory when FFmpeg writes a long line without a newline.
-        pending = pending[-8192:]
-    if pending:
-        scan.read_line(pending)
-    return scan
+    def _add(self, samples: npt.NDArray[np.float32]) -> None:
+        blocks = samples.astype(np.float64).reshape(-1, self.block_frames, self.channels)
+        self.frames += blocks.shape[0] * self.block_frames
+        sums = np.square(blocks).sum(axis=1)
+        if self._previous is not None:
+            sums = np.concatenate([self._previous[np.newaxis], sums])
+        if len(sums) >= WINDOW_BLOCKS:
+            windows = sums[:-1] + sums[1:]
+            self._windows.append(windows.max(axis=1) / (WINDOW_BLOCKS * self.block_frames))
+        self._previous = sums[-1]
 
 
-def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.
-    effects: Effects,
-    source: StrPath,
-    duration: float,
-    cancelled: Cancelled | None = None,
+def _audible_span(
+    levels: Levels,
     *,
-    ffmpeg: str,
-    timeout: float,
-) -> float | None:
-    """Return the source position where trailing silence in the trimmed range starts."""
-    start = effects.trim_start
-    end = min(effects.trim_end or duration, duration)
-    if end <= start:
+    threshold_db: float,
+    reference: SilenceReference,
+    block_seconds: float,
+) -> tuple[float, float] | None:
+    """Return the start of the first and the end of the last window above the threshold."""
+    peak = float(levels.max()) if len(levels) else 0.0
+    if peak == 0:
         return None
 
-    command = [
-        ffmpeg,
-        "-hide_banner",
-        "-nostats",
-        "-loglevel",
-        "info",
-        "-ss",
-        ffmpeg_number(start),
-        "-i",
-        media_path(source),
-        "-t",
-        ffmpeg_number(end - start),
+    base = peak if reference == "peak" else 1.0
+    audible = np.flatnonzero(levels > base * 10 ** (threshold_db / 10))
+    if not len(audible):
+        return None
+    window_blocks = WINDOW_BLOCKS if len(levels) > 1 else 1
+    return (
+        float(audible[0]) * block_seconds,
+        float(audible[-1] + window_blocks) * block_seconds,
+    )
+
+
+def _edges(
+    span: tuple[float, float], decoded: float, *, min_duration: float, padding: float
+) -> tuple[float, float | None]:
+    """Turn an audible span into trim positions, keeping short edge silence and padding."""
+    start, end = span
+    start = 0.0 if start < min_duration else max(0.0, start - padding)
+    trimmed_end: float | None = None
+    if decoded - end >= min_duration and end + padding < decoded:
+        trimmed_end = end + padding
+    return start, trimmed_end
+
+
+def _scan(  # noqa: PLR0913 - Range, level options, and the keyword-only FFmpeg runtime.
+    source: StrPath,
+    info: AudioInfo,
+    *,
+    start: float,
+    end: float | None,
+    cancelled: Cancelled | None,
+    runtime: FFmpegRuntime,
+) -> tuple[_LevelMeter, Levels]:
+    """Decode a source range once and measure its window levels."""
+    command = [runtime.ffmpeg_path, "-v", "error"]
+    if start:
+        command += ["-ss", ffmpeg_number(start)]
+    command += ["-i", media_path(source)]
+    if end is not None:
+        command += ["-t", ffmpeg_number(end - start)]
+
+    # The decoded layout is forced to the probed one so frames split into channels correctly.
+    command += [
         "-map",
         "0:a:0",
         "-vn",
-        "-af",
-        f"silencedetect=noise={ffmpeg_number(effects.silence_threshold_db)}dB"
-        f":d={MIN_TRAILING_SILENCE}",
-        "-progress",
-        "pipe:2",
+        "-ac",
+        str(info.channels),
+        "-ar",
+        str(info.sample_rate),
         "-f",
-        "null",
+        "f32le",
         "-",
     ]
 
-    scan = scan_silence(command, cancelled, timeout=timeout)
-    trailing = scan.trailing_start()
-    if trailing is None:
-        return None
-    if scan.decoded_end is None:
-        raise FFmpegError("FFmpeg did not report decoded duration")
-    if scan.decoded_end - trailing >= MIN_TRAILING_SILENCE:
-        return round(start + trailing, 6)
-    return None
+    meter = _LevelMeter(info.sample_rate, info.channels)
+    for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
+        meter.feed(chunk)
+    return meter, meter.finish()
+
+
+def _silence_edges(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
+    source: StrPath,
+    info: AudioInfo,
+    *,
+    start: float,
+    end: float | None,
+    threshold_db: float,
+    reference: SilenceReference,
+    min_duration: float,
+    padding: float,
+    cancelled: Cancelled | None,
+    runtime: FFmpegRuntime,
+) -> tuple[float, float | None]:
+    """Return trim positions relative to ``start``; raise when the range has no audible audio."""
+    meter, levels = _scan(source, info, start=start, end=end, cancelled=cancelled, runtime=runtime)
+    span = _audible_span(
+        levels, threshold_db=threshold_db, reference=reference, block_seconds=meter.block_seconds
+    )
+    if span is None:
+        raise SilentAudioError("Track contains no audible audio")
+
+    decoded = meter.frames / info.sample_rate
+    return _edges(span, decoded, min_duration=min_duration, padding=padding)
 
 
 def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
@@ -152,68 +187,66 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     *,
     info: AudioInfo | None = None,
     threshold_db: float = DEFAULT_SILENCE_THRESHOLD_DB,
+    threshold_reference: SilenceReference = "full_scale",
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
+    padding: float = DEFAULT_SILENCE_PADDING,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> TrimBounds:
-    """Find audible bounds; retain pauses inside the track.
+    """Find audible bounds by 20 ms RMS windows; retain pauses inside the track.
 
-    The source is probed first to reject files without audio unless ``info`` is given.
+    ``threshold_db`` is relative to full scale or, with ``threshold_reference="peak"``, to the
+    loudest window. Edge silence shorter than ``min_duration`` is kept, and ``padding`` seconds of
+    silence are kept at trimmed edges. The source is probed first unless ``info`` is given.
     """
-    if info is None:
-        probe(source, runtime=runtime)
+    if threshold_db > 0 or not math.isfinite(threshold_db):
+        raise InvalidInputError("Silence threshold must be a finite level at or below 0 dB")
+    if min_duration < 0 or padding < 0:
+        raise InvalidInputError("Minimum duration and padding must not be negative")
 
-    command = [
-        runtime.ffmpeg_path,
-        "-hide_banner",
-        "-nostats",
-        "-loglevel",
-        "info",
-        "-i",
-        media_path(source),
-        "-map",
-        "0:a:0",
-        "-vn",
-        "-af",
-        f"silencedetect=noise={ffmpeg_number(threshold_db)}dB:d={ffmpeg_number(min_duration)}",
-        "-progress",
-        "pipe:2",
-        "-f",
-        "null",
-        "-",
-    ]
-
-    scan = scan_silence(command, cancelled, timeout=runtime.process_timeout)
-    leading = scan.first_start is not None and scan.first_start <= TRIM_EDGE_TOLERANCE
-    start = scan.first_end if leading and scan.first_end is not None else 0.0
-    end = scan.trailing_start()
-    if end is not None and end <= start:
-        raise SilentAudioError("Track contains no audible audio")
+    info = info or probe(source, runtime=runtime)
+    start, end = _silence_edges(
+        source,
+        info,
+        start=0,
+        end=None,
+        threshold_db=threshold_db,
+        reference=threshold_reference,
+        min_duration=min_duration,
+        padding=padding,
+        cancelled=cancelled,
+        runtime=runtime,
+    )
     return TrimBounds(start=round(start, 3), end=None if end is None else round(end, 3))
 
 
-def trailing_trim_end(
+def resolve_silence_trim(
     effects: Effects,
     source: StrPath,
     cancelled: Cancelled | None = None,
     *,
     info: AudioInfo | None = None,
     runtime: FFmpegRuntime,
-) -> float | None:
-    """Return where trailing silence starts when ``trim_silence`` is enabled."""
+) -> Effects:
+    """Replace ``trim_silence`` with trim bounds found inside the trimmed range."""
     if not effects.trim_silence:
-        return None
+        return effects
 
     info = info or probe(source, runtime=runtime)
-    trailing_end = trailing_silence_end(
-        effects,
+    start, end = _silence_edges(
         source,
-        info.duration,
-        cancelled,
-        ffmpeg=runtime.ffmpeg_path,
-        timeout=runtime.process_timeout,
+        info,
+        start=effects.trim_start,
+        end=effects.trim_end,
+        threshold_db=effects.silence_threshold_db,
+        reference=effects.silence_threshold_reference,
+        min_duration=DEFAULT_TRIM_MIN_DURATION,
+        padding=effects.silence_padding,
+        cancelled=cancelled,
+        runtime=runtime,
     )
-
-    if trailing_end is not None and trailing_end <= effects.trim_start + MIN_TRAILING_SILENCE:
-        raise SilentAudioError("Track contains no audible audio")
-    return trailing_end
+    return effects.replace(
+        trim_silence=False,
+        trim_start=round(effects.trim_start + start, 6),
+        trim_end=effects.trim_end if end is None else round(effects.trim_start + end, 6),
+    )
