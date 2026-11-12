@@ -97,8 +97,8 @@ still emit `areverse`, which can buffer the full decoded track.
 An audible tail after an internal pause remains in the output.
 `detect_trim_bounds()` keeps the same tail when reporting audible bounds.
 
-`Effects` checks trim bounds on assignment. Waveform analysis probes the source when `duration` is
-not given.
+`Effects` is immutable; `effects.replace(...)` validates the changed copy. Trim detection and waveform
+analysis probe the source unless an earlier `AudioInfo` is passed as `info=`.
 Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run

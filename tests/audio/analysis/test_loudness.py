@@ -17,6 +17,7 @@ from ffkit.audio import (
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
 loudness_module = importlib.import_module("ffkit.audio.analysis.loudness")
+ONE_SECOND = AudioInfo(duration=1.0, sample_rate=44100, channels=1, codec="pcm_s16le")
 
 
 def test_measure_loudness_on_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
@@ -122,7 +123,7 @@ def test_measure_normalization_gain_rejects_all_silence(
     source.touch()
 
     monkeypatch.setattr(silence_module, "trailing_silence_end", lambda *args, **kwargs: 0.0)
-    monkeypatch.setattr(silence_module, "probe", lambda path, **kwargs: AudioInfo(duration=1.0))
+    monkeypatch.setattr(silence_module, "probe", lambda path, **kwargs: ONE_SECOND)
 
     with pytest.raises(SilentAudioError, match="no audible audio"):
         measure_normalization_gain(source, Effects(trim_silence=True))

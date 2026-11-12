@@ -11,10 +11,10 @@ from ffkit.audio import analyze_peak_waveform, analyze_waveform_tempo, probe, te
 def test_waveform_and_tempo_on_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    duration = probe(source).duration
-    assert len(analyze_peak_waveform(source, duration)) == 400
+    info = probe(source)
+    assert len(analyze_peak_waveform(source, info=info)) == 400
 
-    analyzed = analyze_waveform_tempo(source, duration)
+    analyzed = analyze_waveform_tempo(source, info=info)
 
     assert analyzed.waveform
     assert len(analyzed.peaks) == 400

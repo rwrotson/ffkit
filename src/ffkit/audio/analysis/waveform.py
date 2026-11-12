@@ -1,5 +1,4 @@
 import array
-import json
 import math
 import mmap
 import tempfile
@@ -10,9 +9,8 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ffkit._ffmpeg.args import media_path
-from ffkit._ffmpeg.process import iter_output, run
-from ffkit.audio.analysis.probe import probe
-from ffkit.errors import NoAudioError
+from ffkit._ffmpeg.process import iter_output
+from ffkit.audio.analysis.probe import AudioInfo, probe
 from ffkit.runtime import FFmpegRuntime
 
 WAVEFORM_BINS = 400
@@ -53,34 +51,16 @@ class WaveformAnalysis(BaseModel):
 
 
 def analyze_peak_waveform(
-    source: Path, duration: float | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: Path, *, info: AudioInfo | None = None, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> tuple[float, ...]:
-    """Measure a full-scale peak envelope from four-times oversampled audio."""
-    if duration is None:
-        duration = probe(source, runtime=runtime).duration
-    if not math.isfinite(duration) or duration <= 0:
-        raise NoAudioError("Track duration is unavailable")
+    """Measure a full-scale peak envelope from four-times oversampled audio.
 
-    info = run(
-        [
-            runtime.ffprobe_path,
-            "-v",
-            "error",
-            "-select_streams",
-            "a:0",
-            "-show_entries",
-            "stream=sample_rate,channels",
-            "-of",
-            "json",
-            media_path(source),
-        ],
-        timeout=runtime.process_timeout,
-    )
-
-    stream = json.loads(info)["streams"][0]
-    channels = int(stream["channels"])
-    rate = int(stream["sample_rate"]) * PEAK_OVERSAMPLING
-    frames_per_bin = max(1, math.ceil(duration * rate / WAVEFORM_BINS))
+    The source is probed for its duration, sample rate, and channels unless ``info`` is given.
+    """
+    info = info or probe(source, runtime=runtime)
+    channels = info.channels
+    rate = info.sample_rate * PEAK_OVERSAMPLING
+    frames_per_bin = max(1, math.ceil(info.duration * rate / WAVEFORM_BINS))
     peaks = [0.0] * WAVEFORM_BINS
 
     command = [
@@ -123,7 +103,7 @@ def analyze_peak_waveform(
 
 
 def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
-    source: Path, duration: float | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: Path, *, info: AudioInfo | None = None, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> WaveformAnalysis:
     """Build a compact waveform, a peak envelope, and rough tempo segments of a source."""
     command = [
@@ -184,7 +164,7 @@ def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
             finally:
                 energy.release()
 
-    peaks = analyze_peak_waveform(source, duration, runtime=runtime)
+    peaks = analyze_peak_waveform(source, info=info, runtime=runtime)
 
     segments: list[TempoSegment] = []
     if estimates:

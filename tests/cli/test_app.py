@@ -88,7 +88,13 @@ def test_probe_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source.write_bytes(b"input")
 
     def fake_probe(path: Path, *, runtime: FFmpegRuntime) -> AudioInfo:
-        return AudioInfo(duration=12.5, tags={"title": "Example"})
+        return AudioInfo(
+            duration=12.5,
+            sample_rate=44100,
+            channels=1,
+            codec="pcm_s16le",
+            tags={"title": "Example"},
+        )
 
     monkeypatch.setattr(cli_app, "probe", fake_probe)
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
@@ -105,7 +111,13 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source.touch()
 
     def fake_probe(path: Path, *, runtime: FFmpegRuntime) -> AudioInfo:
-        return AudioInfo(duration=5, tags={"title": "[red]Example[/red]"})
+        return AudioInfo(
+            duration=5,
+            sample_rate=44100,
+            channels=1,
+            codec="pcm_s16le",
+            tags={"title": "[red]Example[/red]"},
+        )
 
     monkeypatch.setattr(cli_app, "probe", fake_probe)
     result = runner.invoke(app, ["audio", "probe", str(source)])

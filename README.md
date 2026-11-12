@@ -120,8 +120,9 @@ in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that fi
 the remaining effects. Leading silence removal applies only when streaming from `start=0`.
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
-`probe()` combines container tags with tags from the first audio stream; stream tags take precedence
-over container tags. It raises `SourceNotFoundError` for a missing source. `merge_tags()` refreshes
+`probe()` returns the duration, sample rate, channels, codec, bit rate, and whether a cover is
+embedded, and combines container tags with tags from the first audio stream; stream tags take
+precedence over container tags. It raises `SourceNotFoundError` for a missing source. `merge_tags()` refreshes
 source tags after a repeated probe while keeping tags the caller changed: pass the current tags, the
 new and previous source tags, and the overrides from the previous `MergedTags`.
 `render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
@@ -137,8 +138,8 @@ source; if no image exists, it returns `None` and preserves the destination. The
 differ from the source audio file. `embedded_cover()` returns the first embedded image as JPEG
 bytes without writing a file.
 
-`analyze_peak_waveform()` and `analyze_waveform_tempo()` probe the source when `duration` is not
-given. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
+`detect_trim_bounds()`, `analyze_peak_waveform()`, and `analyze_waveform_tempo()` probe the source
+unless an `AudioInfo` from an earlier `probe()` is passed as `info=`. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
 checked together. `silence_threshold_db` sets the level used by `trim_silence`.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run

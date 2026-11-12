@@ -10,11 +10,10 @@ from ffkit import (
     CancelledError,
     FFmpegProcessError,
     FFmpegTimeoutError,
-    NoAudioError,
     SilentAudioError,
 )
 from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT
-from ffkit.audio import Effects, TrimBounds, detect_trim_bounds, probe
+from ffkit.audio import AudioInfo, Effects, TrimBounds, detect_trim_bounds, probe
 from ffkit.audio.analysis.silence import SilenceScan
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
@@ -24,7 +23,7 @@ TOOLS = {"ffmpeg": "ffmpeg", "timeout": 30.0}
 def test_trim_bounds_of_full_tone(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    assert detect_trim_bounds(source, 2.0) == TrimBounds(start=0.0)
+    assert detect_trim_bounds(source) == TrimBounds(start=0.0)
 
 
 def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
@@ -55,8 +54,7 @@ def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
     assert bounds.end is not None
     assert 3.9 < bounds.end < 4.1
 
-    duration = probe(source).duration
-    assert detect_trim_bounds(source, duration) == bounds
+    assert detect_trim_bounds(source, info=probe(source)) == bounds
 
 
 def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
@@ -86,16 +84,18 @@ def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
         check=True,
     )
 
-    duration = probe(source).duration
     assert detect_trim_bounds(source) == TrimBounds(start=0.0)
-    assert detect_trim_bounds(source, duration) == TrimBounds(start=0.0)
+    assert detect_trim_bounds(source, info=probe(source)) == TrimBounds(start=0.0)
 
 
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     scan = SilenceScan.from_lines([b"silence_start: 0", b"silence_end: 2", b"silence_start: 2"])
     monkeypatch.setattr("ffkit.audio.analysis.silence.scan_silence", lambda *args, **kwargs: scan)
     with pytest.raises(SilentAudioError, match="no audible audio"):
-        detect_trim_bounds(Path("silent.wav"), duration=2)
+        detect_trim_bounds(
+            Path("silent.wav"),
+            info=AudioInfo(duration=2, sample_rate=44100, channels=1, codec="pcm_s16le"),
+        )
 
 
 def test_trim_bounds_respect_cancellation(make_tone: Callable[..., None], tmp_path: Path) -> None:
@@ -114,8 +114,6 @@ def test_trailing_silence_scan_handles_no_silence_and_empty_trim(
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     effects = effects.replace(trim_start=2)
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
-    with pytest.raises(NoAudioError, match="duration is unavailable"):
-        silence_module.trailing_silence_end(effects, source, None, **TOOLS)
 
 
 def test_trailing_silence_scan_respects_cancellation(

@@ -8,10 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import ffmpeg_number, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
-from ffkit.audio.analysis.probe import probe
+from ffkit.audio.analysis.probe import AudioInfo, probe
 from ffkit.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
 from ffkit.audio.effects import Effects
-from ffkit.errors import FFmpegError, NoAudioError, SilentAudioError
+from ffkit.errors import FFmpegError, SilentAudioError
 from ffkit.runtime import FFmpegRuntime
 
 END_TOLERANCE = 0.001
@@ -100,16 +100,13 @@ def scan_silence(command: list[str], cancelled: Cancelled | None, *, timeout: fl
 def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.
     effects: Effects,
     source: Path,
-    duration: float | None,
+    duration: float,
     cancelled: Cancelled | None = None,
     *,
     ffmpeg: str,
     timeout: float,
 ) -> float | None:
     """Return the source position where trailing silence in the trimmed range starts."""
-    if duration is None:
-        raise NoAudioError("Track duration is unavailable")
-
     start = effects.trim_start
     end = min(effects.trim_end or duration, duration)
     if end <= start:
@@ -153,18 +150,19 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
 
 def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
     path: Path,
-    duration: float | None = None,
+    *,
+    info: AudioInfo | None = None,
     threshold_db: float = DEFAULT_SILENCE_THRESHOLD_DB,
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
     cancelled: Cancelled | None = None,
-    *,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> TrimBounds:
-    """Find audible bounds; retain pauses inside the track."""
-    if duration is None:
-        duration = probe(path, runtime=runtime).duration
-    if not duration or duration <= 0:
-        raise NoAudioError("Track duration is unavailable")
+    """Find audible bounds; retain pauses inside the track.
+
+    The source is probed first to reject files without audio unless ``info`` is given.
+    """
+    if info is None:
+        probe(path, runtime=runtime)
 
     command = [
         runtime.ffmpeg_path,
@@ -200,17 +198,18 @@ def trailing_trim_end(
     source: Path,
     cancelled: Cancelled | None = None,
     *,
+    info: AudioInfo | None = None,
     runtime: FFmpegRuntime,
 ) -> float | None:
     """Return where trailing silence starts when ``trim_silence`` is enabled."""
     if not effects.trim_silence:
         return None
 
-    duration = probe(source, runtime=runtime).duration
+    info = info or probe(source, runtime=runtime)
     trailing_end = trailing_silence_end(
         effects,
         source,
-        duration,
+        info.duration,
         cancelled,
         ffmpeg=runtime.ffmpeg_path,
         timeout=runtime.process_timeout,

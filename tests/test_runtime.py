@@ -65,9 +65,9 @@ ffprobe_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
 ]
 ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: measure_loudness(source, runtime=runtime),
-    lambda source, _, runtime: analyze_waveform_tempo(source, 1, runtime=runtime),
+    lambda source, _, runtime: analyze_waveform_tempo(source, runtime=runtime),
     lambda source, _, runtime: measure_normalization_gain(source, runtime=runtime),
-    lambda source, _, runtime: detect_trim_bounds(source, duration=1, runtime=runtime),
+    lambda source, _, runtime: detect_trim_bounds(source, runtime=runtime),
     lambda source, out, runtime: render(source, out / "out.mp3", runtime=runtime),
     lambda source, _, runtime: b"".join(stream_mp3(source, runtime=runtime)),
 ]
