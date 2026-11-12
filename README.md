@@ -72,7 +72,7 @@ ffkit audio render song.flac song.mp3 --tag title=Intro --cover cover.jpg
 ffkit audio normalization-gain song.flac --target-lufs -14 --peak-ceiling-db -1
 ffkit audio extract-cover song.flac cover.jpg
 ffkit audio render song.flac song.mp3 --trim-silence --silence-threshold-db -45 --vbr-quality 2
-ffkit audio waveform song.flac --peaks
+ffkit audio waveform song.flac --bins 200
 ffkit -f json audio tempo song.flac
 ```
 
@@ -80,8 +80,8 @@ ffkit -f json audio tempo song.flac
 `render` embeds the source cover unless `--cover PATH` replaces it or `--no-cover` drops it;
 `--tag KEY=VALUE` sets a tag and may be repeated. `normalization-gain` prints the fixed gain that
 reaches the target loudness without exceeding the true-peak ceiling. `render` encodes MP3 at
-`--bitrate-kbps` (320 by default) or LAME `--vbr-quality`. `waveform` prints 400 loudness values, or
-peaks with `--peaks`, and `tempo` prints rough tempo segments. JSON output uses the field names of the
+`--bitrate-kbps` (320 by default) or LAME `--vbr-quality`. `waveform` prints loudness, true peak, and 400 (`--bins`)
+peak and momentary loudness levels scaled to 0..1, and `tempo` prints rough tempo segments. JSON output uses the field names of the
 library result models, such as `lufs` and `true_peak_db`. Exit code 2 marks invalid input and 1 a
 processing failure.
 The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PATH` or
@@ -161,11 +161,13 @@ covers, and analysis results, in its own models.
   use 0.1 dB steps and round toward attenuation to stay below the true-peak ceiling.
 - `detect_trim_bounds()` returns the audible `TrimBounds` with the same detector, padding, and
   threshold reference options as `trim_silence`, and keeps short tails after an internal pause.
-- `waveform()` returns up to 400 loudness values scaled to the loudest point, `peak_envelope()` 400
-  full-scale peaks from oversampled audio, and `estimate_tempo()` rough `TempoSegment`s; each
-  decodes the source once.
-- `detect_trim_bounds()` and `peak_envelope()` probe the source unless an earlier `AudioInfo` is
-  passed as `info=`.
+- `waveform()` returns a `Waveform` from one decode: the same `Loudness` as `measure_loudness()`,
+  the power average of BS.1770 momentary loudness per bin, and per-channel `ChannelPeaks` minima and
+  maxima of audio upsampled to 192 kHz like true-peak metering; `bins=` sets the bin count (400).
+  `peak_levels()` and `loudness_levels()` scale them to 0..1 for display. `estimate_tempo()` returns
+  rough `TempoSegment`s from one decode.
+- `detect_trim_bounds()` and `waveform()` probe the source unless an earlier `AudioInfo` is passed as
+  `info=`.
 
 #### Library helpers
 

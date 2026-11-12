@@ -12,7 +12,6 @@ from ffkit.audio import (
     extract_cover,
     measure_loudness,
     measure_normalization_gain,
-    peak_envelope,
     probe,
     render,
     stream,
@@ -62,7 +61,7 @@ def test_runtime_is_frozen() -> None:
 
 ffprobe_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: probe(source, runtime=runtime),
-    lambda source, _, runtime: peak_envelope(source, runtime=runtime),
+    lambda source, _, runtime: waveform(source, runtime=runtime),
 ]
 ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: measure_loudness(source, runtime=runtime),

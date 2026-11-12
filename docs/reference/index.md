@@ -14,7 +14,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.audio.analysis.probe` | Read duration and tags |
 | `ffkit.audio.analysis.silence` | Detect silence and trim bounds |
 | `ffkit.audio.analysis.loudness` | Measure loudness and calculate normalization gain |
-| `ffkit.audio.analysis.waveform` | Build loudness and peak envelopes |
+| `ffkit.audio.analysis.waveform` | Measure momentary loudness and true-peak envelopes |
 | `ffkit.audio.analysis.tempo` | Estimate tempo segments |
 | `ffkit.audio.analysis.cover` | Read the embedded cover image |
 | `ffkit.audio.processing.render` | Render non-destructive encoded output |

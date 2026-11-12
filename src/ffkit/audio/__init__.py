@@ -11,7 +11,7 @@ from .analysis.loudness import (
 from .analysis.probe import AudioInfo, probe
 from .analysis.silence import TrimBounds, detect_trim_bounds
 from .analysis.tempo import TempoSegment, estimate_tempo
-from .analysis.waveform import peak_envelope, waveform
+from .analysis.waveform import ChannelPeaks, Waveform, waveform
 from .defaults import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_PADDING,
@@ -32,6 +32,7 @@ __all__ = [
     "DEFAULT_TARGET_LUFS",
     "DEFAULT_TRIM_MIN_DURATION",
     "AudioInfo",
+    "ChannelPeaks",
     "Effects",
     "Encoding",
     "Loudness",
@@ -39,6 +40,7 @@ __all__ = [
     "SilenceReference",
     "TempoSegment",
     "TrimBounds",
+    "Waveform",
     "detect_trim_bounds",
     "embedded_cover",
     "estimate_tempo",
@@ -47,7 +49,6 @@ __all__ = [
     "library",
     "measure_loudness",
     "measure_normalization_gain",
-    "peak_envelope",
     "probe",
     "render",
     "stream",

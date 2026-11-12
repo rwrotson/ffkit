@@ -25,7 +25,6 @@ from ffkit.audio import (
     extract_cover,
     measure_loudness,
     measure_normalization_gain,
-    peak_envelope,
     probe,
     render,
     waveform,
@@ -366,16 +365,23 @@ def extract_cover_command(
 def waveform_command(
     ctx: typer.Context,
     source: Path,
-    peaks: Annotated[
-        bool,
-        typer.Option("--peaks", help="Report full-scale peaks instead of loudness."),
-    ] = False,
+    bins: Annotated[
+        int,
+        typer.Option("--bins", min=1, max=100_000, help="Number of time bins."),
+    ] = 400,
 ) -> None:
-    """Report a 400-point loudness envelope or peak envelope."""
-    source = input_file(source)
-    runtime = cli_state(ctx).runtime
-    values = peak_envelope(source, runtime=runtime) if peaks else waveform(source, runtime=runtime)
-    emit(ctx, {"values": list(values)}, [" ".join(str(value) for value in values)])
+    """Report loudness, momentary loudness, and per-channel true peaks per time bin."""
+    result = waveform(input_file(source), bins=bins, runtime=cli_state(ctx).runtime)
+    emit(
+        ctx,
+        result.model_dump(exclude={"loudness": {"fingerprint"}}),
+        [
+            f"Loudness: {result.loudness.lufs} LUFS",
+            f"True peak: {result.loudness.true_peak_db} dBTP",
+            "Peaks: " + " ".join(str(level) for level in result.peak_levels(floor_db=-60)),
+            "Momentary: " + " ".join(str(level) for level in result.loudness_levels()),
+        ],
+    )
 
 
 @audio.command("tempo")

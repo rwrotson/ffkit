@@ -10,7 +10,16 @@ from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
 from ffkit import FFmpegNotFoundError, FFmpegProcessError, FFmpegRuntime
-from ffkit.audio import AudioInfo, Effects, Loudness, Mp3Encoding, TempoSegment, TrimBounds
+from ffkit.audio import (
+    AudioInfo,
+    ChannelPeaks,
+    Effects,
+    Loudness,
+    Mp3Encoding,
+    TempoSegment,
+    TrimBounds,
+    Waveform,
+)
 from ffkit.cli.app import app
 from ffkit.cli.settings import Settings
 from ffkit.main import main
@@ -466,14 +475,38 @@ def test_render_encoding_and_silence_options(
 def test_waveform_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
-    monkeypatch.setattr(cli_app, "waveform", lambda path, *, runtime: (0.5, 1.0))
-    monkeypatch.setattr(cli_app, "peak_envelope", lambda path, *, runtime: (0.25,))
+    calls: list[int] = []
+    result = Waveform(
+        bin_duration=0.5,
+        loudness=Loudness(lufs=-14.0, true_peak_db=-1.0, fingerprint=(1, 2, 3)),
+        momentary_lufs=(None, -30.0),
+        channels=(ChannelPeaks(minimum=(0.0, -0.5), maximum=(0.0, 1.0)),),
+    )
 
-    loudness = runner.invoke(app, ["-f", "json", "audio", "waveform", str(source)])
-    peaks = runner.invoke(app, ["audio", "waveform", str(source), "--peaks"])
+    def measure(path: Path, *, bins: int, runtime: FFmpegRuntime) -> Waveform:
+        calls.append(bins)
+        return result
 
-    assert json.loads(loudness.stdout) == {"values": [0.5, 1.0]}
-    assert peaks.stdout.strip() == "0.25"
+    monkeypatch.setattr(cli_app, "waveform", measure)
+
+    data = runner.invoke(app, ["-f", "json", "audio", "waveform", str(source), "--bins", "2"])
+    text = runner.invoke(app, ["audio", "waveform", str(source)])
+    invalid = runner.invoke(app, ["audio", "waveform", str(source), "--bins", "0"])
+
+    assert calls == [2, 400]
+    assert json.loads(data.stdout) == {
+        "bin_duration": 0.5,
+        "loudness": {"lufs": -14.0, "true_peak_db": -1.0},
+        "momentary_lufs": [None, -30.0],
+        "channels": [{"minimum": [0.0, -0.5], "maximum": [0.0, 1.0]}],
+    }
+    assert text.stdout.splitlines() == [
+        "Loudness: -14.0 LUFS",
+        "True peak: -1.0 dBTP",
+        "Peaks: 0.0 1.0",
+        "Momentary: 0.0 0.5",
+    ]
+    assert invalid.exit_code == 2
 
 
 def test_tempo_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
