@@ -2,15 +2,17 @@ import os
 from pathlib import Path
 from uuid import uuid4
 
+from ffkit._ffmpeg.args import StrPath
 from ffkit.audio.analysis.cover import embedded_cover
 from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
 
 def extract_cover(
-    source: Path, destination: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: StrPath, destination: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> Path | None:
     """Atomically extract the first embedded image as JPEG; return None when there is none."""
+    source, destination = Path(source), Path(destination)
     if source.resolve() == destination.resolve() or (
         source.exists() and destination.exists() and source.samefile(destination)
     ):

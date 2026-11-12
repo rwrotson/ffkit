@@ -2,10 +2,9 @@ import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
 from uuid import uuid4
 
-from ffkit._ffmpeg.args import existing_file, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.silence import trailing_trim_end
@@ -27,15 +26,13 @@ MAX_ATTEMPTS = 5
 MIN_CEILING_DB = -20
 CEILING_MARGIN_DB = 0.2
 
-type CoverChoice = Literal["source", "none"]
-
 
 def _command_parts(
-    source: Path, tags: Mapping[str, str], cover: Path | CoverChoice, *, ffmpeg: str
+    source: Path, tags: Mapping[str, str], cover: Path | bool, *, ffmpeg: str
 ) -> tuple[list[str], list[str]]:
     """Return the FFmpeg arguments before and after the audio filter option."""
     inputs = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
-    if cover == "none":
+    if cover is False:
         inputs.extend(["-vn", "-map", "0:a:0"])
     elif isinstance(cover, Path):
         inputs.extend(
@@ -89,7 +86,7 @@ def _encode(
         raise
 
 
-def _check_paths(source: Path, destination: Path, cover: Path | CoverChoice) -> None:
+def _check_paths(source: Path, destination: Path, cover: Path | bool) -> None:
     existing_file(source)
     if isinstance(cover, Path):
         existing_file(cover)
@@ -100,20 +97,23 @@ def _check_paths(source: Path, destination: Path, cover: Path | CoverChoice) -> 
 
 
 def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runtime.
-    source: Path,
-    destination: Path,
-    effects: Effects | None = None,
+    source: StrPath,
+    destination: StrPath,
     *,
+    effects: Effects | None = None,
     tags: Mapping[str, str] | None = None,
-    cover: Path | CoverChoice = "source",
+    cover: StrPath | bool = True,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> None:
     """Apply effects to the original source and render a separate MP3 file.
 
-    Source metadata is copied and ``tags`` override it. ``cover`` keeps the source cover, embeds an
-    image file, or writes no cover.
+    Source metadata is copied and ``tags`` override it. ``cover`` keeps the source cover (``True``),
+    writes no cover (``False``), or embeds an image file.
     """
+    source, destination = Path(source), Path(destination)
+    if not isinstance(cover, bool):
+        cover = Path(cover)
     effects = effects or Effects()
     _check_paths(source, destination, cover)
 
@@ -143,7 +143,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             if ceiling is None or effective_ceiling is None:
                 break
             _check_cancelled(cancelled)
-            peak = measure_loudness(temporary, runtime=runtime).true_peak_db
+            peak = measure_loudness(temporary, cancelled=cancelled, runtime=runtime).true_peak_db
             if peak is None:
                 raise FFmpegError("Could not measure encoded true peak")
             if peak <= ceiling:

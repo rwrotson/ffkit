@@ -1,10 +1,9 @@
 import json
 import math
-from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import existing_file, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import run
 from ffkit.errors import NoAudioError
 from ffkit.runtime import FFmpegRuntime
@@ -32,7 +31,7 @@ def _int(value: object) -> int | None:
     return number if number > 0 else None
 
 
-def probe(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> AudioInfo:
+def probe(source: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> AudioInfo:
     """Read the first audio stream; its tags override container tags."""
     command = [
         runtime.ffprobe_path,

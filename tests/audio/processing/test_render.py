@@ -19,7 +19,15 @@ from ffkit import (
     SourceNotFoundError,
 )
 from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
-from ffkit.audio import Effects, Loudness, audio_filters, measure_loudness, probe, render
+from ffkit.audio import (
+    Effects,
+    Loudness,
+    audio_filters,
+    measure_loudness,
+    probe,
+    render,
+    stream_mp3,
+)
 
 render_module = importlib.import_module("ffkit.audio.processing.render")
 LIMITED = Effects(limiter_ceiling_db=-1)
@@ -65,7 +73,7 @@ def test_render_mp3_with_trim_tags_and_gain(make_tone: Callable[..., None], tmp_
     effects = Effects(trim_start=0.2, trim_end=0.8, gain_db=3)
 
     target = tmp_path / "nested" / "out.mp3"
-    render(source, target, effects, tags={"title": "New", "artist": "Me"})
+    render(source, target, effects=effects, tags={"title": "New", "artist": "Me"})
 
     output = probe(target)
     assert output.duration is not None
@@ -125,7 +133,7 @@ def test_render_trims_edges_without_reversing_audio(
     monkeypatch.setattr(render_module, "audio_filters", checked_filters)
 
     target = tmp_path / "trimmed.mp3"
-    render(source, target, effects)
+    render(source, target, effects=effects)
 
     duration = probe(target).duration
     assert duration is not None
@@ -152,7 +160,7 @@ def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
     effects = Effects(trim_silence=True)
 
     with pytest.raises(SilentAudioError, match="no audible audio"):
-        render(source, tmp_path / "out.mp3", effects)
+        render(source, tmp_path / "out.mp3", effects=effects)
 
 
 def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
@@ -185,7 +193,7 @@ def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
     effects = Effects(trim_silence=True)
 
     target = tmp_path / "rendered.mp3"
-    render(source, target, effects)
+    render(source, target, effects=effects)
 
     duration = probe(target).duration
     assert duration is not None
@@ -198,7 +206,7 @@ def test_render_limiter_checks_encoded_peak(make_tone: Callable[..., None], tmp_
     effects = Effects(gain_db=6, limiter_ceiling_db=-1)
 
     target = tmp_path / "limited.mp3"
-    render(source, target, effects)
+    render(source, target, effects=effects)
 
     peak = measure_loudness(target).true_peak_db
     assert peak is not None
@@ -221,7 +229,7 @@ def test_render_retries_from_source(
 
     monkeypatch.setattr(render_module, "iter_output", record)
 
-    render(source, target, LIMITED)
+    render(source, target, effects=LIMITED)
     assert len(commands) == 2
     assert all(str(source) in command for command in commands)
     assert target.exists()
@@ -233,7 +241,7 @@ def test_render_retries_from_source(
         lambda path, **kwargs: Loudness(lufs=None, true_peak_db=0.0),
     )
     with pytest.raises(PeakCeilingError, match="exceeds"):
-        render(source, target, LIMITED)
+        render(source, target, effects=LIMITED)
     assert target.read_bytes() == b"existing"
 
 
@@ -298,7 +306,7 @@ def test_render_cover_choices(make_tone: Callable[..., None], tmp_path: Path) ->
     kept_cover = tmp_path / "kept-cover.mp3"
     render(with_cover, kept_cover)
     without_cover = tmp_path / "without-cover.mp3"
-    render(with_cover, without_cover, cover="none")
+    render(with_cover, without_cover, cover=False)
     assert kept_cover.stat().st_size > without_cover.stat().st_size
 
     with pytest.raises(SourceNotFoundError):
@@ -332,7 +340,7 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
         lambda path, **kwargs: Loudness(lufs=None, true_peak_db=None),
     )
     with pytest.raises(FFmpegError, match="Could not measure encoded true peak"):
-        render(source, target, LIMITED)
+        render(source, target, effects=LIMITED)
     assert target.read_bytes() == b"existing"
 
     monkeypatch.setattr(
@@ -341,7 +349,7 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
         lambda path, **kwargs: Loudness(lufs=None, true_peak_db=30.0),
     )
     with pytest.raises(PeakCeilingError, match="ceiling could not be reached"):
-        render(source, target, LIMITED)
+        render(source, target, effects=LIMITED)
     assert target.read_bytes() == b"existing"
 
 
@@ -356,7 +364,7 @@ def test_render_cancellation_after_encoding(
     # Encoding finishes without output; cancellation is noticed afterwards.
     monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
     with pytest.raises(CancelledError, match="Operation cancelled"):
-        render(source, target, LIMITED, cancelled=lambda: True)
+        render(source, target, effects=LIMITED, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
 
@@ -373,3 +381,16 @@ def test_render_cancellation_before_replace_without_limiter(
     with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
+
+
+def test_render_and_stream_accept_string_paths(
+    make_tone: Callable[..., None], tmp_path: Path
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source, duration=1)
+    target = tmp_path / "out.mp3"
+
+    render(str(source), str(target), cover=False)
+
+    assert probe(str(target)).codec == "mp3"
+    assert b"".join(stream_mp3(str(source))).startswith(b"ID3")

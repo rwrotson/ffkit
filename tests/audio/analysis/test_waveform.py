@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ffkit import CancelledError
 from ffkit.audio import analyze_peak_waveform, analyze_waveform_tempo, probe, tempo_estimates
 
 
@@ -105,3 +106,16 @@ def test_tempo_segment_transitions(
         (0.0, 90.0),
         (60.0, 140.0),
     ]
+
+
+def test_waveform_functions_respect_cancellation_and_string_paths(
+    make_tone: Callable[..., None], tmp_path: Path
+) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source)
+
+    with pytest.raises(CancelledError):
+        analyze_peak_waveform(source, cancelled=lambda: True)
+    with pytest.raises(CancelledError):
+        analyze_waveform_tempo(source, cancelled=lambda: True)
+    assert analyze_peak_waveform(str(source)) == analyze_peak_waveform(source)

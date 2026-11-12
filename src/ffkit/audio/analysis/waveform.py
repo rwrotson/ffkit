@@ -2,14 +2,13 @@ import array
 import math
 import mmap
 import tempfile
-from pathlib import Path
 from statistics import median
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ffkit._ffmpeg.args import media_path
-from ffkit._ffmpeg.process import iter_output
+from ffkit._ffmpeg.args import StrPath, media_path
+from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import AudioInfo, probe
 from ffkit.runtime import FFmpegRuntime
 
@@ -51,7 +50,11 @@ class WaveformAnalysis(BaseModel):
 
 
 def analyze_peak_waveform(
-    source: Path, *, info: AudioInfo | None = None, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: StrPath,
+    *,
+    info: AudioInfo | None = None,
+    cancelled: Cancelled | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> tuple[float, ...]:
     """Measure a full-scale peak envelope from four-times oversampled audio.
 
@@ -84,7 +87,7 @@ def analyze_peak_waveform(
     frame_bytes = channels * 4
     frame_index = 0
     pending = b""
-    for chunk in iter_output(command, timeout=runtime.process_timeout):
+    for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
         pending += chunk
         while len(pending) >= frame_bytes:
             boundary = frames_per_bin - frame_index % frames_per_bin
@@ -103,7 +106,11 @@ def analyze_peak_waveform(
 
 
 def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
-    source: Path, *, info: AudioInfo | None = None, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: StrPath,
+    *,
+    info: AudioInfo | None = None,
+    cancelled: Cancelled | None = None,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> WaveformAnalysis:
     """Build a compact waveform, a peak envelope, and rough tempo segments of a source."""
     command = [
@@ -129,7 +136,7 @@ def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
         remaining_bytes = b""
         energy_count = 0
         peak = 0.0
-        for chunk in iter_output(command, timeout=runtime.process_timeout):
+        for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
             data = remaining_bytes + chunk
             complete = len(data) // (hop * 2) * (hop * 2)
             for offset in range(0, complete, hop * 2):
@@ -164,7 +171,7 @@ def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
             finally:
                 energy.release()
 
-    peaks = analyze_peak_waveform(source, info=info, runtime=runtime)
+    peaks = analyze_peak_waveform(source, info=info, cancelled=cancelled, runtime=runtime)
 
     segments: list[TempoSegment] = []
     if estimates:

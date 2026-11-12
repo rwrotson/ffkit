@@ -1,12 +1,11 @@
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import ffmpeg_number, media_path
+from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import AudioInfo, probe
 from ffkit.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
@@ -99,7 +98,7 @@ def scan_silence(command: list[str], cancelled: Cancelled | None, *, timeout: fl
 
 def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.
     effects: Effects,
-    source: Path,
+    source: StrPath,
     duration: float,
     cancelled: Cancelled | None = None,
     *,
@@ -149,7 +148,7 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
 
 
 def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg runtime.
-    path: Path,
+    source: StrPath,
     *,
     info: AudioInfo | None = None,
     threshold_db: float = DEFAULT_SILENCE_THRESHOLD_DB,
@@ -162,7 +161,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     The source is probed first to reject files without audio unless ``info`` is given.
     """
     if info is None:
-        probe(path, runtime=runtime)
+        probe(source, runtime=runtime)
 
     command = [
         runtime.ffmpeg_path,
@@ -171,7 +170,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
         "-loglevel",
         "info",
         "-i",
-        media_path(path),
+        media_path(source),
         "-map",
         "0:a:0",
         "-vn",
@@ -195,7 +194,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
 
 def trailing_trim_end(
     effects: Effects,
-    source: Path,
+    source: StrPath,
     cancelled: Cancelled | None = None,
     *,
     info: AudioInfo | None = None,

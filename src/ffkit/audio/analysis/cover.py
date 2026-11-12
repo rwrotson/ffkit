@@ -1,12 +1,10 @@
-from pathlib import Path
-
-from ffkit._ffmpeg.args import media_path
+from ffkit._ffmpeg.args import StrPath, media_path
 from ffkit._ffmpeg.process import run
 from ffkit.errors import FFmpegProcessError
 from ffkit.runtime import FFmpegRuntime
 
 
-def embedded_cover(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> bytes | None:
+def embedded_cover(source: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> bytes | None:
     """Return the first embedded image of the source as JPEG bytes."""
     command = [
         runtime.ffmpeg_path,

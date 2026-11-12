@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 import typer
 from pydantic import ValidationError
@@ -237,10 +237,8 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
 
     tags = parse_tags(tag or [])
     source = input_file(source)
-    cover_choice: Path | Literal["source", "none"] = "source"
-    if no_cover:
-        cover_choice = "none"
-    elif cover is not None:
+    cover_choice: Path | bool = not no_cover
+    if cover is not None:
         cover_choice = input_file(cover)
     destination = output_file(destination, force)
 
@@ -255,7 +253,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     render(
         source,
         destination,
-        effects,
+        effects=effects,
         tags=tags,
         cover=cover_choice,
         runtime=cli_state(ctx).runtime,

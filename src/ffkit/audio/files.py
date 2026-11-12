@@ -1,5 +1,7 @@
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+
+from ffkit._ffmpeg.args import StrPath
 
 EXTENSIONS = frozenset({".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus"})
 
@@ -9,11 +11,11 @@ def _is_audio(path: Path) -> bool:
     return not path.name.startswith(".") and path.suffix.lower() in EXTENSIONS
 
 
-def audio_files(paths: list[Path]) -> list[Path]:
+def audio_files(paths: Iterable[StrPath]) -> list[Path]:
     """Find supported audio files under files and directories."""
     files: set[Path] = set()
     for raw in paths:
-        path = raw.expanduser().resolve()
+        path = Path(raw).expanduser().resolve()
         if path.is_dir():
             files.update(item for item in path.rglob("*") if item.is_file() and _is_audio(item))
         elif path.is_file() and _is_audio(path):
@@ -21,10 +23,10 @@ def audio_files(paths: list[Path]) -> list[Path]:
     return sorted(files)
 
 
-def safe_name(source: Path, tags: Mapping[str, str], index: int, width: int) -> str:
+def safe_name(source: StrPath, tags: Mapping[str, str], *, index: int, width: int) -> str:
     """Build a numbered MP3 filename from artist and title tags or the source name."""
     artist = tags.get("artist", "")
-    title = tags.get("title") or source.stem
+    title = tags.get("title") or Path(source).stem
     name = f"{artist} - {title}" if artist else title
     name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
 

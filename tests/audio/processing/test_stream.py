@@ -37,13 +37,13 @@ def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path
     effects = Effects(trim_start=0.2, trim_end=1.5, gain_db=2)
 
     rendered = tmp_path / "rendered.mp3"
-    render(source, rendered, effects)
+    render(source, rendered, effects=effects)
 
-    streamed = b"".join(stream_mp3(source, effects))
+    streamed = b"".join(stream_mp3(source, effects=effects))
     assert streamed.startswith(b"ID3")
     assert abs(len(pcm(streamed)) - len(pcm(rendered.read_bytes()))) < 12000
 
-    seeked = b"".join(stream_mp3(source, effects, start=0.7))
+    seeked = b"".join(stream_mp3(source, effects=effects, start=0.7))
     assert seeked.startswith(b"ID3")
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
 
@@ -54,15 +54,15 @@ def test_stream_seeks_within_late_trim_interval(
     source = tmp_path / "source.wav"
     make_tone(source)
     effects = Effects(trim_start=1.0, trim_end=1.5)
-    assert b"".join(stream_mp3(source, effects)).startswith(b"ID3")
+    assert b"".join(stream_mp3(source, effects=effects)).startswith(b"ID3")
 
 
 def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
     effects = Effects(trim_start=0.2, trim_end=0.5)
-    assert b"".join(stream_mp3(source, effects, start=0.3)) == b""
-    assert b"".join(stream_mp3(source, effects, start=0.8)) == b""
+    assert b"".join(stream_mp3(source, effects=effects, start=0.3)) == b""
+    assert b"".join(stream_mp3(source, effects=effects, start=0.8)) == b""
 
 
 def test_stream_uses_streaming_filters(
@@ -80,7 +80,7 @@ def test_stream_uses_streaming_filters(
         return filters
 
     monkeypatch.setattr(stream_module, "audio_filters", check_filters)
-    assert b"".join(stream_mp3(source, effects))
+    assert b"".join(stream_mp3(source, effects=effects))
 
 
 def test_stream_reports_failed_encoder_and_closes_early(
@@ -135,6 +135,6 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
     effects = Effects(trim_silence=True)
     plain_effects = Effects()
 
-    seeked = len(pcm(b"".join(stream_mp3(source, effects, start=1.2))))
-    expected = len(pcm(b"".join(stream_mp3(source, plain_effects, start=1.2))))
+    seeked = len(pcm(b"".join(stream_mp3(source, effects=effects, start=1.2))))
+    expected = len(pcm(b"".join(stream_mp3(source, effects=plain_effects, start=1.2))))
     assert abs(seeked - expected) < 12000

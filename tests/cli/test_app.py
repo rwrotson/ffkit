@@ -303,7 +303,7 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
     result = runner.invoke(app, [*base, str(tmp_path / "e.mp3")])
     assert result.exit_code == 0
-    assert [call["cover"] for call in rendered] == [image, "none", "source"]
+    assert [call["cover"] for call in rendered] == [image, False, True]
 
     for options in (["--tag", "title"], ["--tag", "=x"], ["--cover", str(image), "--no-cover"]):
         invalid = runner.invoke(app, [*base, str(tmp_path / "c.mp3"), *options])

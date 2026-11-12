@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from ffkit import SilentAudioError, SourceChangedError
+from ffkit import CancelledError, SilentAudioError, SourceChangedError
 from ffkit.audio import (
     AudioInfo,
     Effects,
@@ -92,13 +92,13 @@ def test_measure_normalization_gain_uses_processed_audio(
     known = measure_loudness(source)
     effects = Effects()
 
-    expected = measure_normalization_gain(source, effects, known=known)
+    expected = measure_normalization_gain(source, effects=effects, known=known)
     effects = effects.replace(gain_db=6)
-    assert measure_normalization_gain(source, effects, known=known) == expected
+    assert measure_normalization_gain(source, effects=effects, known=known) == expected
     effects = effects.replace(trim_start=0.2)
-    assert isinstance(measure_normalization_gain(source, effects, known=known), float)
+    assert isinstance(measure_normalization_gain(source, effects=effects, known=known), float)
     effects = effects.replace(trim_silence=True)
-    assert isinstance(measure_normalization_gain(source, effects), float)
+    assert isinstance(measure_normalization_gain(source, effects=effects), float)
 
 
 def test_measure_normalization_gain_rejects_changed_source(
@@ -126,7 +126,7 @@ def test_measure_normalization_gain_rejects_all_silence(
     monkeypatch.setattr(silence_module, "probe", lambda path, **kwargs: ONE_SECOND)
 
     with pytest.raises(SilentAudioError, match="no audible audio"):
-        measure_normalization_gain(source, Effects(trim_silence=True))
+        measure_normalization_gain(source, effects=Effects(trim_silence=True))
 
 
 def test_measure_normalization_gain_reuses_known_loudness(
@@ -153,3 +153,25 @@ def test_measure_normalization_gain_ignores_stale_or_filtered_loudness(
     stale = Loudness(lufs=-60, true_peak_db=-50, fingerprint=fingerprint)
 
     assert measure_normalization_gain(source, known=stale) == measure_normalization_gain(source)
+
+
+def test_loudness_functions_respect_cancellation(
+    make_tone: Callable[..., None], tmp_path: Path
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source)
+
+    with pytest.raises(CancelledError):
+        measure_loudness(source, cancelled=lambda: True)
+    with pytest.raises(CancelledError):
+        measure_normalization_gain(source, cancelled=lambda: True)
+
+
+def test_loudness_functions_accept_string_paths(
+    make_tone: Callable[..., None], tmp_path: Path
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source)
+
+    assert measure_loudness(str(source)) == measure_loudness(source)
+    assert measure_normalization_gain(str(source)) == measure_normalization_gain(source)

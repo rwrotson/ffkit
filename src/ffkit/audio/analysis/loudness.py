@@ -1,12 +1,11 @@
 import json
 import math
 from collections.abc import Sequence
-from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import media_path, source_fingerprint
-from ffkit._ffmpeg.process import run
+from ffkit._ffmpeg.args import StrPath, media_path, source_fingerprint
+from ffkit._ffmpeg.process import Cancelled, run
 from ffkit.audio.analysis.silence import trailing_trim_end
 from ffkit.audio.defaults import (
     DEFAULT_PEAK_CEILING_DB,
@@ -35,13 +34,14 @@ class Loudness(BaseModel):
 
 
 def measure_loudness(
-    path: Path,
+    source: StrPath,
     *,
     filters: Sequence[str] = (),
+    cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Loudness:
     """Measure integrated LUFS and true peak after applying filters before loudnorm."""
-    fingerprint = source_fingerprint(path)
+    fingerprint = source_fingerprint(source)
     chain = [
         *filters,
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
@@ -53,7 +53,7 @@ def measure_loudness(
         "-hide_banner",
         "-nostats",
         "-i",
-        media_path(path),
+        media_path(source),
         "-map",
         "0:a:0",
         "-vn",
@@ -63,9 +63,11 @@ def measure_loudness(
         "null",
         "-",
     ]
-    stderr = run(command, pipe="stderr", timeout=runtime.process_timeout).decode(errors="replace")
+    stderr = run(
+        command, pipe="stderr", timeout=runtime.process_timeout, cancelled=cancelled
+    ).decode(errors="replace")
 
-    if source_fingerprint(path) != fingerprint:
+    if source_fingerprint(source) != fingerprint:
         raise SourceChangedError("Source audio changed during loudness measurement")
 
     marker = stderr.rfind('"input_i"')
@@ -111,12 +113,13 @@ def gain_for_target(
 
 
 def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmpeg runtime.
-    source: Path,
-    effects: Effects | None = None,
+    source: StrPath,
     *,
+    effects: Effects | None = None,
     target_lufs: float = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
     known: Loudness | None = None,
+    cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> float:
     """Measure processed audio and calculate a fixed gain within the true peak ceiling.
@@ -130,7 +133,7 @@ def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmp
     )
 
     fingerprint = source_fingerprint(source)
-    trailing_end = trailing_trim_end(measured, source, runtime=runtime)
+    trailing_end = trailing_trim_end(measured, source, cancelled, runtime=runtime)
     if trailing_end is not None:
         measured = measured.replace(trim_end=trailing_end)
     filters = audio_filters(measured, streaming=True)
@@ -138,7 +141,7 @@ def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmp
     if not filters and known is not None and known.fingerprint == fingerprint:
         loudness = known
     else:
-        loudness = measure_loudness(source, filters=filters, runtime=runtime)
+        loudness = measure_loudness(source, filters=filters, cancelled=cancelled, runtime=runtime)
 
     if source_fingerprint(source) != fingerprint:
         raise SourceChangedError("Source audio changed during normalization")

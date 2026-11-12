@@ -71,7 +71,7 @@ source = Path("song.flac")
 info = probe(source)
 effects = Effects(gain_db=3)
 filters = audio_filters(effects)
-render(source, Path("song.mp3"), effects, tags={"title": "Song"})
+render(source, "song.mp3", effects=effects, tags={"title": "Song"})
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
@@ -89,7 +89,7 @@ Leading silence removal applies only when streaming from `start=0`.
 tags. A missing source raises `SourceNotFoundError`. `merge_tags()` refreshes source tags after a
 repeated probe and keeps tags the caller changed; the application stores the previous source tags
 and the returned overrides between probes. `render()` writes `tags` over the source metadata, and
-its `cover` option is `"source"`, an image `Path`, or `"none"`.
+its `cover` option is `True` (keep the source cover), `False`, or an image path.
 With `trim_silence` enabled, rendering and normalization scan for trailing silence before
 processing with bounded memory.
 Direct `audio_filters(effects)` calls with `trim_silence=True` and the default `streaming=False`

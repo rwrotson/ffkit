@@ -2,7 +2,7 @@ import logging
 from collections.abc import Generator
 from pathlib import Path
 
-from ffkit._ffmpeg.args import ffmpeg_number, media_path
+from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import iter_output
 from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
@@ -30,17 +30,17 @@ def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | N
 
 
 def stream_mp3(
-    source: Path,
+    source: StrPath,
+    *,
     effects: Effects | None = None,
     start: float = 0,
-    *,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Generator[bytes]:
     """Stream original source audio from a position after its trim start."""
     if start < 0:
         raise InvalidInputError("Stream start must not be negative")
     return _stream(
-        source,
+        Path(source),
         effects or Effects(),
         start,
         ffmpeg=runtime.ffmpeg_path,

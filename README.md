@@ -100,13 +100,13 @@ info = probe(source)
 effects = Effects(gain_db=3)
 filters = audio_filters(effects)
 loudness = measure_loudness(source)
-gain = measure_normalization_gain(source, effects, known=loudness)
-render(source, Path("song.mp3"), effects, tags={"title": "Song"})
-chunks = stream_mp3(source, effects, start=0.5)
+gain = measure_normalization_gain(source, effects=effects, known=loudness)
+render(source, "song.mp3", effects=effects, tags={"title": "Song"})
+chunks = stream_mp3(source, effects=effects, start=0.5)
 cover = extract_cover(source, Path("cover.jpg"))
 
 louder = effects.replace(gain_db=6)
-render(source, Path("song-updated.mp3"), louder)
+render(source, "song-updated.mp3", effects=louder)
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
@@ -126,7 +126,9 @@ precedence over container tags. It raises `SourceNotFoundError` for a missing so
 source tags after a repeated probe while keeping tags the caller changed: pass the current tags, the
 new and previous source tags, and the overrides from the previous `MergedTags`.
 `render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
-cover (`"source"`, the default), embeds an image file (`Path`), or writes no cover (`"none"`).
+cover (`True`, the default), writes no cover (`False`), or embeds an image file (a path).
+Paths may be `str` or `os.PathLike`; options after the source and destination are keyword-only, and
+long-running analysis and rendering accept a `cancelled` callback that raises `CancelledError`.
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
 Calling `audio_filters(effects)` directly with `trim_silence=True` and the default
