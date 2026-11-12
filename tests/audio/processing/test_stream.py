@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import FFmpegProcessError, InvalidInputError
-from ffkit.audio import Effects, render, stream_mp3
+from ffkit.audio import Effects, render, stream
 from ffkit.audio._filters import audio_filters
 
 stream_module = importlib.import_module("ffkit.audio.processing.stream")
@@ -40,11 +40,11 @@ def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path
     rendered = tmp_path / "rendered.mp3"
     render(source, rendered, effects=effects)
 
-    streamed = b"".join(stream_mp3(source, effects=effects))
+    streamed = b"".join(stream(source, effects=effects))
     assert streamed.startswith(b"ID3")
     assert abs(len(pcm(streamed)) - len(pcm(rendered.read_bytes()))) < 12000
 
-    seeked = b"".join(stream_mp3(source, effects=effects, start=0.7))
+    seeked = b"".join(stream(source, effects=effects, start=0.7))
     assert seeked.startswith(b"ID3")
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
 
@@ -55,15 +55,15 @@ def test_stream_seeks_within_late_trim_interval(
     source = tmp_path / "source.wav"
     make_tone(source)
     effects = Effects(trim_start=1.0, trim_end=1.5)
-    assert b"".join(stream_mp3(source, effects=effects)).startswith(b"ID3")
+    assert b"".join(stream(source, effects=effects)).startswith(b"ID3")
 
 
 def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
     effects = Effects(trim_start=0.2, trim_end=0.5)
-    assert b"".join(stream_mp3(source, effects=effects, start=0.3)) == b""
-    assert b"".join(stream_mp3(source, effects=effects, start=0.8)) == b""
+    assert b"".join(stream(source, effects=effects, start=0.3)) == b""
+    assert b"".join(stream(source, effects=effects, start=0.8)) == b""
 
 
 def test_stream_uses_streaming_filters(
@@ -81,25 +81,25 @@ def test_stream_uses_streaming_filters(
         return filters
 
     monkeypatch.setattr(stream_module, "audio_filters", check_filters)
-    assert b"".join(stream_mp3(source, effects=effects))
+    assert b"".join(stream(source, effects=effects))
 
 
 def test_stream_reports_failed_encoder_and_closes_early(
     make_tone: Callable[..., None], tmp_path: Path
 ) -> None:
     with pytest.raises(FFmpegProcessError):
-        b"".join(stream_mp3(tmp_path / "missing.wav"))
+        b"".join(stream(tmp_path / "missing.wav"))
 
     source = tmp_path / "source.wav"
     make_tone(source)
-    stream = stream_mp3(source)
-    assert next(stream)
-    stream.close()
+    chunks = stream(source)
+    assert next(chunks)
+    chunks.close()
 
 
 def test_stream_rejects_negative_start_on_call(tmp_path: Path) -> None:
     with pytest.raises(InvalidInputError, match="must not be negative"):
-        stream_mp3(tmp_path / "source.wav", start=-1)
+        stream(tmp_path / "source.wav", start=-1)
 
 
 def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
@@ -136,6 +136,6 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
     effects = Effects(trim_silence=True)
     plain_effects = Effects()
 
-    seeked = len(pcm(b"".join(stream_mp3(source, effects=effects, start=1.2))))
-    expected = len(pcm(b"".join(stream_mp3(source, effects=plain_effects, start=1.2))))
+    seeked = len(pcm(b"".join(stream(source, effects=effects, start=1.2))))
+    expected = len(pcm(b"".join(stream(source, effects=plain_effects, start=1.2))))
     assert abs(seeked - expected) < 12000

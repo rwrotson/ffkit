@@ -17,10 +17,11 @@ from .defaults import (
     DEFAULT_TRIM_MIN_DURATION,
 )
 from .effects import Effects
+from .encoding import Encoding, Mp3Encoding
 from .files import audio_files, safe_name
 from .processing.extract import extract_cover
 from .processing.render import render
-from .processing.stream import stream_mp3
+from .processing.stream import stream
 from .tags import MergedTags, merge_tags
 
 __all__ = [
@@ -30,8 +31,10 @@ __all__ = [
     "DEFAULT_TRIM_MIN_DURATION",
     "AudioInfo",
     "Effects",
+    "Encoding",
     "Loudness",
     "MergedTags",
+    "Mp3Encoding",
     "TempoSegment",
     "TrimBounds",
     "audio_files",
@@ -47,6 +50,6 @@ __all__ = [
     "probe",
     "render",
     "safe_name",
-    "stream_mp3",
+    "stream",
     "waveform",
 ]

@@ -9,8 +9,8 @@ from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.silence import trailing_trim_end
-from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
+from ffkit.audio.encoding import Encoding, Mp3Encoding
 from ffkit.errors import (
     CancelledError,
     FFmpegError,
@@ -28,7 +28,7 @@ CEILING_MARGIN_DB = 0.2
 
 
 def _command_parts(
-    source: Path, tags: Mapping[str, str], cover: Path | bool, *, ffmpeg: str
+    source: Path, tags: Mapping[str, str], cover: Path | bool, encoding: Encoding, *, ffmpeg: str
 ) -> tuple[list[str], list[str]]:
     """Return the FFmpeg arguments before and after the audio filter option."""
     inputs = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
@@ -54,7 +54,7 @@ def _command_parts(
             ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"]
         )
 
-    outputs = [*MP3_ENCODER_ARGS, "-map_metadata", "0"]
+    outputs = [*encoding.codec_args(), "-map_metadata", "0", "-f", encoding.muxer]
     for key, value in tags.items():
         outputs.extend(["-metadata", f"{key}={value}"])
     return inputs, outputs
@@ -103,10 +103,11 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     effects: Effects | None = None,
     tags: Mapping[str, str] | None = None,
     cover: StrPath | bool = True,
+    encoding: Encoding = Mp3Encoding(),
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> None:
-    """Apply effects to the original source and render a separate MP3 file.
+    """Apply effects to the original source and render a separate encoded file.
 
     Source metadata is copied and ``tags`` override it. ``cover`` keeps the source cover (``True``),
     writes no cover (``False``), or embeds an image file.
@@ -119,8 +120,10 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
 
     ceiling = effects.limiter_ceiling_db
     destination.parent.mkdir(parents=True, exist_ok=True)
-    inputs, outputs = _command_parts(source, tags or {}, cover, ffmpeg=runtime.ffmpeg_path)
-    temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
+    inputs, outputs = _command_parts(
+        source, tags or {}, cover, encoding, ffmpeg=runtime.ffmpeg_path
+    )
+    temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{encoding.extension}")
 
     try:
         trailing_end = trailing_trim_end(effects, source, cancelled, runtime=runtime)

@@ -23,16 +23,18 @@ def audio_files(paths: Iterable[StrPath]) -> list[Path]:
     return sorted(files)
 
 
-def safe_name(source: StrPath, tags: Mapping[str, str], *, index: int, width: int) -> str:
-    """Build a numbered MP3 filename from artist and title tags or the source name."""
+def safe_name(
+    source: StrPath, tags: Mapping[str, str], *, index: int, width: int, extension: str = ".mp3"
+) -> str:
+    """Build a numbered filename from artist and title tags or the source name."""
     artist = tags.get("artist", "")
     title = tags.get("title") or Path(source).stem
     name = f"{artist} - {title}" if artist else title
     name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
 
     prefix = f"{index + 1:0{width}d}. "
-    suffix = ".mp3"
+    suffix = extension
     # APFS limits a single UTF-8 filename to 255 bytes.
     remaining = 255 - len(prefix.encode()) - len(suffix.encode())
     name = name.encode("utf-8")[:remaining].decode("utf-8", errors="ignore").rstrip(" .")
-    return f"{prefix}{name or 'Untitled'}.mp3"
+    return f"{prefix}{name or 'Untitled'}{suffix}"

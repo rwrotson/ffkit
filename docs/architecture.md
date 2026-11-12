@@ -53,7 +53,7 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 | `ffkit.audio` | Processing | `processing` |
 | | Analysis | `analysis` |
 | | Primitives | `_filters \| files \| tags` |
-| | Effects | `effects` |
+| | Models | `effects \| encoding` |
 | | Defaults | `defaults` |
 | `ffkit.audio.analysis` | Measurement | `loudness \| waveform` |
 | | Silence | `silence` |

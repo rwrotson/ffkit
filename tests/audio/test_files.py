@@ -9,6 +9,7 @@ def test_safe_name_uses_tags_and_utf8_limit() -> None:
         safe_name(song, {"artist": "A/B", "title": "T:Q"}, index=0, width=2) == "01. A_B - T_Q.mp3"
     )
     assert safe_name(song, {}, index=1, width=2) == "02. song.mp3"
+    assert safe_name(song, {}, index=0, width=1, extension=".flac") == "1. song.flac"
     assert safe_name(song, {"title": "."}, index=0, width=1) == "1. Untitled.mp3"
     assert len(safe_name(song, {"title": "é" * 200}, index=0, width=1).encode()) <= 255
 

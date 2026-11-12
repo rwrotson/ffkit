@@ -15,7 +15,7 @@ from ffkit.audio import (
     peak_envelope,
     probe,
     render,
-    stream_mp3,
+    stream,
     waveform,
 )
 
@@ -71,7 +71,7 @@ ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: measure_normalization_gain(source, runtime=runtime),
     lambda source, _, runtime: detect_trim_bounds(source, runtime=runtime),
     lambda source, out, runtime: render(source, out / "out.mp3", runtime=runtime),
-    lambda source, _, runtime: b"".join(stream_mp3(source, runtime=runtime)),
+    lambda source, _, runtime: b"".join(stream(source, runtime=runtime)),
 ]
 
 
@@ -112,4 +112,4 @@ def test_stream_uses_idle_timeout(source: Path, tmp_path: Path) -> None:
     silent_encoder.chmod(0o755)
     runtime = FFmpegRuntime(ffmpeg_path=str(silent_encoder), stream_idle_timeout=0.1)
     with pytest.raises(FFmpegTimeoutError, match="no output"):
-        b"".join(stream_mp3(source, runtime=runtime))
+        b"".join(stream(source, runtime=runtime))

@@ -22,10 +22,11 @@ from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
 from ffkit.audio import (
     Effects,
     Loudness,
+    Mp3Encoding,
     measure_loudness,
     probe,
     render,
-    stream_mp3,
+    stream,
 )
 from ffkit.audio._filters import audio_filters
 
@@ -393,4 +394,16 @@ def test_render_and_stream_accept_string_paths(
     render(str(source), str(target), cover=False)
 
     assert probe(str(target)).codec == "mp3"
-    assert b"".join(stream_mp3(str(source))).startswith(b"ID3")
+    assert b"".join(stream(str(source))).startswith(b"ID3")
+
+
+def test_render_and_stream_use_encoding(make_tone: Callable[..., None], tmp_path: Path) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source, duration=1)
+    target = tmp_path / "out.mp3"
+
+    render(source, target, cover=False, encoding=Mp3Encoding(bitrate_kbps=96))
+    streamed = b"".join(stream(source, encoding=Mp3Encoding(bitrate_kbps=96)))
+
+    assert probe(target).bit_rate == 96000
+    assert len(streamed) < len(b"".join(stream(source)))

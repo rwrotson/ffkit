@@ -80,7 +80,7 @@ application keeps track state in its own models.
 The source must always be the original audio file. To change processing, change `Effects` and render
 or stream from that same original source. Never use an earlier render as the source: doing so
 applies effects again to processed audio. Trim bounds refer to the original file, and
-`stream_mp3(start=...)` seeks from `trim_start` in that file before applying the remaining effects.
+`stream(start=...)` seeks from `trim_start` in that file before applying the remaining effects.
 Leading silence removal applies only when streaming from `start=0`.
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
@@ -100,7 +100,7 @@ Normalization gains are rounded to 0.1 dB without exceeding the measured true-pe
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
 for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
-(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `FFmpegTimeoutError`
+(`process_timeout=900`) deadline. `stream()` has no total deadline; it raises `FFmpegTimeoutError`
 when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
 
 ```python

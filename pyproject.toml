@@ -187,7 +187,7 @@ select = [
 
 [tool.ruff.lint.flake8-bugbear]
 # FFmpegRuntime is a frozen model, safe as a shared default.
-extend-immutable-calls = ["ffkit.runtime.FFmpegRuntime"]
+extend-immutable-calls = ["ffkit.runtime.FFmpegRuntime", "ffkit.audio.encoding.Mp3Encoding"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
@@ -253,7 +253,7 @@ layers = [
 name = "Audio layers"
 type = "layers"
 containers = ["ffkit.audio"]
-layers = ["processing", "analysis", "_filters | files | tags", "effects", "defaults"]
+layers = ["processing", "analysis", "_filters | files | tags", "effects | encoding", "defaults"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]

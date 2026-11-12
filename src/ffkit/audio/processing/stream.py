@@ -5,8 +5,8 @@ from pathlib import Path
 from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import iter_output
 from ffkit.audio._filters import audio_filters
-from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
+from ffkit.audio.encoding import Encoding, Mp3Encoding
 from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
@@ -29,29 +29,32 @@ def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | N
     return seeked, source_offset
 
 
-def stream_mp3(
+def stream(
     source: StrPath,
     *,
     effects: Effects | None = None,
     start: float = 0,
+    encoding: Encoding = Mp3Encoding(),
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Generator[bytes]:
-    """Stream original source audio from a position after its trim start."""
+    """Stream encoded source audio from a position after its trim start."""
     if start < 0:
         raise InvalidInputError("Stream start must not be negative")
     return _stream(
         Path(source),
         effects or Effects(),
         start,
+        encoding,
         ffmpeg=runtime.ffmpeg_path,
         idle_timeout=runtime.stream_idle_timeout,
     )
 
 
-def _stream(
+def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
     source: Path,
     effects: Effects,
     start: float,
+    encoding: Encoding,
     *,
     ffmpeg: str,
     idle_timeout: float,
@@ -78,7 +81,7 @@ def _stream(
     filters = audio_filters(seeked_effects, streaming=True)
     if filters:
         command += ["-af", ",".join(filters)]
-    command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]
+    command += [*encoding.codec_args(), "-f", encoding.muxer, "pipe:1"]
 
     try:
         yield from iter_output(command, idle_timeout=idle_timeout)

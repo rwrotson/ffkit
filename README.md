@@ -4,7 +4,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 
 ## What Is Included
 
-- Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, normalization, MP3 rendering and streaming, and cover extraction; `py.typed` for type checkers
+- Audio models and helpers for input discovery, probing, silence detection, waveform and tempo analysis, loudness measurement, normalization, rendering and streaming with a configurable encoder, and cover extraction; `py.typed` for type checkers
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `ffkit.logs.setup_logging()` for applications (`ffkit[logs]` extra): structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with nested `FFKIT_LOG__*` and `FFKIT_FFMPEG__*` sections, a test that keeps `.env.example` in sync, and a generated configuration page
@@ -91,7 +91,8 @@ from ffkit.audio import (
     measure_normalization_gain,
     probe,
     render,
-    stream_mp3,
+    Mp3Encoding,
+    stream,
 )
 
 source = Path("song.flac")
@@ -100,11 +101,11 @@ effects = Effects(gain_db=3)
 loudness = measure_loudness(source)
 gain = measure_normalization_gain(source, effects=effects, known=loudness)
 render(source, "song.mp3", effects=effects, tags={"title": "Song"})
-chunks = stream_mp3(source, effects=effects, start=0.5)
+chunks = stream(source, effects=effects, start=0.5)
 cover = extract_cover(source, Path("cover.jpg"))
 
 louder = effects.replace(gain_db=6)
-render(source, "song-updated.mp3", effects=louder)
+render(source, "song-updated.mp3", effects=louder, encoding=Mp3Encoding(vbr_quality=2))
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
@@ -114,7 +115,7 @@ application keeps track state, such as tags, covers, and analysis results, in it
 Always pass the original audio file as the source. To change processing, change `Effects` and render
 or stream from the original again. Never use a rendered output as the input for another effect change:
 that would apply effects a second time to already processed audio. Effect trim bounds are positions
-in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
+in the original file; `stream(start=...)` seeks from `trim_start` in that file before applying
 the remaining effects. Leading silence removal applies only when streaming from `start=0`.
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
@@ -125,7 +126,9 @@ source tags after a repeated probe while keeping tags the caller changed: pass t
 new and previous source tags, and the overrides from the previous `MergedTags`.
 `render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
 cover (`True`, the default), writes no cover (`False`), or embeds an image file (a path).
-Paths may be `str` or `os.PathLike`; options after the source and destination are keyword-only, and
+`render()` and `stream()` encode with `encoding=`, an `Encoding` that defaults to
+`Mp3Encoding()` (LAME, 320 kbit/s CBR; set `vbr_quality` for VBR); `safe_name(extension=...)` takes
+its `extension`. Paths may be `str` or `os.PathLike`; options after the source and destination are keyword-only, and
 long-running analysis and rendering accept a `cancelled` callback that raises `CancelledError`.
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
@@ -144,7 +147,7 @@ checked together. `silence_threshold_db` sets the level used by `trim_silence`.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
 for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
-(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `FFmpegTimeoutError`
+(`process_timeout=900`) deadline. `stream()` has no total deadline; it raises `FFmpegTimeoutError`
 when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
 
 ```python
