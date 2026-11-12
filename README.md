@@ -87,18 +87,22 @@ processing failure.
 The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PATH` or
 `FFKIT_FFMPEG__FFPROBE_PATH` is set.
 
+### Library
+
+The public API is `ffkit` (`FFmpegRuntime` and errors), `ffkit.audio` (audio functions and models),
+and `ffkit.audio.library` (file discovery, export names, and tag merging, which do not run FFmpeg).
 
 ```python
 from pathlib import Path
 
 from ffkit.audio import (
     Effects,
+    Mp3Encoding,
     extract_cover,
     measure_loudness,
     measure_normalization_gain,
     probe,
     render,
-    Mp3Encoding,
     stream,
 )
 
@@ -109,71 +113,87 @@ loudness = measure_loudness(source)
 gain = measure_normalization_gain(source, effects=effects, known=loudness)
 render(source, "song.mp3", effects=effects, tags={"title": "Song"})
 chunks = stream(source, effects=effects, start=0.5)
-cover = extract_cover(source, Path("cover.jpg"))
+cover = extract_cover(source, "cover.jpg")
 
 louder = effects.replace(gain_db=6)
 render(source, "song-updated.mp3", effects=louder, encoding=Mp3Encoding(vbr_quality=2))
 ```
 
-Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `Loudness`, `TrimBounds`, and `TempoSegment`; they never modify their arguments. The
-application keeps track state, such as tags, covers, and analysis results, in its own models.
+Paths may be `str` or `os.PathLike`, and options after the source and destination are
+keyword-only. Functions return immutable results such as `AudioInfo`, `Loudness`, `TrimBounds`, and
+`TempoSegment` and never modify their arguments; the application keeps track state, such as tags,
+covers, and analysis results, in its own models.
 
-Always pass the original audio file as the source. To change processing, change `Effects` and render
-or stream from the original again. Never use a rendered output as the input for another effect change:
-that would apply effects a second time to already processed audio. Effect trim bounds are positions
-in the original file; `stream(start=...)` seeks from `trim_start` in that file before applying
-the remaining effects. Leading silence removal applies only when streaming from `start=0`.
-`ffkit.audio.library` holds helpers that do not run FFmpeg. `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
+#### Effects and output
 
-`probe()` returns the duration, sample rate, channels, codec, bit rate, and whether a cover is
-embedded, and combines container tags with tags from the first audio stream; stream tags take
-precedence over container tags. It raises `SourceNotFoundError` for a missing source. `merge_tags()` refreshes
-source tags after a repeated probe while keeping tags the caller changed: pass the current tags, the
-new and previous source tags, and the overrides from the previous `MergedTags`.
-`render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
-cover (`True`, the default), writes no cover (`False`), or embeds an image file (a path).
-`render()` and `stream()` encode with `encoding=`, an `Encoding` that defaults to
-`Mp3Encoding()` (LAME, 320 kbit/s CBR; set `vbr_quality` for VBR); `safe_name(extension=...)` takes
-its `extension`. Paths may be `str` or `os.PathLike`; options after the source and destination are keyword-only, and
-long-running analysis and rendering accept a `cancelled` callback that raises `CancelledError`.
-Rendering and normalization scan for trailing silence before processing when `trim_silence` is
-enabled, so long tracks do not require buffering decoded audio in `areverse`.
-An audible ending is retained even when it follows a pause close to the end of the selected range.
-`detect_trim_bounds()` likewise keeps short audible tails after an internal pause.
-`extract_cover()` replaces an existing destination only after extracting an image from the current
-source; if no image exists, it returns `None` and preserves the destination. The destination must
-differ from the source audio file. `embedded_cover()` returns the first embedded image as JPEG
-bytes without writing a file.
+- Always pass the original audio file as the source. To change processing, build new `Effects` and
+  render or stream from the original again; a rendered output used as input would receive the
+  effects twice.
+- `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
+  checked together. Trim bounds are positions in the original file.
+- `trim_silence` removes leading and trailing silence below `silence_threshold_db`. Rendering and
+  normalization find trailing silence with a separate scan, so long tracks are not buffered in
+  memory, and an audible ending after a pause is kept.
+- `stream(start=...)` seeks from `trim_start` before applying the remaining effects; leading silence
+  removal applies only from `start=0`.
+- `render()` and `stream()` encode with `encoding=`, which defaults to `Mp3Encoding()` (LAME,
+  320 kbit/s CBR; set `vbr_quality` for VBR).
+- `render()` writes to a temporary file and replaces the destination only on success. It copies
+  source metadata and writes `tags` over it; `cover` keeps the source cover (`True`, the default),
+  writes none (`False`), or embeds an image file. A `limiter_ceiling_db` effect is verified on the
+  encoded file and retried with a lower ceiling when the true peak exceeds it.
+- `extract_cover()` likewise replaces the destination only after extracting an image; without an
+  embedded image it returns `None`. `embedded_cover()` returns the image as JPEG bytes.
 
-`detect_trim_bounds()` and `peak_envelope()` probe the source unless an `AudioInfo` from an earlier
-`probe()` is passed as `info=`. `waveform()` returns up to 400 loudness values scaled to the loudest
-point, `peak_envelope()` 400 full-scale peaks from oversampled audio, and `estimate_tempo()` rough
-`TempoSegment`s; each decodes the source once. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
-checked together. `silence_threshold_db` sets the level used by `trim_silence`.
-Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
-executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
-for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
-(`process_timeout=900`) deadline. `stream()` has no total deadline; it raises `FFmpegTimeoutError`
-when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
+#### Analysis
+
+- `probe()` returns duration, sample rate, channels, codec, bit rate, whether a cover is embedded,
+  and tags; tags of the first audio stream override container tags.
+- `measure_loudness()` returns a `Loudness`. For an unfiltered measurement it also records the
+  file's `(st_size, st_mtime_ns, st_ctime_ns)` fingerprint, and
+  `measure_normalization_gain(known=...)` reuses it only while no filters apply and the fingerprint
+  matches. `gain_for_target()` calculates the gain from a `Loudness` without running FFmpeg. Gains
+  use 0.1 dB steps and round toward attenuation to stay below the true-peak ceiling.
+- `detect_trim_bounds()` returns the audible `TrimBounds` and keeps short tails after an internal
+  pause.
+- `waveform()` returns up to 400 loudness values scaled to the loudest point, `peak_envelope()` 400
+  full-scale peaks from oversampled audio, and `estimate_tempo()` rough `TempoSegment`s; each
+  decodes the source once.
+- `detect_trim_bounds()` and `peak_envelope()` probe the source unless an earlier `AudioInfo` is
+  passed as `info=`.
+
+#### Library helpers
+
+`ffkit.audio.library.audio_files()` finds supported audio files and skips hidden files, such as macOS
+`._*` files and in-progress render outputs. `safe_name()` builds a numbered export name from tags,
+with the `extension` of the chosen encoding. `merge_tags()` refreshes source tags after a repeated
+probe while keeping tags the caller changed: pass the current tags, the new and previous source
+tags, and the overrides from the previous `MergedTags`.
+
+#### Runtime, cancellation, and errors
+
+Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime` with the
+executables and time limits. By default `ffmpeg` and `ffprobe` are resolved from `PATH`, and each
+run has a 15-minute deadline (`process_timeout=900`). `stream()` has no total deadline; it raises
+`FFmpegTimeoutError` when the encoder produces no output for `stream_idle_timeout` seconds (30 by
+default). Long-running analysis and rendering accept a `cancelled` callback; when it returns `True`,
+FFmpeg is stopped and `CancelledError` is raised.
 
 ```python
-from pathlib import Path
-
 from ffkit import FFmpegRuntime
 from ffkit.audio import probe
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
-info = probe(Path("song.flac"), runtime=runtime)
+info = probe("song.flac", runtime=runtime)
 ```
 
-Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
-would otherwise be exceeded. `measure_loudness()` returns a `Loudness` with integrated loudness and
-true peak; for an unfiltered measurement it also records the file's
-`(st_size, st_mtime_ns, st_ctime_ns)` fingerprint. `measure_normalization_gain(known=...)` reuses
-that result instead of measuring only when no filters apply and the fingerprint still matches.
-`gain_for_target()` calculates the same gain from a `Loudness` without running FFmpeg. Measuring a
-file that changes during the run raises `SourceChangedError`.
+Expected failures raise `FFKitError` subclasses: `InvalidInputError` (also a `ValueError`) and its
+`SourceNotFoundError`, `NoAudioError`, and `SilentAudioError`; `SourceChangedError`;
+`PeakCeilingError`; `CancelledError`; and `FFmpegError` with `FFmpegNotFoundError`,
+`FFmpegTimeoutError`, and `FFmpegProcessError`, which keeps the exit status and the end of stderr.
+See [Architecture](https://rwrotson.github.io/ffkit/architecture/#errors) for the full table.
+
+### Logging
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application with the `logs` extra can use the bundled helper:
 

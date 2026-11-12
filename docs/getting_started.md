@@ -63,59 +63,36 @@ ffkit audio render song.flac song.mp3 --trim-start 1.5 --limiter-ceiling-db -1
 ## Using the Library
 
 ```python
-from pathlib import Path
-
-from ffkit.audio import Effects, probe, render
-
-source = Path("song.flac")
-info = probe(source)
-effects = Effects(gain_db=3)
-render(source, "song.mp3", effects=effects, tags={"title": "Song"})
-```
-
-Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `Loudness`, `TrimBounds`, and `TempoSegment`; they never modify their arguments. The
-application keeps track state in its own models.
-
-The source must always be the original audio file. To change processing, change `Effects` and render
-or stream from that same original source. Never use an earlier render as the source: doing so
-applies effects again to processed audio. Trim bounds refer to the original file, and
-`stream(start=...)` seeks from `trim_start` in that file before applying the remaining effects.
-Leading silence removal applies only when streaming from `start=0`.
-`ffkit.audio.library.audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
-
-`probe()` reads container tags and tags from the first audio stream; stream tags override container
-tags. A missing source raises `SourceNotFoundError`. `merge_tags()` refreshes source tags after a
-repeated probe and keeps tags the caller changed; the application stores the previous source tags
-and the returned overrides between probes. `render()` writes `tags` over the source metadata, and
-its `cover` option is `True` (keep the source cover), `False`, or an image path.
-With `trim_silence` enabled, rendering and normalization scan for trailing silence before
-processing with bounded memory.
-An audible tail after an internal pause remains in the output.
-`detect_trim_bounds()` keeps the same tail when reporting audible bounds.
-
-`Effects` is immutable; `effects.replace(...)` validates the changed copy. Trim detection and waveform
-analysis probe the source unless an earlier `AudioInfo` is passed as `info=`.
-Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
-Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
-executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
-for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
-(`process_timeout=900`) deadline. `stream()` has no total deadline; it raises `FFmpegTimeoutError`
-when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
-
-```python
-from pathlib import Path
-
 from ffkit import FFmpegRuntime
-from ffkit.audio import probe
+from ffkit.audio import Effects, measure_loudness, probe, render
+
+info = probe("song.flac")
+loudness = measure_loudness("song.flac")
+effects = Effects(gain_db=3, trim_silence=True)
+render("song.flac", "song.mp3", effects=effects, tags={"title": "Song"})
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
-info = probe(Path("song.flac"), runtime=runtime)
+render("song.flac", "song-quiet.mp3", effects=effects.replace(gain_db=-3), runtime=runtime)
 ```
 
-`measure_loudness()` returns loudness, true peak, and, without filters, the file fingerprint;
-`measure_normalization_gain(known=...)` reuses that result while no filters apply and the file is
-unchanged.
+- `ffkit` exports `FFmpegRuntime` and the errors, `ffkit.audio` the audio functions and models, and
+  `ffkit.audio.library` file discovery, export names, and tag merging.
+- Functions accept `str` or `os.PathLike` paths and keyword-only options, return immutable models,
+  and never modify their arguments; the application keeps track state in its own models.
+- The source is always the original file. To change processing, build new `Effects` (or call
+  `effects.replace(...)`) and render or stream from the original again; trim bounds refer to the
+  original file, and `stream(start=...)` seeks from `trim_start`.
+- `render()` and `stream()` encode with `encoding=`, by default `Mp3Encoding()` at 320 kbit/s.
+  `render()` replaces the destination only on success; its `cover` option is `True` (keep the source
+  cover), `False`, or an image path.
+- `measure_loudness()` records the file fingerprint for unfiltered measurements, and
+  `measure_normalization_gain(known=...)` reuses that result while the file is unchanged.
+- `detect_trim_bounds()` and `peak_envelope()` accept an earlier `AudioInfo` as `info=` instead of
+  probing again.
+- FFmpeg runs have a 15-minute deadline by default (`process_timeout`); `stream()` instead fails
+  after `stream_idle_timeout` seconds without output. Long-running operations accept a `cancelled`
+  callback.
+- Expected failures raise `FFKitError` subclasses; see [Architecture](architecture.md#errors).
 
 Configure logging in the application, or use the bundled helper from the `logs` extra:
 

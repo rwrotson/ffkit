@@ -127,7 +127,7 @@ from ffkit.logs import LogSettings
 
 ```
 src/ffkit/__init__.py  — Public API (FFmpegRuntime, errors, audio) with __all__; NullHandler on the "ffkit" logger
-src/ffkit/audio/       — Public audio API (ffkit.audio): analysis/, processing/, and shared audio modules
+src/ffkit/audio/       — Public audio API (ffkit.audio): analysis/, processing/, library/ (ffkit.audio.library), and shared audio modules
 src/ffkit/runtime.py   — FFmpegRuntime
 src/ffkit/_ffmpeg/     — Private FFmpeg argument and process helpers
 src/ffkit/errors.py    — FFKitError hierarchy
@@ -136,11 +136,11 @@ src/ffkit/cli/         — Typer CLI, its FFKIT_* settings, and composition root
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `audio`, `runtime | _ffmpeg`, and `errors`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `ffkit`, `ffkit.audio`, and `ffkit.audio.library`. Import `_`-prefixed modules and packages only within their package and its subpackages. The library uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `ffkit.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `audio`, `runtime | _ffmpeg`, and `errors`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `ffkit`, `ffkit.audio`, and `ffkit.audio.library`. Import `_`-prefixed modules and packages only within their package and its subpackages. The library uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `ffkit.audio`, `processing` (output) may import `analysis` (measurement), `library` (application helpers that do not run FFmpeg) is independent of both, they use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
 
-The `FFKitError` hierarchy is available for future APIs. Existing audio helpers raise built-in and subprocess exceptions.
+Expected failures raise `FFKitError` subclasses from `ffkit/errors.py` (listed in `docs/architecture.md`). Run FFmpeg and FFprobe only through `ffkit._ffmpeg.process` (`run`, `iter_output`), which enforces time limits and cancellation and translates process failures to `FFmpegError` subclasses. Public functions accept paths as `StrPath`, take options after the source and destination as keyword-only arguments, and accept `cancelled` when they may run long.
 
-To add functionality: put measurement code in `src/ffkit/audio/analysis/`, output code in `src/ffkit/audio/processing/`, shared audio helpers in `src/ffkit/audio/`, and media-independent FFmpeg helpers in `src/ffkit/_ffmpeg/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `ffkit/audio/__init__.py` (subpackage `__init__.py` files stay empty); test it in the mirrored path under `tests/audio/`; and list it in `docs/reference/index.md`.
+To add functionality: put measurement code in `src/ffkit/audio/analysis/`, output code in `src/ffkit/audio/processing/`, shared audio helpers in `src/ffkit/audio/`, and media-independent FFmpeg helpers in `src/ffkit/_ffmpeg/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `ffkit/audio/__init__.py` (the `analysis` and `processing` `__init__.py` files stay empty; `library/__init__.py` re-exports its helpers); test it in the mirrored path under `tests/audio/`; and list it in `docs/reference/index.md`.
 
 ### Import-Time Behaviour
 
