@@ -122,16 +122,15 @@ def calculate_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FF
     ``known`` is used instead of measuring only when no filters apply and its fingerprint matches
     the source file's size, mtime, and ctime.
     """
-    measured = (effects or Effects()).model_copy()
-    measured.gain_db = 0
-    measured.normalize_lufs = None
-    measured.limiter_ceiling_db = None
+    measured = (effects or Effects()).replace(
+        gain_db=0, normalize_lufs=None, limiter_ceiling_db=None
+    )
 
     fingerprint = source_fingerprint(source)
     trailing_end = trailing_trim_end(measured, source, runtime=runtime)
     if trailing_end is not None:
-        measured.trim_end = trailing_end
-    filters = audio_filters(measured, streaming=True, limiter_db=None)
+        measured = measured.replace(trim_end=trailing_end)
+    filters = audio_filters(measured, streaming=True)
 
     lufs: float | None
     peak: float | None

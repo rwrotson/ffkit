@@ -34,10 +34,7 @@ def pcm(data: bytes) -> bytes:
 def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    effects = Effects()
-    effects.trim_start = 0.2
-    effects.trim_end = 1.5
-    effects.gain_db = 2
+    effects = Effects(trim_start=0.2, trim_end=1.5, gain_db=2)
 
     rendered = tmp_path / "rendered.mp3"
     render(source, rendered, effects)
@@ -49,8 +46,6 @@ def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path
     seeked = b"".join(stream_mp3(source, effects, start=0.7))
     assert seeked.startswith(b"ID3")
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
-    assert effects.trim_start == 0.2
-    assert effects.trim_end == 1.5
 
 
 def test_stream_seeks_within_late_trim_interval(
@@ -58,20 +53,14 @@ def test_stream_seeks_within_late_trim_interval(
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    effects = Effects()
-    effects.trim_end = 1.5
-    effects.trim_start = 1.0
+    effects = Effects(trim_start=1.0, trim_end=1.5)
     assert b"".join(stream_mp3(source, effects)).startswith(b"ID3")
-    assert effects.trim_start == 1.0
-    assert effects.trim_end == 1.5
 
 
 def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    effects = Effects()
-    effects.trim_start = 0.2
-    effects.trim_end = 0.5
+    effects = Effects(trim_start=0.2, trim_end=0.5)
     assert b"".join(stream_mp3(source, effects, start=0.3)) == b""
     assert b"".join(stream_mp3(source, effects, start=0.8)) == b""
 
@@ -81,15 +70,12 @@ def test_stream_uses_streaming_filters(
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    effects = Effects()
-    effects.trim_silence = True
+    effects = Effects(trim_silence=True)
     original = audio_filters
 
-    def check_filters(
-        current: Effects, gain: float, *, streaming: bool, limiter_db: float | None
-    ) -> list[str]:
+    def check_filters(current: Effects, *, streaming: bool) -> list[str]:
         assert streaming is True
-        filters = original(current, gain, streaming=streaming, limiter_db=limiter_db)
+        filters = original(current, streaming=streaming)
         assert "areverse" not in filters
         return filters
 
@@ -146,8 +132,7 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
         check=True,
     )
 
-    effects = Effects()
-    effects.trim_silence = True
+    effects = Effects(trim_silence=True)
     plain_effects = Effects()
 
     seeked = len(pcm(b"".join(stream_mp3(source, effects, start=1.2))))

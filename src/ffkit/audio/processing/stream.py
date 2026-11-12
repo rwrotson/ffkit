@@ -19,26 +19,20 @@ def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | N
     if trim_end is not None and source_offset >= trim_end:
         return None
 
-    # Replace both bounds at once; assigning them separately can fail interval validation.
-    seeked = Effects.model_validate(
-        {
-            **effects.model_dump(),
-            "trim_start": 0,
-            "trim_end": None if trim_end is None else trim_end - source_offset,
-            # Leading silence removal after a seek would drop a pause at the seek position.
-            "trim_silence": effects.trim_silence and start == 0,
-        }
+    seeked = effects.replace(
+        trim_start=0,
+        trim_end=None if trim_end is None else trim_end - source_offset,
+        # Leading silence removal after a seek would drop a pause at the seek position.
+        trim_silence=effects.trim_silence and start == 0,
     )
 
     return seeked, source_offset
 
 
-def stream_mp3(  # noqa: PLR0913 - Stream options plus the keyword-only FFmpeg runtime.
+def stream_mp3(
     source: Path,
     effects: Effects | None = None,
-    gain: float = 0,
     start: float = 0,
-    limiter_db: float | None = None,
     *,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Generator[bytes]:
@@ -48,20 +42,16 @@ def stream_mp3(  # noqa: PLR0913 - Stream options plus the keyword-only FFmpeg r
     return _stream(
         source,
         effects or Effects(),
-        gain,
         start,
-        limiter_db,
         ffmpeg=runtime.ffmpeg_path,
         idle_timeout=runtime.stream_idle_timeout,
     )
 
 
-def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
+def _stream(
     source: Path,
     effects: Effects,
-    gain: float,
     start: float,
-    limiter_db: float | None,
     *,
     ffmpeg: str,
     idle_timeout: float,
@@ -85,7 +75,7 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         "0:a:0",
     ]
 
-    filters = audio_filters(seeked_effects, gain, streaming=True, limiter_db=limiter_db)
+    filters = audio_filters(seeked_effects, streaming=True)
     if filters:
         command += ["-af", ",".join(filters)]
     command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]

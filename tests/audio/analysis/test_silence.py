@@ -112,7 +112,7 @@ def test_trailing_silence_scan_handles_no_silence_and_empty_trim(
     make_tone(source, duration=1)
     effects = Effects()
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
-    effects.trim_start = 2
+    effects = effects.replace(trim_start=2)
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     with pytest.raises(NoAudioError, match="duration is unavailable"):
         silence_module.trailing_silence_end(effects, source, None, **TOOLS)

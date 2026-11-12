@@ -120,7 +120,8 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
         "0:a:0",
         "-vn",
         "-af",
-        f"silencedetect=noise={DEFAULT_SILENCE_THRESHOLD_DB}dB:d={MIN_TRAILING_SILENCE}",
+        f"silencedetect=noise={ffmpeg_number(effects.silence_threshold_db)}dB"
+        f":d={MIN_TRAILING_SILENCE}",
         "-progress",
         "pipe:2",
         "-f",

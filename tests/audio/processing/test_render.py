@@ -22,6 +22,7 @@ from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
 from ffkit.audio import Effects, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.audio.processing.render")
+LIMITED = Effects(limiter_ceiling_db=-1)
 
 
 def _replace_command(monkeypatch: pytest.MonkeyPatch, command: list[str]) -> None:
@@ -61,10 +62,10 @@ def test_render_protects_source_and_existing_output(
 def test_render_mp3_with_trim_tags_and_gain(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
-    effects = Effects(trim_start=0.2, trim_end=0.8, gain_db=2)
+    effects = Effects(trim_start=0.2, trim_end=0.8, gain_db=3)
 
     target = tmp_path / "nested" / "out.mp3"
-    render(source, target, effects, group_gain_db=1, tags={"title": "New", "artist": "Me"})
+    render(source, target, effects, tags={"title": "New", "artist": "Me"})
 
     output = probe(target)
     assert output.duration is not None
@@ -113,14 +114,11 @@ def test_render_trims_edges_without_reversing_audio(
         ],
         check=True,
     )
-    effects = Effects()
-    effects.trim_start = 0.5
-    effects.trim_end = 4.5
-    effects.trim_silence = True
+    effects = Effects(trim_start=0.5, trim_end=4.5, trim_silence=True)
 
-    def checked_filters(current: Effects, gain: float, *, streaming: bool) -> list[str]:
+    def checked_filters(current: Effects, *, streaming: bool) -> list[str]:
         assert streaming is True
-        filters = audio_filters(current, gain, streaming=streaming)
+        filters = audio_filters(current, streaming=streaming)
         assert "areverse" not in filters
         return filters
 
@@ -151,8 +149,7 @@ def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
         check=True,
     )
 
-    effects = Effects()
-    effects.trim_silence = True
+    effects = Effects(trim_silence=True)
 
     with pytest.raises(SilentAudioError, match="no audible audio"):
         render(source, tmp_path / "out.mp3", effects)
@@ -185,8 +182,7 @@ def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
         check=True,
     )
 
-    effects = Effects()
-    effects.trim_silence = True
+    effects = Effects(trim_silence=True)
 
     target = tmp_path / "rendered.mp3"
     render(source, target, effects)
@@ -199,10 +195,10 @@ def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
 def test_render_limiter_checks_encoded_peak(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "loud.wav"
     make_tone(source, duration=1, gain=12)
-    effects = Effects(gain_db=6)
+    effects = Effects(gain_db=6, limiter_ceiling_db=-1)
 
     target = tmp_path / "limited.mp3"
-    render(source, target, effects, limiter_db=-1)
+    render(source, target, effects)
 
     _, peak = measure_loudness(target)
     assert peak is not None
@@ -225,7 +221,7 @@ def test_render_retries_from_source(
 
     monkeypatch.setattr(render_module, "iter_output", record)
 
-    render(source, target, limiter_db=-1)
+    render(source, target, LIMITED)
     assert len(commands) == 2
     assert all(str(source) in command for command in commands)
     assert target.exists()
@@ -233,7 +229,7 @@ def test_render_retries_from_source(
     target.write_bytes(b"existing")
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 0.0))
     with pytest.raises(PeakCeilingError, match="exceeds"):
-        render(source, target, limiter_db=-1)
+        render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"
 
 
@@ -328,12 +324,12 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
 
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, None))
     with pytest.raises(FFmpegError, match="Could not measure encoded true peak"):
-        render(source, target, limiter_db=-1)
+        render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"
 
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 30.0))
     with pytest.raises(PeakCeilingError, match="ceiling could not be reached"):
-        render(source, target, limiter_db=-1)
+        render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"
 
 
@@ -348,7 +344,7 @@ def test_render_cancellation_after_encoding(
     # Encoding finishes without output; cancellation is noticed afterwards.
     monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
     with pytest.raises(CancelledError, match="Operation cancelled"):
-        render(source, target, limiter_db=-1, cancelled=lambda: True)
+        render(source, target, LIMITED, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
 

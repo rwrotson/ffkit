@@ -64,12 +64,11 @@ def test_calculate_normalization_gain_uses_processed_audio(
     effects = Effects()
 
     expected = calculate_normalization_gain(source, effects, known=known)
-    effects.gain_db = 6
+    effects = effects.replace(gain_db=6)
     assert calculate_normalization_gain(source, effects, known=known) == expected
-    assert effects.gain_db == 6
-    effects.trim_start = 0.2
+    effects = effects.replace(trim_start=0.2)
     assert isinstance(calculate_normalization_gain(source, effects, known=known), float)
-    effects.trim_silence = True
+    effects = effects.replace(trim_silence=True)
     assert isinstance(calculate_normalization_gain(source, effects), float)
 
 

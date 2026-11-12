@@ -105,8 +105,8 @@ render(source, Path("song.mp3"), effects, tags={"title": "Song"})
 chunks = stream_mp3(source, effects, start=0.5)
 cover = extract_cover(source, Path("cover.jpg"))
 
-effects.gain_db = 6
-render(source, Path("song-updated.mp3"), effects)
+louder = effects.replace(gain_db=6)
+render(source, Path("song-updated.mp3"), louder)
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
@@ -138,7 +138,8 @@ differ from the source audio file. `embedded_cover()` returns the first embedded
 bytes without writing a file.
 
 `analyze_peak_waveform()` and `analyze_waveform_tempo()` probe the source when `duration` is not
-given. `Effects` validates trim bounds when they are changed as well as when the model is created.
+given. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
+checked together. `silence_threshold_db` sets the level used by `trim_silence`.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
 for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute

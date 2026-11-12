@@ -4,15 +4,14 @@ import pytest
 from pydantic import ValidationError
 
 from ffkit import CancelledError, FFKitError, InvalidInputError
-from ffkit.audio import Effects, TempoSegment, WaveformAnalysis
+from ffkit.audio import DEFAULT_SILENCE_THRESHOLD_DB, Effects, TempoSegment, WaveformAnalysis
 
 
 def test_audio_models_preserve_defaults_and_validation() -> None:
     effects = Effects()
-    assert effects.effective_limiter_db(-1) == -1
-    assert effects.effective_limiter_db(None) is None
-    effects.limiter_ceiling_db = -3
-    assert effects.effective_limiter_db(-1) == -3
+    assert effects.silence_threshold_db == DEFAULT_SILENCE_THRESHOLD_DB
+    with pytest.raises(ValidationError, match="frozen"):
+        effects.gain_db = 3  # type: ignore[misc]  # Checks the frozen model at runtime.
 
     assert issubclass(InvalidInputError, FFKitError)
     assert issubclass(InvalidInputError, ValueError)
@@ -27,14 +26,15 @@ def test_audio_models_preserve_defaults_and_validation() -> None:
         WaveformAnalysis().waveform = (1.0,)  # type: ignore[misc]  # Checks the frozen model at runtime.
 
 
-def test_effects_reject_invalid_trim_assignment_without_mutation() -> None:
+def test_effects_replace_validates_and_keeps_original() -> None:
     effects = Effects(trim_end=4)
+    assert effects.replace(trim_start=1, gain_db=2) == Effects(trim_start=1, trim_end=4, gain_db=2)
+    assert effects.replace(trim_start=5, trim_end=6).trim_start == 5
     with pytest.raises(ValidationError, match="Trim end must be later"):
-        effects.trim_start = 5
-    assert effects.trim_start == 0
-    with pytest.raises(ValidationError, match="Trim end must be later"):
-        effects.trim_end = 0
-    assert effects.trim_end == 4
+        effects.replace(trim_start=5)
+    with pytest.raises(ValidationError):
+        effects.replace(silence_threshold_db=1)
+    assert effects == Effects(trim_end=4)
 
 
 @pytest.mark.parametrize(

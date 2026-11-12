@@ -103,11 +103,9 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     source: Path,
     destination: Path,
     effects: Effects | None = None,
-    group_gain_db: float = 0,
     *,
     tags: Mapping[str, str] | None = None,
     cover: Path | CoverChoice = "source",
-    limiter_db: float | None = None,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> None:
@@ -119,7 +117,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     effects = effects or Effects()
     _check_paths(source, destination, cover)
 
-    ceiling = effects.effective_limiter_db(limiter_db)
+    ceiling = effects.limiter_ceiling_db
     destination.parent.mkdir(parents=True, exist_ok=True)
     inputs, outputs = _command_parts(source, tags or {}, cover, ffmpeg=runtime.ffmpeg_path)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.mp3")
@@ -129,12 +127,11 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
 
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
-            attempt_effects = effects.model_copy()
-            attempt_effects.limiter_ceiling_db = effective_ceiling
-            if trailing_end is not None:
-                attempt_effects.trim_end = trailing_end
-
-            filters = audio_filters(attempt_effects, group_gain_db, streaming=True)
+            attempt_effects = effects.replace(
+                limiter_ceiling_db=effective_ceiling,
+                trim_end=effects.trim_end if trailing_end is None else trailing_end,
+            )
+            filters = audio_filters(attempt_effects, streaming=True)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             _encode(
                 source,

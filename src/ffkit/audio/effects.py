@@ -1,4 +1,8 @@
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from ffkit.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB
 
 
 def _as_float(value: object) -> float | None:
@@ -14,13 +18,14 @@ def _as_float(value: object) -> float | None:
 class Effects(BaseModel):
     """Audio processing options applied to the original source."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(frozen=True)
 
     gain_db: float = 0
     normalize_lufs: float | None = None
     trim_start: float = Field(default=0, ge=0)
     trim_end: float | None = Field(default=None, gt=0)
     trim_silence: bool = False
+    silence_threshold_db: float = Field(default=DEFAULT_SILENCE_THRESHOLD_DB, ge=-100, le=0)
     limiter_ceiling_db: float | None = Field(default=None, ge=-20, le=-0.1)
 
     @model_validator(mode="before")
@@ -34,6 +39,6 @@ class Effects(BaseModel):
                 raise ValueError("Trim end must be later than start")
         return values
 
-    def effective_limiter_db(self, default: float | None) -> float | None:
-        """Return the track limiter ceiling, or the default when the track sets none."""
-        return self.limiter_ceiling_db if self.limiter_ceiling_db is not None else default
+    def replace(self, **changes: object) -> Self:
+        """Return a validated copy with the given fields changed."""
+        return self.model_validate({**self.model_dump(), **changes})

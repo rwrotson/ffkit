@@ -12,28 +12,31 @@ def test_filters_use_fixed_notation_for_small_values() -> None:
 def test_filters_keep_order_and_stream_rule() -> None:
     assert audio_filters(Effects()) == []
 
-    effects = Effects(trim_start=1, trim_end=4, trim_silence=True, gain_db=2, normalize_lufs=-14)
+    effects = Effects(
+        trim_start=1,
+        trim_end=4,
+        trim_silence=True,
+        silence_threshold_db=-45.5,
+        gain_db=5,
+        normalize_lufs=-14,
+        limiter_ceiling_db=-1,
+    )
     expected = [
         "atrim=start=1.0:end=4.0",
         "asetpts=PTS-STARTPTS",
-        "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB",
+        "silenceremove=start_periods=1:start_duration=0:start_threshold=-45.5dB",
         "areverse",
-        "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB",
+        "silenceremove=start_periods=1:start_duration=0:start_threshold=-45.5dB",
         "areverse",
         "volume=5.0dB",
         "loudnorm=I=-14.0:TP=-1:LRA=11",
         "alimiter=limit=0.89125094:level=false:latency=true",
     ]
 
-    assert audio_filters(effects, 3, limiter_db=-1) == expected
-    assert audio_filters(effects, 3, streaming=True, limiter_db=-1) == [
-        *expected[:3],
-        *expected[6:],
-    ]
-
-    effects.limiter_ceiling_db = -3
+    assert audio_filters(effects) == expected
+    assert audio_filters(effects, streaming=True) == [*expected[:3], *expected[6:]]
     assert (
-        audio_filters(effects, limiter_db=-1)[-1]
+        audio_filters(effects.replace(limiter_ceiling_db=-3))[-1]
         == "alimiter=limit=0.70794578:level=false:latency=true"
     )
 
