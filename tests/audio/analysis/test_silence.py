@@ -16,6 +16,7 @@ from ffkit import (
 from ffkit.audio import AudioInfo, Effects, TrimBounds, detect_trim_bounds, probe
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
+
 RUNTIME = FFmpegRuntime()
 
 

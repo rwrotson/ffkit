@@ -22,6 +22,7 @@ from ffkit.errors import (
 from ffkit.runtime import FFmpegRuntime
 
 log = logging.getLogger(__name__)
+
 MAX_ATTEMPTS = 5
 MIN_CEILING_DB = -20
 CEILING_MARGIN_DB = 0.2

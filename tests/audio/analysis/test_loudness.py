@@ -18,6 +18,7 @@ from ffkit.audio import (
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
 loudness_module = importlib.import_module("ffkit.audio.analysis.loudness")
+
 ONE_SECOND = AudioInfo(duration=1.0, sample_rate=44100, channels=1, codec="pcm_s16le")
 
 

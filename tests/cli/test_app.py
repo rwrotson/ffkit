@@ -16,6 +16,7 @@ from ffkit.cli.settings import Settings
 from ffkit.main import main
 
 LOUDNESS = Loudness(lufs=-14.0, true_peak_db=-1.0)
+
 runner = CliRunner()
 
 
