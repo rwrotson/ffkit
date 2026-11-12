@@ -149,8 +149,9 @@ covers, and analysis results, in its own models.
 
 - `probe()` returns duration, sample rate, channels, codec, bit rate, whether a cover is embedded,
   and tags; tags of the first audio stream override container tags.
-- `measure_loudness()` returns a `Loudness`. For an unfiltered measurement it also records the
-  file's `(st_size, st_mtime_ns, st_ctime_ns)` fingerprint, and
+- `measure_loudness()` returns a `Loudness`: ITU-R BS.1770 integrated loudness and true peak from
+  FFmpeg `ebur128`, with mono measured as dual-mono. For an unfiltered measurement it also records
+  the file's `(st_size, st_mtime_ns, st_ctime_ns)` fingerprint, and
   `measure_normalization_gain(known=...)` reuses it only while no filters apply and the fingerprint
   matches. `gain_for_target()` calculates the gain from a `Loudness` without running FFmpeg. Gains
   use 0.1 dB steps and round toward attenuation to stay below the true-peak ceiling.

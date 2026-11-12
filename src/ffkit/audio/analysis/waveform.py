@@ -1,5 +1,6 @@
-import array
 import math
+
+import numpy as np
 
 from ffkit._ffmpeg.args import StrPath, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
@@ -26,7 +27,7 @@ def peak_envelope(
     channels = info.channels
     rate = info.sample_rate * PEAK_OVERSAMPLING
     frames_per_bin = max(1, math.ceil(info.duration * rate / WAVEFORM_BINS))
-    peaks = [0.0] * WAVEFORM_BINS
+    peaks = np.zeros(WAVEFORM_BINS)
 
     command = [
         runtime.ffmpeg_path,
@@ -50,21 +51,23 @@ def peak_envelope(
     frame_index = 0
     pending = b""
     for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
-        pending += chunk
-        while len(pending) >= frame_bytes:
-            boundary = frames_per_bin - frame_index % frames_per_bin
-            count = min(boundary, len(pending) // frame_bytes)
-            size = count * frame_bytes
-            values = array.array("f")
-            values.frombytes(pending[:size])
-            pending = pending[size:]
-            bin_index = min(WAVEFORM_BINS - 1, frame_index // frames_per_bin)
-            # Builtin max/min over the array run in C; per-sample abs() in Python is slow.
-            loudest, quietest = max(values), min(values)
-            peaks[bin_index] = max(peaks[bin_index], loudest, -quietest)
-            frame_index += count
+        data = pending + chunk
+        usable = len(data) // frame_bytes * frame_bytes
+        pending = data[usable:]
+        if not usable:
+            continue
 
-    return tuple(round(value, 5) for value in peaks)
+        samples = np.frombuffer(data[:usable], dtype="<f4").reshape(-1, channels)
+        frame_peaks = np.abs(samples).max(axis=1)
+        bins = np.minimum(
+            (frame_index + np.arange(len(frame_peaks))) // frames_per_bin, WAVEFORM_BINS - 1
+        )
+        starts = np.flatnonzero(np.diff(bins, prepend=-1))
+        chunk_bins = bins[starts]
+        peaks[chunk_bins] = np.maximum(peaks[chunk_bins], np.maximum.reduceat(frame_peaks, starts))
+        frame_index += len(frame_peaks)
+
+    return tuple(round(float(value), 5) for value in peaks)
 
 
 def waveform(

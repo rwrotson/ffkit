@@ -4,6 +4,8 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import numpy as np
+
 from ffkit._ffmpeg.args import StrPath, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.runtime import FFmpegRuntime
@@ -12,10 +14,15 @@ ENERGY_SAMPLE_RATE = 2000
 ENERGY_HOP = 200
 
 
-def _hop_energy(data: bytes) -> float:
-    samples = array.array("h")
-    samples.frombytes(data)
-    return sum(abs(sample) for sample in samples) / (ENERGY_HOP * 32768)
+def _hop_energy(data: bytes) -> bytes:
+    """Return mean absolute amplitudes per hop as native float64 bytes."""
+    samples = np.frombuffer(data, dtype="<i2").astype(np.float64)
+    complete = len(samples) // ENERGY_HOP * ENERGY_HOP
+    sums = np.abs(samples[:complete]).reshape(-1, ENERGY_HOP).sum(axis=1)
+    if complete < len(samples):
+        sums = np.append(sums, np.abs(samples[complete:]).sum())
+    # A trailing partial hop is divided by the full hop size, like complete hops.
+    return (sums / (ENERGY_HOP * 32768)).tobytes()
 
 
 @contextmanager
@@ -47,13 +54,10 @@ def energy(
         for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
             data = pending + chunk
             complete = len(data) // hop_bytes * hop_bytes
-            values = [
-                _hop_energy(data[pos : pos + hop_bytes]) for pos in range(0, complete, hop_bytes)
-            ]
-            energy_file.write(array.array("d", values).tobytes())
+            energy_file.write(_hop_energy(data[:complete]))
             pending = data[complete:]
         if pending:
-            energy_file.write(array.array("d", [_hop_energy(pending)]).tobytes())
+            energy_file.write(_hop_energy(pending))
 
         energy_file.flush()
         if not energy_file.tell():

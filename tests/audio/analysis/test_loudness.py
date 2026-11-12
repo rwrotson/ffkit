@@ -1,5 +1,6 @@
 import importlib
-from collections.abc import Callable
+import subprocess
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -57,16 +58,67 @@ def test_loudness_rejects_nonfinite_values() -> None:
         Loudness(lufs=-14, true_peak_db=float("inf"))
 
 
-def test_measure_loudness_handles_missing_and_nonfinite_values(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize(
+    ("report", "lufs", "peak"),
+    [
+        (b"no ebur128 report", None, None),
+        (
+            b"lavfi.r128.I=-70.000\nlavfi.r128.true_peak=0.000\n    Peak:       -inf dBFS",
+            None,
+            None,
+        ),
+        (b"lavfi.r128.I=nan\nlavfi.r128.true_peak=x\n    Peak:  x dBFS", None, None),
+        (b"lavfi.r128.I=-14.123\nlavfi.r128.true_peak=0.500\n    Peak:  -6.0 dBFS", -14.123, -6.02),
+        (b"lavfi.r128.I=-40.5\nlavfi.r128.true_peak=0.012\n    Peak:  -38.1 dBFS", -40.5, -38.1),
+    ],
+)
+def test_measure_loudness_parses_ebur128_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    report: bytes,
+    lufs: float | None,
+    peak: float | None,
 ) -> None:
     source = tmp_path / "song.wav"
     source.touch()
-    reports = iter([b"no loudnorm report", b'{"input_i": "inf", "input_tp": "not a number"}'])
-    monkeypatch.setattr(loudness_module, "run", lambda *args, **kwargs: next(reports))
+    monkeypatch.setattr(
+        loudness_module, "iter_output", lambda *args, **kwargs: iter([report[:7], report[7:]])
+    )
 
-    assert measure_loudness(source).lufs is None
-    assert measure_loudness(source).true_peak_db is None
+    loudness = measure_loudness(source)
+
+    assert loudness.lufs == lufs
+    assert loudness.true_peak_db == (None if peak is None else pytest.approx(peak, abs=0.01))
+
+
+def test_measure_loudness_matches_bs1770_reference(tmp_path: Path) -> None:
+    stereo = tmp_path / "stereo.wav"
+    mono = tmp_path / "mono.wav"
+    tone = "sine=frequency=997:sample_rate=48000:duration=5,volume=0.8"
+    for path, layout in ((stereo, "stereo"), (mono, "mono")):
+        subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+            [  # noqa: S607 - FFmpeg is resolved from PATH.
+                "ffmpeg",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                tone,
+                "-af",
+                f"pan={layout}|c0=c0" + ("|c1=c0" if layout == "stereo" else ""),
+                "-y",
+                str(path),
+            ],
+            check=True,
+        )
+
+    stereo_loudness = measure_loudness(stereo)
+    mono_loudness = measure_loudness(mono)
+
+    assert stereo_loudness.lufs == pytest.approx(-20, abs=0.05)
+    assert stereo_loudness.true_peak_db == pytest.approx(-20, abs=0.05)
+    assert mono_loudness.lufs == pytest.approx(stereo_loudness.lufs, abs=0.01)
 
 
 def test_measure_loudness_rejects_changed_source(
@@ -75,11 +127,11 @@ def test_measure_loudness_rejects_changed_source(
     source = tmp_path / "song.wav"
     source.touch()
 
-    def change_source(*args: object, **kwargs: object) -> bytes:
+    def change_source(*args: object, **kwargs: object) -> Iterator[bytes]:
         source.write_bytes(b"changed")
-        return b""
+        return iter(())
 
-    monkeypatch.setattr(loudness_module, "run", change_source)
+    monkeypatch.setattr(loudness_module, "iter_output", change_source)
     with pytest.raises(SourceChangedError, match="changed during loudness measurement"):
         measure_loudness(source)
 
