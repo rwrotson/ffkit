@@ -37,6 +37,9 @@ TEMPO_MIN_CHANGE = 6
 TEMPO_MIN_HOLD = 10
 TEMPO_MIN_CONFIDENCE = 0.1
 
+# Lag-0 autocorrelation at or below this means a window has no variation to analyse.
+MIN_ACF_ENERGY = 1e-9
+
 
 class TempoSegment(BaseModel):
     """A timed BPM estimate."""
@@ -144,7 +147,7 @@ def _window_tempo(section: FloatArray) -> tuple[float, FloatArray] | None:
     centered = section - section.mean()
     size = len(centered)
     acf = np.fft.irfft(np.abs(np.fft.rfft(centered, 2 * size)) ** ACF_EXPONENT)[:size]
-    if acf[0] <= 1e-9:
+    if acf[0] <= MIN_ACF_ENERGY:
         return None
     acf /= acf[0]
 
@@ -194,9 +197,7 @@ def _pulse_scores(section: FloatArray, periods: FloatArray) -> FloatArray:
         maxima[index] = scores.max()
         variances[index] = scores.var()
 
-    total: FloatArray = maxima / max(maxima.sum(), 1e-12) + variances / max(
-        variances.sum(), 1e-12
-    )
+    total: FloatArray = maxima / max(maxima.sum(), 1e-12) + variances / max(variances.sum(), 1e-12)
     return total
 
 
@@ -239,9 +240,7 @@ def _segments(
     times = [time for time, _, _ in windows]
     tempi = [_fold(bpm, tempo) for _, bpm, _ in windows]
     half = SMOOTHING // 2
-    smoothed = [
-        float(np.median(tempi[max(0, i - half) : i + half + 1])) for i in range(len(tempi))
-    ]
+    smoothed = [float(np.median(tempi[max(0, i - half) : i + half + 1])) for i in range(len(tempi))]
 
     bounds = [0]
     for index in range(1, len(smoothed)):
