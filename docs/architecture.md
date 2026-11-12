@@ -17,15 +17,16 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Errors | `ffkit/errors.py` | The `FFKitError` hierarchy | — | base |
 
 The public API is `ffkit`, which exports `FFmpegRuntime`, the errors, and the `audio` package, and
-`ffkit.audio`, which re-exports the audio functions, models, and defaults with `__all__`.
+`ffkit.audio`, which re-exports the audio functions, models, and defaults with `__all__`, and
+`ffkit.audio.library`, which exports helpers for applications that manage audio files.
 `ffkit/__init__.py` also attaches a `NullHandler` to the `ffkit` logger. A base install provides only
 the library; `ffkit.logs` raises `ModuleNotFoundError` that names the `logs` extra when structlog is
 missing.
 
 ### Rules
 
-- `main`, `cli`, and `logs` import library names only from `ffkit` and `ffkit.audio`, never from
-  their modules.
+- `main`, `cli`, and `logs` import library names only from `ffkit`, `ffkit.audio`, and
+  `ffkit.audio.library`, never from their modules.
 - A module or package whose name starts with `_` is imported only by modules in the same package and
   its subpackages.
 - The library never reads the environment or `.env`. Only the CLI does, in `ffkit.cli.settings`;
@@ -40,38 +41,42 @@ Media domains, such as `ffkit.audio` and a future `ffkit.video`, are sibling pac
 import each other. Code they share, such as `FFmpegRuntime` and the FFmpeg and subprocess helpers,
 lives below them; `ffkit.errors` imports nothing from `ffkit`.
 
-`ffkit.audio` has two subpackages of operations on top of a shared base:
+`ffkit.audio` has three subpackages on top of a shared base:
 
 - `analysis` measures audio and returns data or immutable result models; it never creates output
   files or modifies its arguments.
 - `processing` transforms audio into a new file or stream; it may use `analysis`.
+- `library` discovers input files, names exports, and merges tags for applications; it does not run
+  FFmpeg.
 
 Layers are listed from top to bottom. Modules joined by `|` may not import each other:
 
 | Package | Layer | Modules |
 | --- | --- | --- |
-| `ffkit.audio` | Processing | `processing` |
+| `ffkit.audio` | Operations | `library \| processing` |
 | | Analysis | `analysis` |
-| | Primitives | `_filters \| files \| tags` |
+| | Filters | `_filters` |
 | | Models | `effects \| encoding` |
 | | Defaults | `defaults` |
 | `ffkit.audio.analysis` | Measurement | `loudness \| waveform` |
 | | Silence | `silence` |
 | | Probe | `probe \| cover` |
 | `ffkit.audio.processing` | Output | `render \| stream \| extract` |
+| `ffkit.audio.library` | Helpers | `files \| tags` |
 
 Every module in these packages must belong to one of their layers. The `__init__.py` files of
-`analysis` and `processing` are empty; `ffkit/audio/__init__.py` re-exports from their modules.
+`analysis` and `processing` are empty; `ffkit/audio/__init__.py` re-exports from their modules, and
+`ffkit/audio/library/__init__.py` re-exports the library helpers.
 
 ### Enforcement
 
 import-linter checks the package layers, the audio layers, access to the library through `ffkit`
-and `ffkit.audio`, and the third-party packages of each layer (`uv run poe lint-imports`). The
+and its public packages, and the third-party packages of each layer (`uv run poe lint-imports`). The
 contracts are in `pyproject.toml`. Rules that the contracts do not cover are checked in review.
 
 ## Public API
 
-Everything listed in `ffkit.__all__` and `ffkit.audio.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.logs`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
+Everything listed in `ffkit.__all__`, `ffkit.audio.__all__`, and `ffkit.audio.library.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.logs`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
 
 Audio effects are non-destructive: the source path is always the original file, and each render or
 stream applies the current effects to that source. Changing an effect must never use a previous

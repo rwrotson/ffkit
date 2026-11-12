@@ -1,4 +1,4 @@
-from ffkit.audio import MergedTags, merge_tags
+from ffkit.audio.library import MergedTags, merge_tags
 
 
 def test_first_merge_keeps_every_current_tag() -> None:

@@ -9,8 +9,8 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.audio.defaults` | Define default values for audio functions and CLI options |
 | `ffkit.audio.effects` | Define the audio effects model |
 | `ffkit.audio.encoding` | Define output encoder settings |
-| `ffkit.audio.files` | Discover supported audio inputs and build export names |
-| `ffkit.audio.tags` | Merge probed source tags with caller overrides |
+| `ffkit.audio.library.files` | Discover supported audio inputs and build export names |
+| `ffkit.audio.library.tags` | Merge probed source tags with caller overrides |
 | `ffkit.audio.analysis.probe` | Read duration and tags |
 | `ffkit.audio.analysis.silence` | Detect silence and trim bounds |
 | `ffkit.audio.analysis.loudness` | Measure loudness and calculate normalization gain |

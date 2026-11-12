@@ -69,7 +69,7 @@ uv run --group docs properdocs build --strict
 - Do not lower coverage thresholds, disable checks, relax import-linter contracts, or add lint and type suppressions solely to pass CI. Explain necessary suppressions at the affected line.
 - Use non-rewriting checks (`poe fmt-check`, `poe lint`) for verification; run formatters or `--fix` only when intentionally editing files. Pre-commit's Ruff hooks rewrite files.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite: it skips coverage, and CI also runs tests on macOS, the lowest-dependency job, package and docs builds, and security scans.
-- Treat everything exported from `ffkit/__init__.py` and `ffkit/audio/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
+- Treat everything exported from `ffkit/__init__.py`, `ffkit/audio/__init__.py`, and `ffkit/audio/library/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
 - When changing settings or public API, update `.env.example`, README, and the docs. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
 - Keep the user's `.env` and secrets untracked.
 
@@ -136,7 +136,7 @@ src/ffkit/cli/         — Typer CLI, its FFKIT_* settings, and composition root
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `audio`, `runtime | _ffmpeg`, and `errors`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `ffkit` and `ffkit.audio`. Import `_`-prefixed modules and packages only within their package and its subpackages. The library uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `ffkit.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `audio`, `runtime | _ffmpeg`, and `errors`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `ffkit`, `ffkit.audio`, and `ffkit.audio.library`. Import `_`-prefixed modules and packages only within their package and its subpackages. The library uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `ffkit.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
 
 The `FFKitError` hierarchy is available for future APIs. Existing audio helpers raise built-in and subprocess exceptions.
 

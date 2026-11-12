@@ -82,7 +82,7 @@ or stream from that same original source. Never use an earlier render as the sou
 applies effects again to processed audio. Trim bounds refer to the original file, and
 `stream(start=...)` seeks from `trim_start` in that file before applying the remaining effects.
 Leading silence removal applies only when streaming from `start=0`.
-`audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
+`ffkit.audio.library.audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
 `probe()` reads container tags and tags from the first audio stream; stream tags override container
 tags. A missing source raises `SourceNotFoundError`. `merge_tags()` refreshes source tags after a

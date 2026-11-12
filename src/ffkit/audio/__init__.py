@@ -1,5 +1,6 @@
 """Audio analysis and processing helpers."""
 
+from . import library
 from .analysis.cover import embedded_cover
 from .analysis.loudness import (
     Loudness,
@@ -18,11 +19,9 @@ from .defaults import (
 )
 from .effects import Effects
 from .encoding import Encoding, Mp3Encoding
-from .files import audio_files, safe_name
 from .processing.extract import extract_cover
 from .processing.render import render
 from .processing.stream import stream
-from .tags import MergedTags, merge_tags
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",
@@ -33,23 +32,20 @@ __all__ = [
     "Effects",
     "Encoding",
     "Loudness",
-    "MergedTags",
     "Mp3Encoding",
     "TempoSegment",
     "TrimBounds",
-    "audio_files",
     "detect_trim_bounds",
     "embedded_cover",
     "estimate_tempo",
     "extract_cover",
     "gain_for_target",
+    "library",
     "measure_loudness",
     "measure_normalization_gain",
-    "merge_tags",
     "peak_envelope",
     "probe",
     "render",
-    "safe_name",
     "stream",
     "waveform",
 ]

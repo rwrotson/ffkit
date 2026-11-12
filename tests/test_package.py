@@ -13,6 +13,7 @@ def test_package_logger_has_null_handler() -> None:
 def test_public_api_names_exist() -> None:
     assert all(hasattr(ffkit, name) for name in ffkit.__all__)
     assert all(hasattr(ffkit.audio, name) for name in ffkit.audio.__all__)
+    assert all(hasattr(ffkit.audio.library, name) for name in ffkit.audio.library.__all__)
 
 
 def test_import_leaves_global_logging_unconfigured() -> None:

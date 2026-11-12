@@ -117,7 +117,7 @@ or stream from the original again. Never use a rendered output as the input for 
 that would apply effects a second time to already processed audio. Effect trim bounds are positions
 in the original file; `stream(start=...)` seeks from `trim_start` in that file before applying
 the remaining effects. Leading silence removal applies only when streaming from `start=0`.
-`audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
+`ffkit.audio.library` holds helpers that do not run FFmpeg. `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
 `probe()` returns the duration, sample rate, channels, codec, bit rate, and whether a cover is
 embedded, and combines container tags with tags from the first audio stream; stream tags take
@@ -268,8 +268,7 @@ src/
     │   ├── defaults.py      # default values
     │   ├── effects.py       # Effects model
     │   ├── _filters.py      # FFmpeg filter chain
-    │   ├── files.py         # audio input discovery and export names
-    │   ├── tags.py          # tag merging
+    │   ├── library/         # ffkit.audio.library: input discovery, export names, tag merging
     │   ├── analysis/        # probe, loudness, silence, waveform, embedded cover
     │   └── processing/      # render, stream, cover extraction
     ├── logs/

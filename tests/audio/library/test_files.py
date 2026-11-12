@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ffkit.audio import audio_files, safe_name
+from ffkit.audio.library import audio_files, safe_name
 
 
 def test_safe_name_uses_tags_and_utf8_limit() -> None:

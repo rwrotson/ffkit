@@ -253,7 +253,7 @@ layers = [
 name = "Audio layers"
 type = "layers"
 containers = ["ffkit.audio"]
-layers = ["processing", "analysis", "_filters | files | tags", "effects | encoding", "defaults"]
+layers = ["library | processing", "analysis", "_filters", "effects | encoding", "defaults"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
@@ -264,6 +264,13 @@ layers = ["loudness | waveform", "silence", "probe | cover"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
+name = "Audio library modules are independent"
+type = "layers"
+containers = ["ffkit.audio.library"]
+layers = ["files | tags"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
 name = "Audio processing modules are independent"
 type = "layers"
 containers = ["ffkit.audio.processing"]
@@ -271,7 +278,7 @@ layers = ["render | stream | extract"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
-name = "Applications use the library only through ffkit and ffkit.audio"
+name = "Applications use the library only through its public packages"
 type = "forbidden"
 source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs"]
 forbidden_modules = [
@@ -282,9 +289,10 @@ forbidden_modules = [
     "ffkit.audio.processing",
     "ffkit.audio.defaults",
     "ffkit.audio.effects",
-    "ffkit.audio.files",
-    "ffkit.audio.filters",
-    "ffkit.audio.tags",
+    "ffkit.audio.encoding",
+    "ffkit.audio._filters",
+    "ffkit.audio.library.files",
+    "ffkit.audio.library.tags",
 ]
 # The ffkit and ffkit.audio packages re-export these modules.
 allow_indirect_imports = true
