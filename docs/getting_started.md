@@ -37,7 +37,7 @@ uv run pre-commit install
 
 `pre-commit install` sets up three Git hooks:
 
-- `pre-commit` — file hygiene checks, `uv lock` check, actionlint, ruff (with `--fix`), import-linter, mypy
+- `pre-commit` — file hygiene checks, `uv lock` check, actionlint, a check that `.gitignore` hides no source files, ruff (with `--fix`), import-linter, mypy
 - `commit-msg` — Conventional Commit format (Commitizen)
 - `pre-push` — pytest without coverage
 
