@@ -7,7 +7,6 @@ import pytest
 
 from ffkit import (
     Effects,
-    Track,
     audio_filters,
     render,
     stream_mp3,
@@ -39,23 +38,23 @@ def pcm(data: bytes) -> bytes:
 def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    track = Track(path=str(source))
-    track.effects.trim_start = 0.2
-    track.effects.trim_end = 1.5
-    track.effects.gain_db = 2
+    effects = Effects()
+    effects.trim_start = 0.2
+    effects.trim_end = 1.5
+    effects.gain_db = 2
 
     rendered = tmp_path / "rendered.mp3"
-    render(track, rendered)
+    render(source, rendered, effects)
 
-    streamed = b"".join(stream_mp3(track))
+    streamed = b"".join(stream_mp3(source, effects))
     assert streamed.startswith(b"ID3")
     assert abs(len(pcm(streamed)) - len(pcm(rendered.read_bytes()))) < 12000
 
-    seeked = b"".join(stream_mp3(track, start=0.7))
+    seeked = b"".join(stream_mp3(source, effects, start=0.7))
     assert seeked.startswith(b"ID3")
     assert len(pcm(seeked)) < len(pcm(rendered.read_bytes()))
-    assert track.effects.trim_start == 0.2
-    assert track.effects.trim_end == 1.5
+    assert effects.trim_start == 0.2
+    assert effects.trim_end == 1.5
 
 
 def test_stream_seeks_within_late_trim_interval(
@@ -63,22 +62,22 @@ def test_stream_seeks_within_late_trim_interval(
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    track = Track(path=str(source))
-    track.effects.trim_end = 1.5
-    track.effects.trim_start = 1.0
-    assert b"".join(stream_mp3(track)).startswith(b"ID3")
-    assert track.effects.trim_start == 1.0
-    assert track.effects.trim_end == 1.5
+    effects = Effects()
+    effects.trim_end = 1.5
+    effects.trim_start = 1.0
+    assert b"".join(stream_mp3(source, effects)).startswith(b"ID3")
+    assert effects.trim_start == 1.0
+    assert effects.trim_end == 1.5
 
 
 def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    track = Track(path=str(source))
-    track.effects.trim_start = 0.2
-    track.effects.trim_end = 0.5
-    assert b"".join(stream_mp3(track, start=0.3)) == b""
-    assert b"".join(stream_mp3(track, start=0.8)) == b""
+    effects = Effects()
+    effects.trim_start = 0.2
+    effects.trim_end = 0.5
+    assert b"".join(stream_mp3(source, effects, start=0.3)) == b""
+    assert b"".join(stream_mp3(source, effects, start=0.8)) == b""
 
 
 def test_stream_uses_streaming_filters(
@@ -86,8 +85,8 @@ def test_stream_uses_streaming_filters(
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    track = Track(path=str(source))
-    track.effects.trim_silence = True
+    effects = Effects()
+    effects.trim_silence = True
     original = audio_filters
 
     def check_filters(
@@ -99,26 +98,25 @@ def test_stream_uses_streaming_filters(
         return filters
 
     monkeypatch.setattr(stream_module, "audio_filters", check_filters)
-    assert b"".join(stream_mp3(track))
+    assert b"".join(stream_mp3(source, effects))
 
 
 def test_stream_reports_failed_encoder_and_closes_early(
     make_tone: Callable[..., None], tmp_path: Path
 ) -> None:
-    missing = Track(path=str(tmp_path / "missing.wav"))
     with pytest.raises(RuntimeError, match="Audio encoder exited"):
-        b"".join(stream_mp3(missing))
+        b"".join(stream_mp3(tmp_path / "missing.wav"))
 
     source = tmp_path / "source.wav"
     make_tone(source)
-    stream = stream_mp3(Track(path=str(source)))
+    stream = stream_mp3(source)
     assert next(stream)
     stream.close()
 
 
 def test_stream_rejects_negative_start_on_call(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="must not be negative"):
-        stream_mp3(Track(path=str(tmp_path / "source.wav")), start=-1)
+        stream_mp3(tmp_path / "source.wav", start=-1)
 
 
 def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
@@ -152,10 +150,10 @@ def test_stream_seek_keeps_pause_with_trim_silence(tmp_path: Path) -> None:
         check=True,
     )
 
-    track = Track(path=str(source))
-    track.effects.trim_silence = True
-    plain = Track(path=str(source))
+    effects = Effects()
+    effects.trim_silence = True
+    plain_effects = Effects()
 
-    seeked = len(pcm(b"".join(stream_mp3(track, start=1.2))))
-    expected = len(pcm(b"".join(stream_mp3(plain, start=1.2))))
+    seeked = len(pcm(b"".join(stream_mp3(source, effects, start=1.2))))
+    expected = len(pcm(b"".join(stream_mp3(source, plain_effects, start=1.2))))
     assert abs(seeked - expected) < 12000

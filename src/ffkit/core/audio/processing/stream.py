@@ -3,40 +3,41 @@ import os
 import selectors
 import subprocess
 from collections.abc import Generator
+from pathlib import Path
 
 from ffkit.core._ffmpeg import ffmpeg_number, media_path
 from ffkit.core._process import stop
 from ffkit.core.audio._constants import MP3_ENCODER_ARGS
 from ffkit.core.audio.filters import audio_filters
-from ffkit.core.audio.models import Effects, Track
+from ffkit.core.audio.models import Effects
 from ffkit.core.runtime import FFmpegRuntime
 
 log = logging.getLogger(__name__)
 
 
-def _seeked_track(track: Track, start: float) -> tuple[Track, float] | None:
-    snapshot = track.model_copy(deep=True)
-    source_offset = start + snapshot.effects.trim_start
-    trim_end = snapshot.effects.trim_end
+def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | None:
+    source_offset = start + effects.trim_start
+    trim_end = effects.trim_end
     if trim_end is not None and source_offset >= trim_end:
         return None
 
     # Replace both bounds at once; assigning them separately can fail interval validation.
-    snapshot.effects = Effects.model_validate(
+    seeked = Effects.model_validate(
         {
-            **snapshot.effects.model_dump(),
+            **effects.model_dump(),
             "trim_start": 0,
             "trim_end": None if trim_end is None else trim_end - source_offset,
             # Leading silence removal after a seek would drop a pause at the seek position.
-            "trim_silence": snapshot.effects.trim_silence and start == 0,
+            "trim_silence": effects.trim_silence and start == 0,
         }
     )
 
-    return snapshot, source_offset
+    return seeked, source_offset
 
 
-def stream_mp3(
-    track: Track,
+def stream_mp3(  # noqa: PLR0913 - Stream options plus the keyword-only FFmpeg runtime.
+    source: Path,
+    effects: Effects | None = None,
     gain: float = 0,
     start: float = 0,
     limiter_db: float | None = None,
@@ -47,7 +48,8 @@ def stream_mp3(
     if start < 0:
         raise ValueError("Stream start must not be negative")
     return _stream(
-        track,
+        source,
+        effects or Effects(),
         gain,
         start,
         limiter_db,
@@ -57,7 +59,8 @@ def stream_mp3(
 
 
 def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
-    track: Track,
+    source: Path,
+    effects: Effects,
     gain: float,
     start: float,
     limiter_db: float | None,
@@ -65,10 +68,10 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
     ffmpeg: str,
     idle_timeout: float,
 ) -> Generator[bytes]:
-    seeked = _seeked_track(track, start)
+    seeked = _seeked_effects(effects, start)
     if seeked is None:
         return
-    snapshot, source_offset = seeked
+    seeked_effects, source_offset = seeked
 
     command = [
         ffmpeg,
@@ -78,13 +81,13 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         "-ss",
         ffmpeg_number(source_offset),
         "-i",
-        media_path(snapshot.path),
+        media_path(source),
         "-vn",
         "-map",
         "0:a:0",
     ]
 
-    filters = audio_filters(snapshot.effects, gain, streaming=True, limiter_db=limiter_db)
+    filters = audio_filters(seeked_effects, gain, streaming=True, limiter_db=limiter_db)
     if filters:
         command += ["-af", ",".join(filters)]
     command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]
@@ -109,7 +112,7 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         if process.wait(timeout=5):
             raise RuntimeError(f"Audio encoder exited with status {process.returncode}")
     except Exception:
-        log.exception("audio_stream_failed track=%s", track.id)
+        log.exception("audio_stream_failed source=%s", source)
         raise
     finally:
         stop(process, grace=2)

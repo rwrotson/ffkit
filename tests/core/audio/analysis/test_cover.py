@@ -2,7 +2,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
-from ffkit import Track, embedded_cover, render
+from ffkit import embedded_cover, render
 
 
 def test_embedded_cover_without_image(make_tone: Callable[..., None], tmp_path: Path) -> None:
@@ -34,7 +34,7 @@ def test_embedded_cover_reads_jpeg_bytes(make_tone: Callable[..., None], tmp_pat
         check=True,
     )
     encoded = tmp_path / "with-cover.mp3"
-    render(Track(path=str(source), cover_path=str(image)), encoded)
+    render(source, encoded, cover=image)
 
     cover = embedded_cover(encoded)
 

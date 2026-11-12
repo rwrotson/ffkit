@@ -5,29 +5,18 @@ from pydantic import ValidationError
 
 from ffkit import (
     Effects,
-    Group,
     TempoSegment,
-    Track,
     WaveformAnalysis,
 )
 from ffkit.core.errors import CancelledError, FFKitError, InvalidInputError
 
 
 def test_audio_models_preserve_defaults_and_validation() -> None:
-    track = Track(path="song.flac")
-    group = Group(name="Mix", tracks=[track])
-    assert track.effects == Effects()
-    assert group.effective_gain_db == 0
-    assert group.limiter_for(track) == -1
-
-    group.limiter_enabled = False
-    assert group.limiter_for(track) is None
-    track.effects.limiter_ceiling_db = -3
-    assert group.limiter_for(track) == -3
-
-    group.normalization_gain_db = 2
-    group.gain_db = 3
-    assert group.effective_gain_db == 5
+    effects = Effects()
+    assert effects.effective_limiter_db(-1) == -1
+    assert effects.effective_limiter_db(None) is None
+    effects.limiter_ceiling_db = -3
+    assert effects.effective_limiter_db(-1) == -3
 
     assert issubclass(InvalidInputError, FFKitError)
     assert issubclass(InvalidInputError, ValueError)
@@ -35,7 +24,7 @@ def test_audio_models_preserve_defaults_and_validation() -> None:
     assert issubclass(CancelledError, RuntimeError)
 
     with pytest.raises(ValidationError):
-        Track(path="song.flac", effects=Effects(trim_start=2, trim_end=1))
+        Effects(trim_start=2, trim_end=1)
     with pytest.raises(ValidationError, match="increasing start times"):
         WaveformAnalysis(tempo=(TempoSegment(start=2, bpm=100), TempoSegment(start=1, bpm=120)))
     with pytest.raises(ValidationError, match="frozen"):

@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from ffkit import (
     FFmpegRuntime,
-    Track,
     analyze_loudness,
     analyze_peak_waveform,
     analyze_waveform_tempo,
@@ -71,8 +70,8 @@ ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: analyze_waveform_tempo(source, 1, runtime=runtime),
     lambda source, _, runtime: calculate_normalization_gain(source, runtime=runtime),
     lambda source, _, runtime: detect_trim_bounds(source, duration=1, runtime=runtime),
-    lambda source, out, runtime: render(Track(path=str(source)), out / "out.mp3", runtime=runtime),
-    lambda source, _, runtime: b"".join(stream_mp3(Track(path=str(source)), runtime=runtime)),
+    lambda source, out, runtime: render(source, out / "out.mp3", runtime=runtime),
+    lambda source, _, runtime: b"".join(stream_mp3(source, runtime=runtime)),
 ]
 
 
@@ -100,7 +99,7 @@ def test_extract_cover_uses_configured_ffmpeg(source: Path, tmp_path: Path) -> N
     missing = str(tmp_path / "missing-ffmpeg")
     with pytest.raises(FileNotFoundError) as error:
         extract_cover(
-            Track(path=str(source)),
+            source,
             tmp_path / "cover.jpg",
             runtime=FFmpegRuntime(ffmpeg_path=missing),
         )
@@ -113,4 +112,4 @@ def test_stream_uses_idle_timeout(source: Path, tmp_path: Path) -> None:
     silent_encoder.chmod(0o755)
     runtime = FFmpegRuntime(ffmpeg_path=str(silent_encoder), stream_idle_timeout=0.1)
     with pytest.raises(TimeoutError, match="stopped responding"):
-        b"".join(stream_mp3(Track(path=str(source)), runtime=runtime))
+        b"".join(stream_mp3(source, runtime=runtime))

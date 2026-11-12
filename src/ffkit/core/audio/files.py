@@ -1,6 +1,5 @@
+from collections.abc import Mapping
 from pathlib import Path
-
-from ffkit.core.audio.models import Track
 
 EXTENSIONS = frozenset({".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".aac", ".ogg", ".opus"})
 
@@ -22,10 +21,10 @@ def audio_files(paths: list[Path]) -> list[Path]:
     return sorted(files)
 
 
-def safe_name(track: Track, index: int, width: int) -> str:
-    """Build a numbered MP3 filename from track metadata."""
-    artist = track.tags.get("artist", "")
-    title = track.tags.get("title") or Path(track.path).stem
+def safe_name(source: Path, tags: Mapping[str, str], index: int, width: int) -> str:
+    """Build a numbered MP3 filename from artist and title tags or the source name."""
+    artist = tags.get("artist", "")
+    title = tags.get("title") or source.stem
     name = f"{artist} - {title}" if artist else title
     name = "".join(character if character not in "/\\:\x00" else "_" for character in name).strip()
 

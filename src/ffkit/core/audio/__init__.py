@@ -19,11 +19,9 @@ from .filters import audio_filters
 from .models import (
     AudioInfo,
     Effects,
-    Group,
     MergedTags,
     SourceLoudness,
     TempoSegment,
-    Track,
     WaveformAnalysis,
 )
 from .processing.cover import extract_cover
@@ -38,11 +36,9 @@ __all__ = [
     "DEFAULT_TRIM_MIN_DURATION",
     "AudioInfo",
     "Effects",
-    "Group",
     "MergedTags",
     "SourceLoudness",
     "TempoSegment",
-    "Track",
     "WaveformAnalysis",
     "analyze_loudness",
     "analyze_peak_waveform",

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 from pydantic import ValidationError
@@ -18,7 +18,6 @@ from ffkit import (
     DEFAULT_TRIM_MIN_DURATION,
     Effects,
     FFmpegRuntime,
-    Track,
     calculate_normalization_gain,
     detect_trim_bounds,
     extract_cover,
@@ -247,7 +246,11 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
 
     tags = parse_tags(tag or [])
     source = input_file(source)
-    cover_path = None if cover is None else str(input_file(cover))
+    cover_choice: Path | Literal["source", "none"] = "source"
+    if no_cover:
+        cover_choice = "none"
+    elif cover is not None:
+        cover_choice = input_file(cover)
     destination = output_file(destination, force)
 
     effects = Effects(
@@ -258,15 +261,14 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         trim_silence=trim_silence,
         limiter_ceiling_db=limiter_ceiling_db,
     )
-    track = Track(
-        path=str(source),
-        effects=effects,
+    render(
+        source,
+        destination,
+        effects,
         tags=tags,
-        cover_path=cover_path,
-        cover_removed=no_cover,
+        cover=cover_choice,
+        runtime=cli_state(ctx).runtime,
     )
-
-    render(track, destination, runtime=cli_state(ctx).runtime)
     emit(ctx, {"path": str(destination)}, [str(destination)])
 
 
@@ -301,6 +303,6 @@ def extract_cover_command(
     """Extract an embedded cover as JPEG."""
     source = input_file(source)
     destination = output_file(destination, force)
-    if extract_cover(Track(path=str(source)), destination, runtime=cli_state(ctx).runtime) is None:
+    if extract_cover(source, destination, runtime=cli_state(ctx).runtime) is None:
         raise RuntimeError("No embedded cover found")
     emit(ctx, {"path": str(destination)}, [str(destination)])

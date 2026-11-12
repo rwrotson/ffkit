@@ -4,34 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from ffkit import (
-    Track,
-    extract_cover,
-    render,
-)
+from ffkit import extract_cover, render
 
 
-def test_extract_cover_custom_missing_and_removed(
-    make_tone: Callable[..., None], tmp_path: Path
-) -> None:
+def test_extract_cover_without_image(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
     target = tmp_path / "covers" / "embedded.jpg"
-    track = Track(path=str(source))
 
-    assert extract_cover(track, target) is None
+    assert extract_cover(source, target) is None
     assert not target.exists()
-
-    custom = tmp_path / "custom.jpg"
-    custom.write_bytes(b"custom")
-    track.cover_path = str(custom)
-    assert extract_cover(track, target) == custom
-
-    track.cover_path = str(tmp_path / "missing.jpg")
-    assert extract_cover(track, target) is None
-
-    track.cover_removed = True
-    assert extract_cover(track, target) is None
 
 
 def test_extract_cover_timeout_removes_partial_file(
@@ -49,7 +31,7 @@ def test_extract_cover_timeout_removes_partial_file(
     monkeypatch.setattr("ffkit.core.audio.analysis.cover.subprocess.run", time_out)
 
     with pytest.raises(subprocess.TimeoutExpired):
-        extract_cover(Track(path="source.mp3"), target)
+        extract_cover(Path("source.mp3"), target)
     assert target.read_bytes() == b"previous cover"
     assert not list(tmp_path.glob("*.tmp.jpg"))
 
@@ -64,12 +46,12 @@ def test_extract_cover_write_failure_removes_partial_file(
         raise OSError("replace failed")
 
     monkeypatch.setattr(
-        "ffkit.core.audio.processing.cover.embedded_cover", lambda track, runtime: b"image"
+        "ffkit.core.audio.processing.cover.embedded_cover", lambda source, runtime: b"image"
     )
     monkeypatch.setattr("ffkit.core.audio.processing.cover.os.replace", fail_replace)
 
     with pytest.raises(OSError, match="replace failed"):
-        extract_cover(Track(path="source.mp3"), target)
+        extract_cover(Path("source.mp3"), target)
     assert target.read_bytes() == b"previous cover"
     assert not list(tmp_path.glob("*.tmp.jpg"))
 
@@ -95,18 +77,15 @@ def test_extract_embedded_cover(make_tone: Callable[..., None], tmp_path: Path) 
         check=True,
     )
 
-    track = Track(path=str(source), cover_path=str(image))
-    encoded = tmp_path / "with-cover.mp3"
-    render(track, encoded)
-
-    embedded = Track(path=str(encoded))
-    original_mp3 = encoded.read_bytes()
+    embedded = tmp_path / "with-cover.mp3"
+    render(source, embedded, cover=image)
+    original_mp3 = embedded.read_bytes()
     alias = tmp_path / "alias.mp3"
-    alias.symlink_to(encoded)
-    for destination in (encoded, alias):
+    alias.symlink_to(embedded)
+    for destination in (embedded, alias):
         with pytest.raises(ValueError, match="Output path must differ"):
             extract_cover(embedded, destination)
-    assert encoded.read_bytes() == original_mp3
+    assert embedded.read_bytes() == original_mp3
 
     target = tmp_path / "embedded.jpg"
     assert extract_cover(embedded, target) == target
@@ -117,5 +96,5 @@ def test_extract_embedded_cover(make_tone: Callable[..., None], tmp_path: Path) 
     assert extract_cover(embedded, target) == target
     assert target.read_bytes() == original
 
-    assert extract_cover(Track(path=str(source)), target) is None
+    assert extract_cover(source, target) is None
     assert target.read_bytes() == original

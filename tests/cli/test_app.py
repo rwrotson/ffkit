@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
-from ffkit import AudioInfo, FFmpegRuntime, Track
+from ffkit import AudioInfo, Effects, FFmpegRuntime
 from ffkit.cli.app import app
 from ffkit.main import main
 
@@ -140,8 +140,8 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     source.touch()
     destination.write_bytes(b"original")
 
-    def fake_render(track: Track, path: Path, *, runtime: FFmpegRuntime) -> None:
-        assert track.effects.gain_db == 3
+    def fake_render(source: Path, path: Path, effects: Effects, **kwargs: object) -> None:
+        assert effects.gain_db == 3
         path.write_bytes(b"rendered")
 
     monkeypatch.setattr(cli_app, "render", fake_render)
@@ -151,7 +151,7 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert result.exit_code == 0
     assert destination.read_bytes() == b"rendered"
 
-    def fail_render(track: Track, path: Path, *, runtime: FFmpegRuntime) -> None:
+    def fail_render(source: Path, path: Path, effects: Effects, **kwargs: object) -> None:
         raise subprocess.CalledProcessError(1, ["ffmpeg"])
 
     monkeypatch.setattr(cli_app, "render", fail_render)
@@ -166,7 +166,7 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     source.touch()
     destination.write_bytes(b"original")
 
-    def fake_cover(track: Track, path: Path, *, runtime: FFmpegRuntime) -> Path:
+    def fake_cover(source: Path, path: Path, *, runtime: FFmpegRuntime) -> Path:
         path.write_bytes(b"cover")
         return path
 
@@ -177,7 +177,7 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     assert result.exit_code == 0
     assert destination.read_bytes() == b"cover"
 
-    monkeypatch.setattr(cli_app, "extract_cover", lambda track, path, *, runtime: None)
+    monkeypatch.setattr(cli_app, "extract_cover", lambda source, path, *, runtime: None)
     failed = runner.invoke(
         app, ["audio", "extract-cover", str(source), str(destination), "--force"]
     )
@@ -256,8 +256,12 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     image = tmp_path / "cover.jpg"
     source.touch()
     image.touch()
-    rendered: list[Track] = []
-    monkeypatch.setattr(cli_app, "render", lambda track, path, *, runtime: rendered.append(track))
+    rendered: list[dict[str, object]] = []
+
+    def fake_render(source: Path, path: Path, effects: Effects, **kwargs: object) -> None:
+        rendered.append(kwargs)
+
+    monkeypatch.setattr(cli_app, "render", fake_render)
 
     base = ["audio", "render", str(source)]
     result = runner.invoke(
@@ -274,19 +278,21 @@ def test_render_cover_and_tags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         ],
     )
     assert result.exit_code == 0
-    assert rendered[-1].cover_path == str(image)
-    assert rendered[-1].tags == {"title": "A=B", "x": ""}
+    assert rendered[-1]["tags"] == {"title": "A=B", "x": ""}
 
     result = runner.invoke(app, [*base, str(tmp_path / "b.mp3"), "--no-cover"])
     assert result.exit_code == 0
-    assert rendered[-1].cover_removed
+
+    result = runner.invoke(app, [*base, str(tmp_path / "e.mp3")])
+    assert result.exit_code == 0
+    assert [call["cover"] for call in rendered] == [image, "none", "source"]
 
     for options in (["--tag", "title"], ["--tag", "=x"], ["--cover", str(image), "--no-cover"]):
         invalid = runner.invoke(app, [*base, str(tmp_path / "c.mp3"), *options])
         assert invalid.exit_code == 2
     missing = runner.invoke(app, [*base, str(tmp_path / "d.mp3"), "--cover", "missing.jpg"])
     assert missing.exit_code == 2
-    assert len(rendered) == 2
+    assert len(rendered) == 3
 
 
 def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
