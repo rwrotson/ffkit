@@ -54,7 +54,7 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 | | Constants | `defaults \| _constants` |
 | `core.audio.analysis` | Measurement | `loudness \| waveform` |
 | | Silence | `silence` |
-| | Probe | `probe` |
+| | Probe | `probe \| cover` |
 | `core.audio.processing` | Output | `render \| stream \| cover` |
 
 Every module in these packages must belong to one of their layers. The `__init__.py` files of

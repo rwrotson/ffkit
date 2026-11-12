@@ -1,3 +1,4 @@
+from .analysis.cover import embedded_cover
 from .analysis.loudness import (
     analyze_loudness,
     calculate_normalization_gain,
@@ -36,6 +37,7 @@ __all__ = [
     "audio_filters",
     "calculate_normalization_gain",
     "detect_trim_bounds",
+    "embedded_cover",
     "extract_cover",
     "measure_loudness",
     "normalization_gain",

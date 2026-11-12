@@ -1,9 +1,8 @@
 import os
-import subprocess
 from pathlib import Path
 from uuid import uuid4
 
-from ffkit.core._ffmpeg import media_path
+from ffkit.core.audio.analysis.cover import embedded_cover
 from ffkit.core.audio.models import Track
 from ffkit.core.runtime import FFmpegRuntime
 
@@ -24,32 +23,15 @@ def extract_cover(
     ):
         raise ValueError("Output path must differ from source audio")
 
+    image = embedded_cover(track, runtime=runtime)
+    if image is None:
+        return None
+
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.jpg")
     try:
-        result = subprocess.run(  # noqa: S603 - Fixed FFmpeg command with separate paths.
-            [
-                runtime.ffmpeg_path,
-                "-v",
-                "error",
-                "-i",
-                media_path(track.path),
-                "-map",
-                "0:v:0",
-                "-frames:v",
-                "1",
-                "-y",
-                media_path(temporary),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=runtime.process_timeout,
-        )
-
-        if result.returncode != 0 or not temporary.is_file():
-            return None
+        temporary.write_bytes(image)
         os.replace(temporary, destination)
-        return destination
     finally:
         temporary.unlink(missing_ok=True)
+    return destination

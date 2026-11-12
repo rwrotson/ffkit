@@ -43,13 +43,32 @@ def test_extract_cover_timeout_removes_partial_file(
         timeout = kwargs["timeout"]
         assert isinstance(timeout, (int, float))
         assert timeout > 0
-        Path(command[-1]).write_bytes(b"partial")
         raise subprocess.TimeoutExpired(command, timeout)
 
     target.write_bytes(b"previous cover")
-    monkeypatch.setattr("ffkit.core.audio.processing.cover.subprocess.run", time_out)
+    monkeypatch.setattr("ffkit.core.audio.analysis.cover.subprocess.run", time_out)
 
     with pytest.raises(subprocess.TimeoutExpired):
+        extract_cover(Track(path="source.mp3"), target)
+    assert target.read_bytes() == b"previous cover"
+    assert not list(tmp_path.glob("*.tmp.jpg"))
+
+
+def test_extract_cover_write_failure_removes_partial_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "cover.jpg"
+    target.write_bytes(b"previous cover")
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(
+        "ffkit.core.audio.processing.cover.embedded_cover", lambda track, runtime: b"image"
+    )
+    monkeypatch.setattr("ffkit.core.audio.processing.cover.os.replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
         extract_cover(Track(path="source.mp3"), target)
     assert target.read_bytes() == b"previous cover"
     assert not list(tmp_path.glob("*.tmp.jpg"))

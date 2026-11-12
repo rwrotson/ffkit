@@ -1,0 +1,34 @@
+import subprocess
+
+from ffkit.core._ffmpeg import media_path
+from ffkit.core.audio.models import Track
+from ffkit.core.runtime import FFmpegRuntime
+
+
+def embedded_cover(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> bytes | None:
+    """Return the first embedded image of the source as JPEG bytes."""
+    result = subprocess.run(  # noqa: S603 - Fixed FFmpeg command with a separate path.
+        [
+            runtime.ffmpeg_path,
+            "-v",
+            "error",
+            "-i",
+            media_path(track.path),
+            "-map",
+            "0:v:0",
+            "-frames:v",
+            "1",
+            "-c:v",
+            "mjpeg",
+            "-f",
+            "image2pipe",
+            "pipe:1",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=runtime.process_timeout,
+    )
+    if result.returncode != 0 or not result.stdout:
+        return None
+    return result.stdout

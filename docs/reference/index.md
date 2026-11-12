@@ -14,6 +14,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.core.audio.analysis.silence` | Detect silence and trim bounds |
 | `ffkit.core.audio.analysis.loudness` | Measure loudness and calculate normalization gain |
 | `ffkit.core.audio.analysis.waveform` | Build waveforms and tempo estimates |
+| `ffkit.core.audio.analysis.cover` | Read the embedded cover image |
 | `ffkit.core.audio.processing.render` | Render non-destructive MP3 output |
 | `ffkit.core.audio.processing.stream` | Stream MP3 audio from a playback position |
 | `ffkit.core.audio.processing.cover` | Extract an embedded cover image |

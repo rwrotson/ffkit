@@ -266,7 +266,7 @@ exhaustive = true
 name = "Audio analysis layers"
 type = "layers"
 containers = ["ffkit.core.audio.analysis"]
-layers = ["loudness | waveform", "silence", "probe"]
+layers = ["loudness | waveform", "silence", "probe | cover"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
