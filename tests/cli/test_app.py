@@ -10,7 +10,8 @@ import pytest
 from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
-from ffkit import AudioInfo, Effects, FFmpegRuntime
+from ffkit import FFmpegRuntime
+from ffkit.audio import AudioInfo, Effects
 from ffkit.cli.app import app
 from ffkit.main import main
 

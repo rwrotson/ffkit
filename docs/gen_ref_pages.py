@@ -7,7 +7,7 @@ src = Path(__file__).parent.parent / "src" / "ffkit"
 nav = Nav()  # type: ignore[no-untyped-call]  # Nav.__init__ has no annotations.
 
 for path in sorted(src.rglob("*.py")):
-    if path.name == "__init__.py" or path.name.startswith("_"):
+    if path.name == "__init__.py" or any(part.startswith("_") for part in path.parts):
         continue
 
     module_path = path.relative_to(src.parent).with_suffix("")

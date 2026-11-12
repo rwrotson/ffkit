@@ -11,13 +11,13 @@ from pydantic import ValidationError
 from rich.console import Console
 from typer.core import TyperGroup
 
-from ffkit import (
+from ffkit import FFmpegRuntime
+from ffkit.audio import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
     Effects,
-    FFmpegRuntime,
     calculate_normalization_gain,
     detect_trim_bounds,
     extract_cover,

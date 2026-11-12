@@ -1,6 +1,6 @@
 # Architecture
 
-The core does the library's work and knows nothing about settings, logging setup, or the CLI.
+The library does the work and knows nothing about settings, logging setup, or the CLI.
 Each outer layer adds one application concern on top of the layers below it.
 
 ## Layers
@@ -10,32 +10,37 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Layer | Location | Responsibility | Third-party packages | Install |
 | --- | --- | --- | --- | --- |
 | Entry point | `ffkit/main.py` | `ffkit` console script; reports a missing `cli` extra | — | base |
-| CLI | `ffkit/cli/` | Composition root: loads `FFKIT_*` settings, sets up logging, passes values to the core, maps errors to exit codes | Pydantic Settings, Typer, Rich | `ffkit[cli]` |
+| CLI | `ffkit/cli/` | Composition root: loads `FFKIT_*` settings, sets up logging, passes values to the library, maps errors to exit codes | Pydantic Settings, Typer, Rich | `ffkit[cli]` |
 | Logging setup | `ffkit/logs/` | `LogSettings` and `setup_logging()` for applications | structlog | `ffkit[logs]` |
-| Core | `ffkit/core/` | Audio models and helpers, defaults, and the `FFKitError` hierarchy | Pydantic | base |
+| Media domains | `ffkit/audio/` | Audio models, helpers, and defaults | Pydantic | base |
+| FFmpeg | `ffkit/runtime.py`, `ffkit/_ffmpeg/` | `FFmpegRuntime`; private argument and process helpers | Pydantic | base |
+| Errors | `ffkit/errors.py` | The `FFKitError` hierarchy | — | base |
 
-`ffkit/__init__.py` is the public API: it re-exports the core with `__all__` and attaches a
-`NullHandler` to the `ffkit` logger. A base install provides only the core; `ffkit.logs` raises
-`ModuleNotFoundError` that names the `logs` extra when structlog is missing.
+The public API is `ffkit`, which exports `FFmpegRuntime`, the errors, and the `audio` package, and
+`ffkit.audio`, which re-exports the audio functions, models, and defaults with `__all__`.
+`ffkit/__init__.py` also attaches a `NullHandler` to the `ffkit` logger. A base install provides only
+the library; `ffkit.logs` raises `ModuleNotFoundError` that names the `logs` extra when structlog is
+missing.
 
 ### Rules
 
-- Layers outside the core import core names only from `ffkit`, never from `ffkit.core` or its modules.
-- A module whose name starts with `_` is imported only by modules in the same package and its
-  subpackages.
+- `main`, `cli`, and `logs` import library names only from `ffkit` and `ffkit.audio`, never from
+  their modules.
+- A module or package whose name starts with `_` is imported only by modules in the same package and
+  its subpackages.
 - The library never reads the environment or `.env`. Only the CLI does, in `ffkit.cli.settings`;
   an application composes its own settings from `LogSettings` and `FFmpegRuntime`.
 - Library layers receive settings as arguments, such as `runtime=`, `target_lufs=`, or
-  `setup_logging(LogSettings(...))`. A model lives in the layer that uses it.
+  `setup_logging(LogSettings(...))`. A model lives in the module that uses it.
 - A new third-party dependency belongs to the lowest layer that needs it, and to that layer's extra.
 
-### Inside the core
+### Media domains
 
-Media domains, such as `core.audio` and a future `core.video`, are sibling packages that do not
+Media domains, such as `ffkit.audio` and a future `ffkit.video`, are sibling packages that do not
 import each other. Code they share, such as `FFmpegRuntime` and the FFmpeg and subprocess helpers,
-lives in `core` below them; `core.errors` imports nothing from `ffkit`.
+lives below them; `ffkit.errors` imports nothing from `ffkit`.
 
-`core.audio` has two subpackages of operations on top of a shared base:
+`ffkit.audio` has two subpackages of operations on top of a shared base:
 
 - `analysis` measures audio and returns data or immutable result models; it never creates output
   files or modifies its arguments.
@@ -45,31 +50,28 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 
 | Package | Layer | Modules |
 | --- | --- | --- |
-| `core` | Domains | `audio` |
-| | FFmpeg | `runtime \| _process \| _ffmpeg` |
-| | Errors | `errors` |
-| `core.audio` | Processing | `processing` |
+| `ffkit.audio` | Processing | `processing` |
 | | Analysis | `analysis` |
 | | Primitives | `filters \| files \| tags` |
-| | Models | `models` |
-| | Constants | `defaults \| _constants` |
-| `core.audio.analysis` | Measurement | `loudness \| waveform` |
+| | Effects | `effects` |
+| | Defaults | `defaults` |
+| `ffkit.audio.analysis` | Measurement | `loudness \| waveform` |
 | | Silence | `silence` |
 | | Probe | `probe \| cover` |
-| `core.audio.processing` | Output | `render \| stream \| cover` |
+| `ffkit.audio.processing` | Output | `render \| stream \| extract` |
 
 Every module in these packages must belong to one of their layers. The `__init__.py` files of
-`analysis` and `processing` are empty; `core/audio/__init__.py` re-exports from their modules.
+`analysis` and `processing` are empty; `ffkit/audio/__init__.py` re-exports from their modules.
 
 ### Enforcement
 
-import-linter checks the package layers, the core and audio layers, access to the core through
-`ffkit`, and the third-party packages of each layer (`uv run poe lint-imports`). The contracts are
-in `pyproject.toml`. Rules that the contracts do not cover are checked in review.
+import-linter checks the package layers, the audio layers, access to the library through `ffkit`
+and `ffkit.audio`, and the third-party packages of each layer (`uv run poe lint-imports`). The
+contracts are in `pyproject.toml`. Rules that the contracts do not cover are checked in review.
 
 ## Public API
 
-Everything listed in `ffkit.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.logs`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
+Everything listed in `ffkit.__all__` and `ffkit.audio.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.logs`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
 
 Audio effects are non-destructive: the source path is always the original file, and each render or
 stream applies the current effects to that source. Changing an effect must never use a previous
@@ -102,15 +104,13 @@ Existing audio helpers raise built-in and subprocess exceptions, except cancella
 
 ## Adding functionality
 
-- Put the code in `core/`: measurement in `core/audio/analysis/`, output in
-  `core/audio/processing/`, shared audio helpers in `core/audio/`, and FFmpeg helpers that do not
-  depend on the media type in `core/`. Place a new module in one of the
-  layers above, and raise a `FFKitError` subclass for expected failures.
+- Put measurement in `ffkit/audio/analysis/`, output in `ffkit/audio/processing/`, shared audio
+  helpers in `ffkit/audio/`, and FFmpeg helpers that do not depend on the media type in
+  `ffkit/_ffmpeg/`. Place a new module in one of the layers above, and raise a `FFKitError`
+  subclass for expected failures.
 - Accept values as arguments; do not read the environment.
 - Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime` that defaults to `FFmpegRuntime()`.
   Internal helpers receive only the fields they use, such as `ffmpeg` or `timeout`.
-- Export public names from the package `__init__.py` files up to `ffkit/__init__.py`, and add them to `__all__`.
-- Put default values that callers may need in `core/audio/defaults.py`.
-- Test the behaviour in `tests/core/`, in a file that mirrors the module path.
-
-`core/audio/` groups the audio models and helpers. Future media domains can use sibling packages under `core/`.
+- Export public names from `ffkit/audio/__init__.py` and add them to its `__all__`.
+- Put default values that callers may need in `ffkit/audio/defaults.py`.
+- Test the behaviour in `tests/`, in a file that mirrors the module path.

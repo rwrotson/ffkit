@@ -54,7 +54,7 @@ uv run --group docs properdocs build --strict
 
 ## Dependencies
 
-- Put runtime imports needed by the core in `[project].dependencies` and those of outer layers in their extra (`logs`, `cli`); also list extra packages in the `dev` group so tests can import them. Put development tools in the `dev` group, and documentation tools in the `docs` group.
+- Put runtime imports needed by the library in `[project].dependencies` and those of outer layers in their extra (`logs`, `cli`); also list extra packages in the `dev` group so tests can import them. Put development tools in the `dev` group, and documentation tools in the `docs` group.
 - Keep runtime dependencies minimal and lower bounds wide enough for library consumers; they share one environment with the application.
 - Change dependencies through uv (`uv add`, `uv remove`) so `pyproject.toml` and `uv.lock` change together. Verify the lock with `uv sync --locked --all-groups`.
 - Raise a direct dependency's lower bound when code needs a newer API. The locked environment does not check lower bounds; the CI `lowest` job does.
@@ -69,7 +69,7 @@ uv run --group docs properdocs build --strict
 - Do not lower coverage thresholds, disable checks, relax import-linter contracts, or add lint and type suppressions solely to pass CI. Explain necessary suppressions at the affected line.
 - Use non-rewriting checks (`poe fmt-check`, `poe lint`) for verification; run formatters or `--fix` only when intentionally editing files. Pre-commit's Ruff hooks rewrite files.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite: it skips coverage, and CI also runs tests on macOS, the lowest-dependency job, package and docs builds, and security scans.
-- Treat everything exported from `ffkit/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
+- Treat everything exported from `ffkit/__init__.py` and `ffkit/audio/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
 - When changing settings or public API, update `.env.example`, README, and the docs. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
 - Keep the user's `.env` and secrets untracked.
 
@@ -119,25 +119,28 @@ module-root = "src"
 Internal imports use the `ffkit.` prefix. Ruff bans relative imports except in package `__init__.py`, which may re-export from sibling modules (`from .module import ...`, never `..`):
 
 ```python
-from ffkit.core.errors import InvalidInputError
+from ffkit.errors import InvalidInputError
 from ffkit.logs import LogSettings
 ```
 
 ### Layers & Public API
 
 ```
-src/ffkit/__init__.py  — Public API re-exported with __all__; NullHandler on the "ffkit" logger
-src/ffkit/core/        — Audio helpers under core/audio/, FFmpegRuntime and shared FFmpeg helpers, and the FFKitError hierarchy
+src/ffkit/__init__.py  — Public API (FFmpegRuntime, errors, audio) with __all__; NullHandler on the "ffkit" logger
+src/ffkit/audio/       — Public audio API (ffkit.audio): analysis/, processing/, and shared audio modules
+src/ffkit/runtime.py   — FFmpegRuntime
+src/ffkit/_ffmpeg/     — Private FFmpeg argument and process helpers
+src/ffkit/errors.py    — FFKitError hierarchy
 src/ffkit/logs/        — LogSettings and opt-in setup_logging() for applications (`ffkit[logs]` extra)
 src/ffkit/cli/         — Typer CLI, its FFKIT_* settings, and composition root (`ffkit[cli]` extra)
 src/ffkit/main.py      — `ffkit` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, and `core`; a layer imports only layers below it. Outside the core, import core names only from `ffkit`. Import `_`-prefixed modules only within their package and its subpackages. The core uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `core.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
+Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, `audio`, `runtime | _ffmpeg`, and `errors`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `ffkit` and `ffkit.audio`. Import `_`-prefixed modules and packages only within their package and its subpackages. The library uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings, Typer, and Rich. Inside `ffkit.audio`, `processing` (output) may import `analysis` (measurement), both use the shared base modules, and every module belongs to one layer listed in `docs/architecture.md`. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
 
 The `FFKitError` hierarchy is available for future APIs. Existing audio helpers raise built-in and subprocess exceptions.
 
-To add functionality: put measurement code in `src/ffkit/core/audio/analysis/`, output code in `src/ffkit/core/audio/processing/`, shared audio helpers in `src/ffkit/core/audio/`, and media-independent FFmpeg helpers in `src/ffkit/core/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `core/audio/__init__.py` (subpackage `__init__.py` files stay empty) up to `ffkit/__init__.py`; test it in the mirrored path under `tests/core/audio/`; and list it in `docs/reference/index.md`.
+To add functionality: put measurement code in `src/ffkit/audio/analysis/`, output code in `src/ffkit/audio/processing/`, shared audio helpers in `src/ffkit/audio/`, and media-independent FFmpeg helpers in `src/ffkit/_ffmpeg/`; add the module to the audio layer contracts in `pyproject.toml` and `docs/architecture.md`; export supported names from `ffkit/audio/__init__.py` (subpackage `__init__.py` files stay empty); test it in the mirrored path under `tests/audio/`; and list it in `docs/reference/index.md`.
 
 ### Import-Time Behaviour
 
@@ -161,7 +164,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 ### Testing
 
-`tests/` mirrors the package (`core/`, `logs/`, `cli/`); `tests/test_package.py` covers the public API and import-time behaviour.
+`tests/` mirrors the package (`audio/`, `_ffmpeg/`, `logs/`, `cli/`); `tests/test_package.py` covers the public API and import-time behaviour.
 
 Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `FFKIT_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 

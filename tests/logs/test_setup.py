@@ -149,10 +149,10 @@ def test_library_records_reach_configured_handlers(
 ) -> None:
     _ = clean_root_logger
     setup_logging(LogSettings(format="json", level="DEBUG"))
-    logging.getLogger("ffkit.core.example").debug("from library")
+    logging.getLogger("ffkit.audio.example").debug("from library")
     event = json.loads(capsys.readouterr().err)
     assert event["event"] == "from library"
-    assert event["logger"] == "ffkit.core.example"
+    assert event["logger"] == "ffkit.audio.example"
 
 
 def test_setup_logging_without_arguments_ignores_environment(

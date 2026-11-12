@@ -187,7 +187,7 @@ select = [
 
 [tool.ruff.lint.flake8-bugbear]
 # FFmpegRuntime is a frozen model, safe as a shared default.
-extend-immutable-calls = ["ffkit.core.runtime.FFmpegRuntime"]
+extend-immutable-calls = ["ffkit.runtime.FFmpegRuntime"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
@@ -240,54 +240,59 @@ include_external_packages = true
 [[tool.importlinter.contracts]]
 name = "Package layers"
 type = "layers"
-layers = ["ffkit.main", "ffkit.cli", "ffkit.logs", "ffkit.core"]
-
-[[tool.importlinter.contracts]]
-name = "Core layers"
-type = "layers"
-containers = ["ffkit.core"]
-layers = ["audio", "runtime | _process | _ffmpeg", "errors"]
-exhaustive = true
+layers = [
+    "ffkit.main",
+    "ffkit.cli",
+    "ffkit.logs",
+    "ffkit.audio",
+    "ffkit.runtime | ffkit._ffmpeg",
+    "ffkit.errors",
+]
 
 [[tool.importlinter.contracts]]
 name = "Audio layers"
 type = "layers"
-containers = ["ffkit.core.audio"]
-layers = [
-    "processing",
-    "analysis",
-    "filters | files | tags",
-    "models",
-    "defaults | _constants",
-]
+containers = ["ffkit.audio"]
+layers = ["processing", "analysis", "filters | files | tags", "effects", "defaults"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
 name = "Audio analysis layers"
 type = "layers"
-containers = ["ffkit.core.audio.analysis"]
+containers = ["ffkit.audio.analysis"]
 layers = ["loudness | waveform", "silence", "probe | cover"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
 name = "Audio processing modules are independent"
 type = "layers"
-containers = ["ffkit.core.audio.processing"]
-layers = ["render | stream | cover"]
+containers = ["ffkit.audio.processing"]
+layers = ["render | stream | extract"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
-name = "Other layers use the core only through the ffkit public API"
+name = "Applications use the library only through ffkit and ffkit.audio"
 type = "forbidden"
 source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs"]
-forbidden_modules = ["ffkit.core", "ffkit.core.**"]
-# The ffkit package itself re-exports the core.
+forbidden_modules = [
+    "ffkit.errors",
+    "ffkit.runtime",
+    "ffkit._ffmpeg",
+    "ffkit.audio.analysis",
+    "ffkit.audio.processing",
+    "ffkit.audio.defaults",
+    "ffkit.audio.effects",
+    "ffkit.audio.files",
+    "ffkit.audio.filters",
+    "ffkit.audio.tags",
+]
+# The ffkit and ffkit.audio packages re-export these modules.
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Core uses only Pydantic among third-party packages"
+name = "The library uses only Pydantic among third-party packages"
 type = "forbidden"
-source_modules = ["ffkit.core"]
+source_modules = ["ffkit.audio", "ffkit.runtime", "ffkit._ffmpeg", "ffkit.errors"]
 forbidden_modules = ["pydantic_settings", "structlog", "typer", "rich"]
 
 [[tool.importlinter.contracts]]

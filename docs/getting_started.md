@@ -65,7 +65,7 @@ ffkit audio render song.flac song.mp3 --trim-start 1.5 --limiter-ceiling-db -1
 ```python
 from pathlib import Path
 
-from ffkit import Effects, audio_filters, probe, render
+from ffkit.audio import Effects, audio_filters, probe, render
 
 source = Path("song.flac")
 info = probe(source)
@@ -109,7 +109,8 @@ when the encoder produces no output for `stream_idle_timeout` seconds (30 by def
 ```python
 from pathlib import Path
 
-from ffkit import FFmpegRuntime, probe
+from ffkit import FFmpegRuntime
+from ffkit.audio import probe
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
 info = probe(Path("song.flac"), runtime=runtime)
@@ -169,7 +170,7 @@ Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `fe
 
 ## Adding Functionality
 
-Add measurement under `ffkit.core.audio.analysis` and output under `ffkit.core.audio.processing`, export supported names from `ffkit`, and cover them in the mirrored path under `tests/core/audio`. Keep the core independent of environment loading and logging setup.
+Add measurement under `ffkit.audio.analysis` and output under `ffkit.audio.processing`, export supported names from `ffkit.audio`, and cover them in the mirrored path under `tests/audio`. Keep the library independent of environment loading and logging setup.
 
 ## Configuration
 

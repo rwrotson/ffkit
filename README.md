@@ -8,7 +8,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 - Library-safe logging: stdlib loggers with a `NullHandler`, and no environment reads or logging configuration at import time
 - An opt-in `ffkit.logs.setup_logging()` for applications (`ffkit[logs]` extra): structlog to stderr (console or JSON) and an optional rotating JSON log file with UTC timestamps
 - One Pydantic `Settings` with nested `FFKIT_LOG__*` and `FFKIT_FFMPEG__*` sections, a test that keeps `.env.example` in sync, and a generated configuration page
-- import-linter contracts that keep the core API independent of configuration and logging setup
+- import-linter contracts that keep the library API independent of configuration and logging setup
 - Strict MyPy with the Pydantic plugin, Ruff, pytest in parallel and random order with a 95% branch coverage gate, poethepoet tasks, pre-commit hooks, Commitizen
 - CI on Ubuntu and macOS with a lowest-dependency test job, package and strict docs builds, pip-audit, and trivy; actions pinned to commit SHAs; release artifacts and ProperDocs on GitHub Pages after CI passes on a release tag
 
@@ -84,7 +84,7 @@ The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PAT
 ```python
 from pathlib import Path
 
-from ffkit import (
+from ffkit.audio import (
     Effects,
     analyze_loudness,
     audio_filters,
@@ -148,7 +148,8 @@ when the encoder produces no output for `stream_idle_timeout` seconds (30 by def
 ```python
 from pathlib import Path
 
-from ffkit import FFmpegRuntime, probe
+from ffkit import FFmpegRuntime
+from ffkit.audio import probe
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
 info = probe(Path("song.flac"), runtime=runtime)
@@ -252,20 +253,17 @@ src/
 └── ffkit/
     ├── __init__.py          # public API (__all__), NullHandler
     ├── py.typed             # PEP 561 marker
-    ├── core/
-    │   ├── errors.py        # FFKitError, InvalidInputError
-    │   └── audio/
-    │       ├── analysis.py      # probing and audio analysis
-    │       ├── cover.py         # embedded cover extraction
-    │       ├── defaults.py      # public default values
-    │       ├── filters.py       # FFmpeg filters and gain calculations
-    │       ├── formats.py       # supported audio input discovery
-    │       ├── models.py        # track, effects, and group models
-    │       ├── normalization.py # processed-track gain calculation
-    │       ├── render.py        # non-destructive MP3 rendering
-    │       ├── runtime.py       # FFmpegRuntime: executables and time limits
-    │       ├── silence.py       # silence detection parsing
-    │       └── stream.py        # MP3 playback stream
+    ├── errors.py            # FFKitError hierarchy
+    ├── runtime.py           # FFmpegRuntime: executables and time limits
+    ├── _ffmpeg/             # private FFmpeg argument and process helpers
+    ├── audio/               # public ffkit.audio API
+    │   ├── defaults.py      # default values
+    │   ├── effects.py       # Effects model
+    │   ├── filters.py       # FFmpeg filter chain
+    │   ├── files.py         # audio input discovery and export names
+    │   ├── tags.py          # tag merging
+    │   ├── analysis/        # probe, loudness, silence, waveform, embedded cover
+    │   └── processing/      # render, stream, cover extraction
     ├── logs/
     │   ├── settings.py      # LogSettings (ffkit[logs])
     │   └── setup.py         # opt-in setup_logging() for applications (ffkit[logs])
