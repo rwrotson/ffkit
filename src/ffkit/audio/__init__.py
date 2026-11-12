@@ -10,7 +10,8 @@ from .analysis.loudness import (
 )
 from .analysis.probe import AudioInfo, probe
 from .analysis.silence import TrimBounds, detect_trim_bounds
-from .analysis.waveform import TempoSegment, estimate_tempo, peak_envelope, waveform
+from .analysis.tempo import TempoSegment, estimate_tempo
+from .analysis.waveform import peak_envelope, waveform
 from .defaults import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_THRESHOLD_DB,

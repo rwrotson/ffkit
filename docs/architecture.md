@@ -58,7 +58,8 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 | | Filters | `_filters` |
 | | Models | `effects \| encoding` |
 | | Defaults | `defaults` |
-| `ffkit.audio.analysis` | Measurement | `loudness \| waveform` |
+| `ffkit.audio.analysis` | Measurement | `loudness \| waveform \| tempo` |
+| | Energy | `_energy` |
 | | Silence | `silence` |
 | | Probe | `probe \| cover` |
 | `ffkit.audio.processing` | Output | `render \| stream \| extract` |

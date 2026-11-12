@@ -296,7 +296,7 @@ src/
     │   ├── effects.py       # Effects model
     │   ├── _filters.py      # FFmpeg filter chain
     │   ├── library/         # ffkit.audio.library: input discovery, export names, tag merging
-    │   ├── analysis/        # probe, loudness, silence, waveform, embedded cover
+    │   ├── analysis/        # probe, loudness, silence, waveform, tempo, embedded cover
     │   └── processing/      # render, stream, cover extraction
     ├── logs/
     │   ├── settings.py      # LogSettings (ffkit[logs])
