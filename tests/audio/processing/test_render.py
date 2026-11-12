@@ -22,12 +22,12 @@ from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
 from ffkit.audio import (
     Effects,
     Loudness,
-    audio_filters,
     measure_loudness,
     probe,
     render,
     stream_mp3,
 )
+from ffkit.audio._filters import audio_filters
 
 render_module = importlib.import_module("ffkit.audio.processing.render")
 LIMITED = Effects(limiter_ceiling_db=-1)

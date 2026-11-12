@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from ffkit import FFmpegProcessError, InvalidInputError
-from ffkit.audio import Effects, audio_filters, render, stream_mp3
+from ffkit.audio import Effects, render, stream_mp3
+from ffkit.audio._filters import audio_filters
 
 stream_module = importlib.import_module("ffkit.audio.processing.stream")
 

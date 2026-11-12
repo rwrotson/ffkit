@@ -4,9 +4,9 @@ from pathlib import Path
 
 from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import iter_output
+from ffkit.audio._filters import audio_filters
 from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
-from ffkit.audio.filters import audio_filters
 from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 

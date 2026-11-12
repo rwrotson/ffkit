@@ -1,4 +1,5 @@
 import array
+import importlib
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -6,23 +7,23 @@ from pathlib import Path
 import pytest
 
 from ffkit import CancelledError
-from ffkit.audio import analyze_peak_waveform, analyze_waveform_tempo, probe, tempo_estimates
+from ffkit.audio import estimate_tempo, peak_envelope, probe, waveform
+
+waveform_module = importlib.import_module("ffkit.audio.analysis.waveform")
 
 
 def test_waveform_and_tempo_on_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    info = probe(source)
-    assert len(analyze_peak_waveform(source, info=info)) == 400
+    peaks = peak_envelope(source, info=probe(source))
 
-    analyzed = analyze_waveform_tempo(source, info=info)
-
-    assert analyzed.waveform
-    assert len(analyzed.peaks) == 400
-    assert analyzed.peaks[0] > 0
+    assert waveform(source)
+    assert len(peaks) == 400
+    assert peaks[0] > 0
+    assert estimate_tempo(source) == ()
 
 
-def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
+def test_peak_envelope_probes_without_info(tmp_path: Path) -> None:
     source = tmp_path / "delayed.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
         [  # noqa: S607 - FFmpeg is resolved from PATH.
@@ -41,14 +42,14 @@ def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
         check=True,
     )
 
-    peaks = analyze_peak_waveform(source)
+    peaks = peak_envelope(source)
     assert len(peaks) == 400
     assert 100 < next(index for index, peak in enumerate(peaks) if peak > 0) < 150
 
 
 def test_tempo_estimates_known_pulse_train() -> None:
     values = array.array("d", [1.0 if i % 5 == 0 else 0.0 for i in range(600)])
-    estimates = tempo_estimates(memoryview(values))
+    estimates = waveform_module._tempo_estimates(memoryview(values))
     assert estimates
     assert estimates[0][1] == 120
 
@@ -70,7 +71,7 @@ def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
         check=True,
     )
 
-    assert analyze_waveform_tempo(short).waveform
+    assert waveform(short)
 
     silent = tmp_path / "silent.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
@@ -88,9 +89,10 @@ def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
         check=True,
     )
 
-    analyzed = analyze_waveform_tempo(silent)
-    assert analyzed.waveform
-    assert max(analyzed.waveform) == 0
+    silent_waveform = waveform(silent)
+    assert silent_waveform
+    assert max(silent_waveform) == 0
+    assert estimate_tempo(silent) == ()
 
 
 def test_tempo_segment_transitions(
@@ -99,10 +101,9 @@ def test_tempo_segment_transitions(
     source = tmp_path / "tone.wav"
     make_tone(source)
     estimates = [(0.0, 120.0, 0.5), (30.0, 60.0, 0.5), (60.0, 140.0, 0.5), (90.0, 140.0, 0.5)]
-    monkeypatch.setattr("ffkit.audio.analysis.waveform.tempo_estimates", lambda energy: estimates)
+    monkeypatch.setattr(waveform_module, "_tempo_estimates", lambda energy: estimates)
 
-    analyzed = analyze_waveform_tempo(source)
-    assert [(segment.start, segment.bpm) for segment in analyzed.tempo] == [
+    assert [(segment.start, segment.bpm) for segment in estimate_tempo(source)] == [
         (0.0, 90.0),
         (60.0, 140.0),
     ]
@@ -114,8 +115,15 @@ def test_waveform_functions_respect_cancellation_and_string_paths(
     source = tmp_path / "tone.wav"
     make_tone(source)
 
-    with pytest.raises(CancelledError):
-        analyze_peak_waveform(source, cancelled=lambda: True)
-    with pytest.raises(CancelledError):
-        analyze_waveform_tempo(source, cancelled=lambda: True)
-    assert analyze_peak_waveform(str(source)) == analyze_peak_waveform(source)
+    for analyze in (peak_envelope, waveform, estimate_tempo):
+        with pytest.raises(CancelledError):
+            analyze(source, cancelled=lambda: True)
+    assert peak_envelope(str(source)) == peak_envelope(source)
+    assert waveform(str(source)) == waveform(source)
+
+
+def test_waveform_of_source_without_decoded_audio(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(waveform_module, "iter_output", lambda *args, **kwargs: iter(()))
+
+    assert waveform("empty.wav") == ()
+    assert estimate_tempo("empty.wav") == ()

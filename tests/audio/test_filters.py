@@ -1,4 +1,5 @@
-from ffkit.audio import Effects, audio_filters
+from ffkit.audio import Effects
+from ffkit.audio._filters import audio_filters
 
 
 def test_filters_use_fixed_notation_for_small_values() -> None:

@@ -65,17 +65,16 @@ ffkit audio render song.flac song.mp3 --trim-start 1.5 --limiter-ceiling-db -1
 ```python
 from pathlib import Path
 
-from ffkit.audio import Effects, audio_filters, probe, render
+from ffkit.audio import Effects, probe, render
 
 source = Path("song.flac")
 info = probe(source)
 effects = Effects(gain_db=3)
-filters = audio_filters(effects)
 render(source, "song.mp3", effects=effects, tags={"title": "Song"})
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `Loudness`, `TrimBounds`, and `WaveformAnalysis`; they never modify their arguments. The
+`AudioInfo`, `Loudness`, `TrimBounds`, and `TempoSegment`; they never modify their arguments. The
 application keeps track state in its own models.
 
 The source must always be the original audio file. To change processing, change `Effects` and render
@@ -92,8 +91,6 @@ and the returned overrides between probes. `render()` writes `tags` over the sou
 its `cover` option is `True` (keep the source cover), `False`, or an image path.
 With `trim_silence` enabled, rendering and normalization scan for trailing silence before
 processing with bounded memory.
-Direct `audio_filters(effects)` calls with `trim_silence=True` and the default `streaming=False`
-still emit `areverse`, which can buffer the full decoded track.
 An audible tail after an internal pause remains in the output.
 `detect_trim_bounds()` keeps the same tail when reporting audible bounds.
 

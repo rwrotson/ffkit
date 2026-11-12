@@ -6,11 +6,11 @@ from uuid import uuid4
 
 from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
+from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.silence import trailing_trim_end
 from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
-from ffkit.audio.filters import audio_filters
 from ffkit.errors import (
     CancelledError,
     FFmpegError,

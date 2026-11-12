@@ -86,7 +86,6 @@ from pathlib import Path
 
 from ffkit.audio import (
     Effects,
-    audio_filters,
     extract_cover,
     measure_loudness,
     measure_normalization_gain,
@@ -98,7 +97,6 @@ from ffkit.audio import (
 source = Path("song.flac")
 info = probe(source)
 effects = Effects(gain_db=3)
-filters = audio_filters(effects)
 loudness = measure_loudness(source)
 gain = measure_normalization_gain(source, effects=effects, known=loudness)
 render(source, "song.mp3", effects=effects, tags={"title": "Song"})
@@ -110,7 +108,7 @@ render(source, "song-updated.mp3", effects=louder)
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `Loudness`, `TrimBounds`, and `WaveformAnalysis`; they never modify their arguments. The
+`AudioInfo`, `Loudness`, `TrimBounds`, and `TempoSegment`; they never modify their arguments. The
 application keeps track state, such as tags, covers, and analysis results, in its own models.
 
 Always pass the original audio file as the source. To change processing, change `Effects` and render
@@ -131,8 +129,6 @@ Paths may be `str` or `os.PathLike`; options after the source and destination ar
 long-running analysis and rendering accept a `cancelled` callback that raises `CancelledError`.
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
-Calling `audio_filters(effects)` directly with `trim_silence=True` and the default
-`streaming=False` still emits `areverse`, which can buffer the full decoded track.
 An audible ending is retained even when it follows a pause close to the end of the selected range.
 `detect_trim_bounds()` likewise keeps short audible tails after an internal pause.
 `extract_cover()` replaces an existing destination only after extracting an image from the current
@@ -140,8 +136,10 @@ source; if no image exists, it returns `None` and preserves the destination. The
 differ from the source audio file. `embedded_cover()` returns the first embedded image as JPEG
 bytes without writing a file.
 
-`detect_trim_bounds()`, `analyze_peak_waveform()`, and `analyze_waveform_tempo()` probe the source
-unless an `AudioInfo` from an earlier `probe()` is passed as `info=`. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
+`detect_trim_bounds()` and `peak_envelope()` probe the source unless an `AudioInfo` from an earlier
+`probe()` is passed as `info=`. `waveform()` returns up to 400 loudness values scaled to the loudest
+point, `peak_envelope()` 400 full-scale peaks from oversampled audio, and `estimate_tempo()` rough
+`TempoSegment`s; each decodes the source once. `Effects` is immutable; `effects.replace(...)` returns a validated copy, so trim bounds are
 checked together. `silence_threshold_db` sets the level used by `trim_silence`.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
@@ -266,7 +264,7 @@ src/
     ├── audio/               # public ffkit.audio API
     │   ├── defaults.py      # default values
     │   ├── effects.py       # Effects model
-    │   ├── filters.py       # FFmpeg filter chain
+    │   ├── _filters.py      # FFmpeg filter chain
     │   ├── files.py         # audio input discovery and export names
     │   ├── tags.py          # tag merging
     │   ├── analysis/        # probe, loudness, silence, waveform, embedded cover

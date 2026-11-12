@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from ffkit import CancelledError, FFKitError, InvalidInputError
-from ffkit.audio import DEFAULT_SILENCE_THRESHOLD_DB, Effects, TempoSegment, WaveformAnalysis
+from ffkit.audio import DEFAULT_SILENCE_THRESHOLD_DB, Effects
 
 
 def test_audio_models_preserve_defaults_and_validation() -> None:
@@ -20,10 +20,6 @@ def test_audio_models_preserve_defaults_and_validation() -> None:
 
     with pytest.raises(ValidationError):
         Effects(trim_start=2, trim_end=1)
-    with pytest.raises(ValidationError, match="increasing start times"):
-        WaveformAnalysis(tempo=(TempoSegment(start=2, bpm=100), TempoSegment(start=1, bpm=120)))
-    with pytest.raises(ValidationError, match="frozen"):
-        WaveformAnalysis().waveform = (1.0,)  # type: ignore[misc]  # Checks the frozen model at runtime.
 
 
 def test_effects_replace_validates_and_keeps_original() -> None:

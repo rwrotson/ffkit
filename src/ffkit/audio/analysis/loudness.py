@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import StrPath, media_path, source_fingerprint
 from ffkit._ffmpeg.process import Cancelled, run
+from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.silence import trailing_trim_end
 from ffkit.audio.defaults import (
     DEFAULT_PEAK_CEILING_DB,
@@ -14,7 +15,6 @@ from ffkit.audio.defaults import (
     LOUDNORM_TRUE_PEAK_DB,
 )
 from ffkit.audio.effects import Effects
-from ffkit.audio.filters import audio_filters
 from ffkit.errors import SilentAudioError, SourceChangedError
 from ffkit.runtime import FFmpegRuntime
 

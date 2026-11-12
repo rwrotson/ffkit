@@ -253,7 +253,7 @@ layers = [
 name = "Audio layers"
 type = "layers"
 containers = ["ffkit.audio"]
-layers = ["processing", "analysis", "filters | files | tags", "effects", "defaults"]
+layers = ["processing", "analysis", "_filters | files | tags", "effects", "defaults"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
