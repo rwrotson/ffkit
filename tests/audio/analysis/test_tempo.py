@@ -105,7 +105,9 @@ def test_onset_strength_is_independent_of_chunk_boundaries(
 
         monkeypatch.setattr(tempo_module, "iter_output", chunks)
         return tempo_module._onset_strength(  # type: ignore[no-any-return]
-            "source.wav", cancelled=None, runtime=tempo_module.FFmpegRuntime()
+            "source.wav",
+            cancelled=None,
+            runtime=tempo_module.FFmpegRuntime(),
         )
 
     expected = onsets(len(data))

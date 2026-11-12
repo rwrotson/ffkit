@@ -76,7 +76,8 @@ def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:
 
 
 def test_probe_rejects_missing_audio_stream(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "video.mp4"
     source.write_bytes(b"x")
@@ -136,13 +137,16 @@ def test_probe_reports_embedded_cover(make_tone: Callable[..., None], tmp_path: 
     ],
 )
 def test_probe_rejects_stream_without_sample_rate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stream: dict[str, object]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stream: dict[str, object],
 ) -> None:
     source = tmp_path / "source.wav"
     source.touch()
     report = {"streams": [stream], "format": {"duration": "1"}}
     monkeypatch.setattr(
-        "ffkit.audio.analysis.probe.run", lambda *args, **kwargs: json.dumps(report).encode()
+        "ffkit.audio.analysis.probe.run",
+        lambda *args, **kwargs: json.dumps(report).encode(),
     )
 
     with pytest.raises(NoAudioError, match="no decodable audio"):

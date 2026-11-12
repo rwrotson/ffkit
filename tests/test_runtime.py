@@ -77,7 +77,9 @@ ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
 
 @pytest.mark.parametrize("call", ffprobe_calls)
 def test_functions_use_configured_ffprobe(
-    call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+    call: Callable[[Path, Path, FFmpegRuntime], object],
+    source: Path,
+    tmp_path: Path,
 ) -> None:
     missing = str(tmp_path / "missing-ffprobe")
     with pytest.raises(FFmpegNotFoundError) as error:
@@ -87,7 +89,9 @@ def test_functions_use_configured_ffprobe(
 
 @pytest.mark.parametrize("call", ffmpeg_calls)
 def test_functions_use_configured_ffmpeg(
-    call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+    call: Callable[[Path, Path, FFmpegRuntime], object],
+    source: Path,
+    tmp_path: Path,
 ) -> None:
     missing = str(tmp_path / "missing-ffmpeg")
     with pytest.raises(FFmpegNotFoundError) as error:

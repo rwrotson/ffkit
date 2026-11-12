@@ -89,7 +89,8 @@ def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
 
 
 def test_waveform_functions_respect_cancellation_and_string_paths(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)

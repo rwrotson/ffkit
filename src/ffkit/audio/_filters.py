@@ -19,7 +19,7 @@ def audio_filters(effects: Effects) -> list[str]:
     if effects.normalize_lufs is not None:
         filters.append(
             f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}"
-            f":TP={LOUDNORM_TRUE_PEAK_DB}:LRA={LOUDNORM_RANGE}"
+            f":TP={LOUDNORM_TRUE_PEAK_DB}:LRA={LOUDNORM_RANGE}",
         )
 
     ceiling = effects.limiter_ceiling_db

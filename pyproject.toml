@@ -146,6 +146,8 @@ select = [
     "S",
     "RUF",
     "TID",
+    # With the formatter's magic trailing comma, wrapped brackets put one item per line.
+    "COM812",
     "C4",
     "SIM",
     "PT",

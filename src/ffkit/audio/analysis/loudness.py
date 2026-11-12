@@ -77,7 +77,10 @@ def measure_loudness(
     report = _Report()
     pending = b""
     for chunk in iter_output(
-        command, pipe="stderr", timeout=runtime.process_timeout, cancelled=cancelled
+        command,
+        pipe="stderr",
+        timeout=runtime.process_timeout,
+        cancelled=cancelled,
     ):
         pending += chunk
         while b"\n" in pending:
@@ -168,7 +171,9 @@ def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmp
     the source file's size, mtime, and ctime.
     """
     measured = (effects or Effects()).replace(
-        gain_db=0, normalize_lufs=None, limiter_ceiling_db=None
+        gain_db=0,
+        normalize_lufs=None,
+        limiter_ceiling_db=None,
     )
 
     fingerprint = source_fingerprint(source)

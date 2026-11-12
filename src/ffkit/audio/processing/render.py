@@ -28,7 +28,12 @@ CEILING_MARGIN_DB = 0.2
 
 
 def _command_parts(
-    source: Path, tags: Mapping[str, str], cover: Path | bool, encoding: Encoding, *, ffmpeg: str
+    source: Path,
+    tags: Mapping[str, str],
+    cover: Path | bool,
+    encoding: Encoding,
+    *,
+    ffmpeg: str,
 ) -> tuple[list[str], list[str]]:
     """Return the FFmpeg arguments before and after the audio filter option."""
     inputs = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
@@ -47,11 +52,11 @@ def _command_parts(
                 "mjpeg",
                 "-disposition:v:0",
                 "attached_pic",
-            ]
+            ],
         )
     else:
         inputs.extend(
-            ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"]
+            ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"],
         )
 
     outputs = [*encoding.codec_args(), "-map_metadata", "0", "-f", encoding.muxer]
@@ -76,7 +81,11 @@ def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> 
 
 
 def _encode(
-    source: Path, command: list[str], cancelled: Cancelled | None, *, timeout: float
+    source: Path,
+    command: list[str],
+    cancelled: Cancelled | None,
+    *,
+    timeout: float,
 ) -> None:
     try:
         for _ in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
@@ -121,7 +130,11 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     ceiling = effects.limiter_ceiling_db
     destination.parent.mkdir(parents=True, exist_ok=True)
     inputs, outputs = _command_parts(
-        source, tags or {}, cover, encoding, ffmpeg=runtime.ffmpeg_path
+        source,
+        tags or {},
+        cover,
+        encoding,
+        ffmpeg=runtime.ffmpeg_path,
     )
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{encoding.extension}")
 

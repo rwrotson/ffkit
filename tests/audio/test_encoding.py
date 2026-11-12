@@ -13,7 +13,8 @@ def test_mp3_encoding_arguments() -> None:
 
 
 @pytest.mark.parametrize(
-    "value", [{"bitrate_kbps": 16}, {"bitrate_kbps": 321}, {"vbr_quality": 10}]
+    "value",
+    [{"bitrate_kbps": 16}, {"bitrate_kbps": 321}, {"vbr_quality": 10}],
 )
 def test_mp3_encoding_rejects_invalid_values(value: dict[str, int]) -> None:
     with pytest.raises(ValidationError):

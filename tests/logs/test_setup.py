@@ -23,7 +23,9 @@ def test_setup_logging_without_dir_logs_only_to_console(
 
 
 def test_setup_logging_without_console_keeps_file_logs(
-    tmp_path: Path, clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path), console=False)
     clean_root_logger.error("file only")
@@ -33,7 +35,8 @@ def test_setup_logging_without_console_keeps_file_logs(
 
 
 def test_setup_logging_without_console_or_file_is_silent(
-    clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     setup_logging(LogSettings(), console=False)
     clean_root_logger.error("no stderr fallback")
@@ -41,7 +44,8 @@ def test_setup_logging_without_console_or_file_is_silent(
 
 
 def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path / "working", level="WARNING"))
     original_handlers = _app_handlers(clean_root_logger)
@@ -65,7 +69,8 @@ def test_setup_logging_creates_log_dir(tmp_path: Path, clean_root_logger: loggin
 
 
 def test_setup_logging_does_not_add_duplicate_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     config = LogSettings(dir=tmp_path / "logs")
     setup_logging(config)
@@ -75,7 +80,8 @@ def test_setup_logging_does_not_add_duplicate_handlers(
 
 
 def test_setup_logging_preserves_unrelated_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     foreign_console = logging.StreamHandler()
     foreign_file = logging.handlers.RotatingFileHandler(tmp_path / "foreign.log")
@@ -93,7 +99,8 @@ def test_setup_logging_preserves_unrelated_handlers(
 
 
 def test_setup_logging_replaces_own_handlers_on_reconfiguration(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path / "first"))
     previous_file = next(
@@ -107,7 +114,7 @@ def test_setup_logging_replaces_own_handlers_on_reconfiguration(
             file_level="DEBUG",
             console_level="WARNING",
             format="json",
-        )
+        ),
     )
 
     assert len(_app_handlers(clean_root_logger)) == _EXPECTED_HANDLER_COUNT
@@ -134,7 +141,9 @@ def test_setup_logging_sets_root_level(tmp_path: Path, clean_root_logger: loggin
 
 
 def test_setup_logging_json_formatter(
-    tmp_path: Path, clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = LogSettings(dir=tmp_path / "logs", format="json")
     setup_logging(config)
@@ -145,7 +154,8 @@ def test_setup_logging_json_formatter(
 
 
 def test_library_records_reach_configured_handlers(
-    clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = clean_root_logger
     setup_logging(LogSettings(format="json", level="DEBUG"))
@@ -156,7 +166,8 @@ def test_library_records_reach_configured_handlers(
 
 
 def test_setup_logging_without_arguments_ignores_environment(
-    monkeypatch: pytest.MonkeyPatch, clean_root_logger: logging.Logger
+    monkeypatch: pytest.MonkeyPatch,
+    clean_root_logger: logging.Logger,
 ) -> None:
     monkeypatch.setenv("FFKIT_LOG__LEVEL", "ERROR")
     setup_logging()

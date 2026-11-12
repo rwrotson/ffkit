@@ -18,7 +18,8 @@ def test_extract_cover_without_image(make_tone: Callable[..., None], tmp_path: P
 
 
 def test_extract_cover_timeout_removes_partial_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "cover.jpg"
 
@@ -38,7 +39,8 @@ def test_extract_cover_timeout_removes_partial_file(
 
 
 def test_extract_cover_write_failure_removes_partial_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "cover.jpg"
     target.write_bytes(b"previous cover")
@@ -47,7 +49,8 @@ def test_extract_cover_write_failure_removes_partial_file(
         raise OSError("replace failed")
 
     monkeypatch.setattr(
-        "ffkit.audio.processing.extract.embedded_cover", lambda source, runtime: b"image"
+        "ffkit.audio.processing.extract.embedded_cover",
+        lambda source, runtime: b"image",
     )
     monkeypatch.setattr("ffkit.audio.processing.extract.os.replace", fail_replace)
 

@@ -109,7 +109,11 @@ def _audible_span(
 
 
 def _edges(
-    span: tuple[float, float], decoded: float, *, min_duration: float, padding: float
+    span: tuple[float, float],
+    decoded: float,
+    *,
+    min_duration: float,
+    padding: float,
 ) -> tuple[float, float | None]:
     """Turn an audible span into trim positions, keeping short edge silence and padding."""
     start, end = span
@@ -173,7 +177,10 @@ def _silence_edges(  # noqa: PLR0913 - Scan options plus the keyword-only FFmpeg
     """Return trim positions relative to ``start``; raise when the range has no audible audio."""
     meter, levels = _scan(source, info, start=start, end=end, cancelled=cancelled, runtime=runtime)
     span = _audible_span(
-        levels, threshold_db=threshold_db, reference=reference, block_seconds=meter.block_seconds
+        levels,
+        threshold_db=threshold_db,
+        reference=reference,
+        block_seconds=meter.block_seconds,
     )
     if span is None:
         raise SilentAudioError("Track contains no audible audio")

@@ -41,14 +41,16 @@ def test_missing_input_reports_json_error() -> None:
 
 
 def test_json_processing_failure_has_one_error_object(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "broken.wav"
     source.write_bytes(b"invalid audio")
     monkeypatch.setenv("FFKIT_LOG__DIR", str(tmp_path / "logs"))
 
     result = runner.invoke(
-        app, ["--output-format", "json", "audio", "render", str(source), str(tmp_path / "out.mp3")]
+        app,
+        ["--output-format", "json", "audio", "render", str(source), str(tmp_path / "out.mp3")],
     )
 
     assert result.exit_code == 1
@@ -74,7 +76,8 @@ def test_filesystem_errors_use_json_output(tmp_path: Path, monkeypatch: pytest.M
     occupied.write_text("file")
 
     result = runner.invoke(
-        app, ["--output-format", "json", "audio", "render", str(source), str(occupied / "out.mp3")]
+        app,
+        ["--output-format", "json", "audio", "render", str(source), str(occupied / "out.mp3")],
     )
     assert result.exit_code == 1
     assert json.loads(result.stderr)["error"]["type"] == "FileExistsError"
@@ -182,7 +185,8 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
     monkeypatch.setattr(cli_app, "render", fake_render)
     result = runner.invoke(
-        app, ["audio", "render", str(source), str(destination), "--force", "--gain-db", "3"]
+        app,
+        ["audio", "render", str(source), str(destination), "--force", "--gain-db", "3"],
     )
     assert result.exit_code == 0
     assert destination.read_bytes() == b"rendered"
@@ -208,14 +212,16 @@ def test_cover_force_is_atomic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
     monkeypatch.setattr(cli_app, "extract_cover", fake_cover)
     result = runner.invoke(
-        app, ["audio", "extract-cover", str(source), str(destination), "--force"]
+        app,
+        ["audio", "extract-cover", str(source), str(destination), "--force"],
     )
     assert result.exit_code == 0
     assert destination.read_bytes() == b"cover"
 
     monkeypatch.setattr(cli_app, "extract_cover", lambda source, path, *, runtime: None)
     failed = runner.invoke(
-        app, ["audio", "extract-cover", str(source), str(destination), "--force"]
+        app,
+        ["audio", "extract-cover", str(source), str(destination), "--force"],
     )
     assert failed.exit_code == 1
     assert destination.read_bytes() == b"cover"
@@ -233,7 +239,9 @@ def test_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.parametrize("missing", ["typer", "rich", "pydantic_settings", "structlog"])
 def test_entrypoint_without_cli_extra(
-    missing: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    missing: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     original_import = builtins.__import__
 
@@ -267,7 +275,8 @@ def test_invalid_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_missing_ffmpeg_is_processing_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
@@ -337,7 +346,11 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     calls: list[tuple[float, float]] = []
 
     def fake_gain(
-        path: Path, *, target_lufs: float, peak_ceiling_db: float, runtime: FFmpegRuntime
+        path: Path,
+        *,
+        target_lufs: float,
+        peak_ceiling_db: float,
+        runtime: FFmpegRuntime,
     ) -> float:
         calls.append((target_lufs, peak_ceiling_db))
         return 2.5
@@ -353,7 +366,8 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     text = runner.invoke(app, ["audio", "normalization-gain", str(source)])
     assert "Gain: 2.5 dB" in text.stdout
     invalid = runner.invoke(
-        app, ["audio", "normalization-gain", str(source), "--peak-ceiling-db", "0"]
+        app,
+        ["audio", "normalization-gain", str(source), "--peak-ceiling-db", "0"],
     )
     assert invalid.exit_code == 2
 
@@ -376,7 +390,8 @@ def test_commands_use_configured_runtime(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 
 def test_missing_configured_ffprobe_is_processing_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
@@ -388,7 +403,8 @@ def test_missing_configured_ffprobe_is_processing_error(
 
 
 def test_verbose_raises_log_level_without_changing_settings(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
@@ -396,7 +412,9 @@ def test_verbose_raises_log_level_without_changing_settings(
     levels: list[str] = []
     monkeypatch.setattr(cli_app, "load_settings", lambda: settings)
     monkeypatch.setattr(
-        cli_app, "setup_logging", lambda config, **kwargs: levels.append(config.level)
+        cli_app,
+        "setup_logging",
+        lambda config, **kwargs: levels.append(config.level),
     )
     monkeypatch.setattr(cli_app, "measure_loudness", lambda path, *, runtime: LOUDNESS)
 
@@ -407,7 +425,8 @@ def test_verbose_raises_log_level_without_changing_settings(
 
 
 def test_render_encoding_and_silence_options(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
@@ -466,7 +485,7 @@ def test_tempo_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     text = runner.invoke(app, ["audio", "tempo", str(source)])
 
     assert json.loads(result.stdout) == {
-        "segments": [{"start": 0.0, "bpm": 120.0, "confidence": 0.5}]
+        "segments": [{"start": 0.0, "bpm": 120.0, "confidence": 0.5}],
     }
     assert "120.0 BPM" in text.stdout
     monkeypatch.setattr(cli_app, "estimate_tempo", lambda path, *, runtime: ())

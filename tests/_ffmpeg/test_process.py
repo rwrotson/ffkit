@@ -25,7 +25,9 @@ def _python(code: str) -> list[str]:
 
 def _sleeping(stdout: int | None = None, stderr: int | None = None) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(10)"], stdout=stdout, stderr=stderr
+        [sys.executable, "-c", "import time; time.sleep(10)"],
+        stdout=stdout,
+        stderr=stderr,
     )
 
 

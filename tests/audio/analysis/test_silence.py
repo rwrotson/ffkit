@@ -64,7 +64,10 @@ def test_trim_bounds_keep_internal_pause_and_pad_edges(tmp_path: Path) -> None:
 
 def test_trim_bounds_clamp_padding_and_keep_short_edges(tmp_path: Path) -> None:
     source = make_audio(
-        tmp_path / "short-edges.wav", "anullsrc=r=44100:cl=mono:d=0.05", TONE, SILENCE
+        tmp_path / "short-edges.wav",
+        "anullsrc=r=44100:cl=mono:d=0.05",
+        TONE,
+        SILENCE,
     )
     bounds = detect_trim_bounds(source)
     assert bounds.start == 0.0
@@ -137,7 +140,8 @@ def test_trim_bounds_reject_invalid_options(tmp_path: Path) -> None:
 
 
 def test_trim_bounds_respect_cancellation_and_failures(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -179,7 +183,10 @@ def test_level_meter_handles_short_and_empty_input() -> None:
     assert meter.frames == 4
     assert levels.tolist() == [pytest.approx(4 * 0.25 / 10)]
     span = silence_module._audible_span(
-        levels, threshold_db=-50, reference="full_scale", block_seconds=0.01
+        levels,
+        threshold_db=-50,
+        reference="full_scale",
+        block_seconds=0.01,
     )
     assert span == (0.0, 0.01)
 
@@ -204,5 +211,7 @@ def test_resolve_silence_trim_uses_trimmed_range(tmp_path: Path) -> None:
 
     with pytest.raises(SilentAudioError):
         silence_module.resolve_silence_trim(
-            Effects(trim_start=2.1, trim_end=2.9, trim_silence=True), source, runtime=RUNTIME
+            Effects(trim_start=2.1, trim_end=2.9, trim_silence=True),
+            source,
+            runtime=RUNTIME,
         )

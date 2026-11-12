@@ -13,16 +13,21 @@ class LogSettings(BaseModel):
     console_level: LogLevel = Field(default="DEBUG", description="Minimum level printed to stderr")
     file_level: LogLevel = Field(default="INFO", description="Minimum level written to the file")
     format: Literal["console", "json"] = Field(
-        default="console", description="Console log renderer; file logs are always JSON"
+        default="console",
+        description="Console log renderer; file logs are always JSON",
     )
     dir: Path | None = Field(
-        default=None, description="Log directory; file logging is disabled if unset"
+        default=None,
+        description="Log directory; file logging is disabled if unset",
     )
     file_name: str = Field(
-        default="ffkit.log", description="Log file basename without path separators"
+        default="ffkit.log",
+        description="Log file basename without path separators",
     )
     file_max_bytes: int = Field(
-        default=4 * 1024 * 1024, ge=0, description="File size that triggers rotation"
+        default=4 * 1024 * 1024,
+        ge=0,
+        description="File size that triggers rotation",
     )
     file_backup_count: int = Field(default=5, ge=0, description="Rotated files to keep")
 

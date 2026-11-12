@@ -44,7 +44,8 @@ def _replace_command(monkeypatch: pytest.MonkeyPatch, command: list[str]) -> Non
 
 
 def test_render_protects_source_and_existing_output(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -85,7 +86,9 @@ def test_render_mp3_with_trim_tags_and_gain(make_tone: Callable[..., None], tmp_
 
 
 def test_render_relative_colon_path_and_tags(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     source = Path("Song: Live.wav")
@@ -100,7 +103,8 @@ def test_render_relative_colon_path_and_tags(
 
 
 def test_render_trims_edges_without_reversing_audio(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "edges.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
@@ -214,7 +218,9 @@ def test_render_limiter_checks_encoded_peak(make_tone: Callable[..., None], tmp_
 
 
 def test_render_retries_from_source(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -247,7 +253,9 @@ def test_render_retries_from_source(
 
 @pytest.mark.parametrize("cancelled", [None, lambda: False])
 def test_render_keeps_only_error_tail(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cancelled: Callable[[], bool] | None
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cancelled: Callable[[], bool] | None,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
@@ -263,7 +271,8 @@ def test_render_keeps_only_error_tail(
 
 
 def test_render_encoder_timeout_kills_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
@@ -314,7 +323,8 @@ def test_render_cover_choices(make_tone: Callable[..., None], tmp_path: Path) ->
 
 
 def test_render_cancellation_preserves_output(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -327,7 +337,9 @@ def test_render_cancellation_preserves_output(
 
 
 def test_render_rejects_unmeasurable_or_unreachable_peak(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -354,7 +366,9 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
 
 
 def test_render_cancellation_after_encoding(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -370,7 +384,9 @@ def test_render_cancellation_after_encoding(
 
 
 def test_render_cancellation_before_replace_without_limiter(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
@@ -386,7 +402,8 @@ def test_render_cancellation_before_replace_without_limiter(
 
 
 def test_render_and_stream_accept_string_paths(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)

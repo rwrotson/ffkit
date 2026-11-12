@@ -82,7 +82,9 @@ def test_measure_loudness_parses_ebur128_report(
     source = tmp_path / "song.wav"
     source.touch()
     monkeypatch.setattr(
-        loudness_module, "iter_output", lambda *args, **kwargs: iter([report[:7], report[7:]])
+        loudness_module,
+        "iter_output",
+        lambda *args, **kwargs: iter([report[:7], report[7:]]),
     )
 
     loudness = measure_loudness(source)
@@ -122,7 +124,8 @@ def test_measure_loudness_matches_bs1770_reference(tmp_path: Path) -> None:
 
 
 def test_measure_loudness_rejects_changed_source(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "song.wav"
     source.touch()
@@ -137,7 +140,8 @@ def test_measure_loudness_rejects_changed_source(
 
 
 def test_measure_normalization_gain_uses_processed_audio(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -154,7 +158,9 @@ def test_measure_normalization_gain_uses_processed_audio(
 
 
 def test_measure_normalization_gain_rejects_changed_source(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -169,7 +175,8 @@ def test_measure_normalization_gain_rejects_changed_source(
 
 
 def test_measure_normalization_gain_rejects_all_silence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "silent.wav"
     source.touch()
@@ -185,7 +192,9 @@ def test_measure_normalization_gain_rejects_all_silence(
 
 
 def test_measure_normalization_gain_reuses_known_loudness(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -201,7 +210,9 @@ def test_measure_normalization_gain_reuses_known_loudness(
 
 @pytest.mark.parametrize("fingerprint", [(0, 0, 0), None])
 def test_measure_normalization_gain_ignores_stale_or_filtered_loudness(
-    make_tone: Callable[..., None], tmp_path: Path, fingerprint: tuple[int, int, int] | None
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    fingerprint: tuple[int, int, int] | None,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -211,7 +222,8 @@ def test_measure_normalization_gain_ignores_stale_or_filtered_loudness(
 
 
 def test_loudness_functions_respect_cancellation(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -223,7 +235,8 @@ def test_loudness_functions_respect_cancellation(
 
 
 def test_loudness_functions_accept_string_paths(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)

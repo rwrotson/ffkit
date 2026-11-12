@@ -24,7 +24,12 @@ def audio_files(paths: Iterable[StrPath]) -> list[Path]:
 
 
 def safe_name(
-    source: StrPath, tags: Mapping[str, str], *, index: int, width: int, extension: str = ".mp3"
+    source: StrPath,
+    tags: Mapping[str, str],
+    *,
+    index: int,
+    width: int,
+    extension: str = ".mp3",
 ) -> str:
     """Build a numbered filename from artist and title tags or the source name."""
     artist = tags.get("artist", "")

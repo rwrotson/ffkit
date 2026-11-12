@@ -33,7 +33,7 @@ def table(rows: Iterator[tuple[str, FieldInfo]]) -> list[str]:
     for variable, field in rows:
         description = field.description or ""
         lines.append(
-            f"| `{variable}` | {type_name(field)} | {default_value(field)} | {description} |"
+            f"| `{variable}` | {type_name(field)} | {default_value(field)} | {description} |",
         )
 
     return lines

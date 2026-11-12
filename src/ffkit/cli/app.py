@@ -101,7 +101,8 @@ app.add_typer(audio, name="audio")
 def root(
     ctx: typer.Context,
     output_format: Annotated[
-        OutputFormat, typer.Option("--output-format", "-f")
+        OutputFormat,
+        typer.Option("--output-format", "-f"),
     ] = OutputFormat.text,
     verbose: Annotated[bool, typer.Option("--verbose", "-V")] = False,
     show_version: Annotated[bool, typer.Option("--version", "-v", is_eager=True)] = False,
@@ -208,17 +209,20 @@ def trim_bounds_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter t
     ctx: typer.Context,
     source: Path,
     threshold_db: Annotated[
-        float, typer.Option("--threshold-db", min=-100, max=0)
+        float,
+        typer.Option("--threshold-db", min=-100, max=0),
     ] = DEFAULT_SILENCE_THRESHOLD_DB,
     min_duration: Annotated[
-        float, typer.Option("--min-duration", min=0, max=10)
+        float,
+        typer.Option("--min-duration", min=0, max=10),
     ] = DEFAULT_TRIM_MIN_DURATION,
     threshold_reference: Annotated[
         ThresholdReference,
         typer.Option("--threshold-reference", help="Full scale or the loudest window."),
     ] = ThresholdReference.full_scale,
     padding: Annotated[
-        float, typer.Option("--padding", min=0, max=1, help="Silence kept at trimmed edges.")
+        float,
+        typer.Option("--padding", min=0, max=1, help="Silence kept at trimmed edges."),
     ] = DEFAULT_SILENCE_PADDING,
 ) -> None:
     """Find audible start and end positions."""
@@ -251,7 +255,8 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     trim_end: Annotated[float | None, typer.Option("--trim-end")] = None,
     trim_silence: Annotated[bool, typer.Option("--trim-silence")] = False,
     silence_threshold_db: Annotated[
-        float, typer.Option("--silence-threshold-db", help="Level used by --trim-silence.")
+        float,
+        typer.Option("--silence-threshold-db", help="Level used by --trim-silence."),
     ] = DEFAULT_SILENCE_THRESHOLD_DB,
     silence_threshold_reference: Annotated[
         ThresholdReference,
@@ -263,16 +268,20 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     ] = DEFAULT_SILENCE_PADDING,
     limiter_ceiling_db: Annotated[float | None, typer.Option("--limiter-ceiling-db")] = None,
     cover: Annotated[
-        Path | None, typer.Option("--cover", help="Image to embed instead of the source cover.")
+        Path | None,
+        typer.Option("--cover", help="Image to embed instead of the source cover."),
     ] = None,
     no_cover: Annotated[
-        bool, typer.Option("--no-cover", help="Do not embed a cover image.")
+        bool,
+        typer.Option("--no-cover", help="Do not embed a cover image."),
     ] = False,
     tag: Annotated[
-        list[str] | None, typer.Option("--tag", help="Set a KEY=VALUE tag; repeatable.")
+        list[str] | None,
+        typer.Option("--tag", help="Set a KEY=VALUE tag; repeatable."),
     ] = None,
     bitrate_kbps: Annotated[
-        int, typer.Option("--bitrate-kbps", help="MP3 constant bit rate.")
+        int,
+        typer.Option("--bitrate-kbps", help="MP3 constant bit rate."),
     ] = 320,
     vbr_quality: Annotated[
         int | None,
@@ -320,10 +329,12 @@ def normalization_gain_command(
     ctx: typer.Context,
     source: Path,
     target_lufs: Annotated[
-        float, typer.Option("--target-lufs", min=-30, max=0)
+        float,
+        typer.Option("--target-lufs", min=-30, max=0),
     ] = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: Annotated[
-        float, typer.Option("--peak-ceiling-db", min=-20, max=-0.1)
+        float,
+        typer.Option("--peak-ceiling-db", min=-20, max=-0.1),
     ] = DEFAULT_PEAK_CEILING_DB,
 ) -> None:
     """Calculate a fixed gain that reaches the target loudness within the peak ceiling."""
@@ -356,7 +367,8 @@ def waveform_command(
     ctx: typer.Context,
     source: Path,
     peaks: Annotated[
-        bool, typer.Option("--peaks", help="Report full-scale peaks instead of loudness.")
+        bool,
+        typer.Option("--peaks", help="Report full-scale peaks instead of loudness."),
     ] = False,
 ) -> None:
     """Report a 400-point loudness envelope or peak envelope."""

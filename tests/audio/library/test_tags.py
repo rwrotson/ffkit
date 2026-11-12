@@ -10,7 +10,8 @@ def test_first_merge_keeps_every_current_tag() -> None:
     )
 
     assert merged == MergedTags(
-        tags={"title": "Source", "artist": "Custom"}, overrides={"artist": "Custom"}
+        tags={"title": "Source", "artist": "Custom"},
+        overrides={"artist": "Custom"},
     )
 
 

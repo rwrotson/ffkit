@@ -50,7 +50,8 @@ def test_stream_renders_and_seeks(make_tone: Callable[..., None], tmp_path: Path
 
 
 def test_stream_seeks_within_late_trim_interval(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -67,7 +68,9 @@ def test_stream_stops_at_trim_end(make_tone: Callable[..., None], tmp_path: Path
 
 
 def test_stream_resolves_silence_trim(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -82,7 +85,8 @@ def test_stream_resolves_silence_trim(
 
 
 def test_stream_reports_failed_encoder_and_closes_early(
-    make_tone: Callable[..., None], tmp_path: Path
+    make_tone: Callable[..., None],
+    tmp_path: Path,
 ) -> None:
     with pytest.raises(FFmpegProcessError):
         b"".join(stream(tmp_path / "missing.wav"))

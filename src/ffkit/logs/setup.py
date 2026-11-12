@@ -52,7 +52,7 @@ def _prepare_handlers(
                         structlog.processors.JSONRenderer(),
                     ],
                     foreign_pre_chain=shared_processors,
-                )
+                ),
             )
             prepared.append(fh)
     except Exception:

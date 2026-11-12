@@ -11,7 +11,10 @@ class Mp3Encoding(BaseModel):
     format: Literal["mp3"] = "mp3"
     bitrate_kbps: int = Field(default=320, ge=32, le=320, description="Constant bit rate")
     vbr_quality: int | None = Field(
-        default=None, ge=0, le=9, description="LAME VBR quality; 0 is best, replaces the bit rate"
+        default=None,
+        ge=0,
+        le=9,
+        description="LAME VBR quality; 0 is best, replaces the bit rate",
     )
 
     @property

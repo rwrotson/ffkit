@@ -9,7 +9,10 @@ from ffkit.runtime import FFmpegRuntime
 
 
 def extract_cover(
-    source: StrPath, destination: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime()
+    source: StrPath,
+    destination: StrPath,
+    *,
+    runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Path | None:
     """Atomically extract the first embedded image as JPEG; return None when there is none."""
     source, destination = Path(source), Path(destination)

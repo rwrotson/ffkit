@@ -34,7 +34,8 @@ def test_ffmpeg_section_loads_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = load_settings()
 
     assert settings.ffmpeg == FFmpegRuntime(
-        ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=60
+        ffmpeg_path="/opt/ffmpeg/bin/ffmpeg",
+        process_timeout=60,
     )
 
 

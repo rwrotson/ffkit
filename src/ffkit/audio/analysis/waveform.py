@@ -60,7 +60,8 @@ def peak_envelope(
         samples = np.frombuffer(data[:usable], dtype="<f4").reshape(-1, channels)
         frame_peaks = np.abs(samples).max(axis=1)
         bins = np.minimum(
-            (frame_index + np.arange(len(frame_peaks))) // frames_per_bin, WAVEFORM_BINS - 1
+            (frame_index + np.arange(len(frame_peaks))) // frames_per_bin,
+            WAVEFORM_BINS - 1,
         )
         starts = np.flatnonzero(np.diff(bins, prepend=-1))
         chunk_bins = bins[starts]

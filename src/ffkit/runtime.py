@@ -7,14 +7,22 @@ class FFmpegRuntime(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     ffmpeg_path: str = Field(
-        default="ffmpeg", min_length=1, description="FFmpeg executable; bare names use PATH"
+        default="ffmpeg",
+        min_length=1,
+        description="FFmpeg executable; bare names use PATH",
     )
     ffprobe_path: str = Field(
-        default="ffprobe", min_length=1, description="FFprobe executable; bare names use PATH"
+        default="ffprobe",
+        min_length=1,
+        description="FFprobe executable; bare names use PATH",
     )
     process_timeout: float = Field(
-        default=900, gt=0, description="Seconds an FFmpeg or FFprobe run may take"
+        default=900,
+        gt=0,
+        description="Seconds an FFmpeg or FFprobe run may take",
     )
     stream_idle_timeout: float = Field(
-        default=30, gt=0, description="Seconds a stream may go without output before failing"
+        default=30,
+        gt=0,
+        description="Seconds a stream may go without output before failing",
     )

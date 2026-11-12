@@ -51,12 +51,18 @@ def stop(process: subprocess.Popen[bytes], *, grace: float | None = None) -> Non
 
 
 def _spawn(
-    command: Sequence[str], *, stdout: int | IO[bytes], stderr: int | IO[bytes]
+    command: Sequence[str],
+    *,
+    stdout: int | IO[bytes],
+    stderr: int | IO[bytes],
 ) -> subprocess.Popen[bytes]:
     log.debug("ffmpeg_command command=%s", command)
     try:
         return subprocess.Popen(  # noqa: S603 - Fixed FFmpeg commands with separate arguments.
-            list(command), stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr
+            list(command),
+            stdin=subprocess.DEVNULL,
+            stdout=stdout,
+            stderr=stderr,
         )
     except FileNotFoundError as error:
         if error.filename not in {command[0], None}:
@@ -65,7 +71,9 @@ def _spawn(
 
 
 def _poll_interval(
-    deadline: float | None, idle_timeout: float | None, cancelled: Cancelled | None
+    deadline: float | None,
+    idle_timeout: float | None,
+    cancelled: Cancelled | None,
 ) -> float | None:
     limits = [] if cancelled is None else [CANCEL_POLL_INTERVAL]
     if deadline is not None:
@@ -110,11 +118,13 @@ def iter_output(  # noqa: C901 - One loop handles deadlines, idle time, and canc
                     now = time.monotonic()
                     if deadline is not None and now >= deadline:
                         raise FFmpegTimeoutError(
-                            f"Did not finish within {timeout} s", command=command
+                            f"Did not finish within {timeout} s",
+                            command=command,
                         )
                     if idle_timeout is not None and now - idle_since >= idle_timeout:
                         raise FFmpegTimeoutError(
-                            f"Produced no output for {idle_timeout} s", command=command
+                            f"Produced no output for {idle_timeout} s",
+                            command=command,
                         )
                     if not selector.select(_poll_interval(deadline, idle_timeout, cancelled)):
                         continue
@@ -132,7 +142,8 @@ def iter_output(  # noqa: C901 - One loop handles deadlines, idle time, and canc
                 returncode = process.wait(timeout=remaining)
             except subprocess.TimeoutExpired as error:
                 raise FFmpegTimeoutError(
-                    f"Did not exit within {remaining:.1f} s", command=command
+                    f"Did not exit within {remaining:.1f} s",
+                    command=command,
                 ) from error
             if returncode:
                 stderr = error_tail(errors) if pipe == "stdout" else tail.decode(errors="replace")

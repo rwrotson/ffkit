@@ -188,3 +188,4 @@ MyPy runs with `strict = true` and the Pydantic plugin over `src/`, `tests/`, an
 - A comment placed above a line or group of lines applies only to it. Separate that line or group from the code before and after it with a blank line, unless it starts or ends a block, so the comment's scope is clear. At module and class level, give each commented constant or attribute its own block, and keep uncommented related definitions together in one block.
 - In long functions, methods, and tests, separate logical steps (input validation, setup, command building, execution, result handling; arrange, act, assert) with a single blank line. Do not add comments to label the steps. Keep short functions compact.
 - Prefer clearer names and more precise types over comments that restate code.
+- When a signature, call, or literal does not fit on one line, put each item on its own line with a trailing comma. Ruff rule `COM812` enforces this with the formatter.

@@ -70,7 +70,10 @@ def estimate_tempo(
 
 
 def _onset_strength(
-    source: StrPath, *, cancelled: Cancelled | None, runtime: FFmpegRuntime
+    source: StrPath,
+    *,
+    cancelled: Cancelled | None,
+    runtime: FFmpegRuntime,
 ) -> FloatArray:
     """Return the low-pass filtered log-magnitude spectral flux at ``ONSET_RATE``."""
     command = [
@@ -234,7 +237,8 @@ def _support(windows: list[tuple[float, float, FloatArray]], bpm: float) -> floa
 
 
 def _segments(
-    windows: list[tuple[float, float, FloatArray]], tempo: float
+    windows: list[tuple[float, float, FloatArray]],
+    tempo: float,
 ) -> tuple[TempoSegment, ...]:
     """Split folded window tempi into segments at sustained tempo changes."""
     times = [time for time, _, _ in windows]

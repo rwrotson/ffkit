@@ -27,7 +27,10 @@ def _hop_energy(data: bytes) -> bytes:
 
 @contextmanager
 def energy(
-    source: StrPath, *, cancelled: Cancelled | None, runtime: FFmpegRuntime
+    source: StrPath,
+    *,
+    cancelled: Cancelled | None,
+    runtime: FFmpegRuntime,
 ) -> Iterator[memoryview[float]]:
     """Yield mean absolute amplitude per 0.1 s hop, kept in a temporary file for long sources."""
     command = [

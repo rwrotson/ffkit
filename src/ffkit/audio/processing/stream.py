@@ -53,7 +53,12 @@ def stream(
 
 
 def _stream(
-    source: Path, effects: Effects, start: float, encoding: Encoding, *, runtime: FFmpegRuntime
+    source: Path,
+    effects: Effects,
+    start: float,
+    encoding: Encoding,
+    *,
+    runtime: FFmpegRuntime,
 ) -> Generator[bytes]:
     effects = resolve_silence_trim(effects, source, runtime=runtime)
     seeked = _seeked_effects(effects, start)

@@ -23,7 +23,10 @@ def test_import_leaves_global_logging_unconfigured() -> None:
     )
     # Run in a fresh interpreter: this process already configured logging in other tests.
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
 
     assert result.stdout.split() == ["0", "False"]
@@ -34,7 +37,10 @@ def test_import_does_not_require_app_extra() -> None:
         "import sys, ffkit; print('pydantic_settings' in sys.modules, 'structlog' in sys.modules)"
     )
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     assert result.stdout.split() == ["False", "False"]
 
@@ -49,7 +55,10 @@ def test_logs_package_reports_missing_extra() -> None:
     )
 
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
 
     assert result.stdout.startswith(f"{missing} ")
