@@ -19,7 +19,7 @@ from ffkit import (
     SourceNotFoundError,
 )
 from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
-from ffkit.audio import Effects, audio_filters, measure_loudness, probe, render
+from ffkit.audio import Effects, Loudness, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.audio.processing.render")
 LIMITED = Effects(limiter_ceiling_db=-1)
@@ -200,7 +200,7 @@ def test_render_limiter_checks_encoded_peak(make_tone: Callable[..., None], tmp_
     target = tmp_path / "limited.mp3"
     render(source, target, effects)
 
-    _, peak = measure_loudness(target)
+    peak = measure_loudness(target).true_peak_db
     assert peak is not None
     assert peak <= -0.99
 
@@ -211,7 +211,7 @@ def test_render_retries_from_source(
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
     target = tmp_path / "out.mp3"
-    measured = iter([(None, 0.0), (None, -2.0)])
+    measured = iter([Loudness(lufs=None, true_peak_db=0.0), Loudness(lufs=None, true_peak_db=-2.0)])
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: next(measured))
     commands: list[Sequence[str]] = []
 
@@ -227,7 +227,11 @@ def test_render_retries_from_source(
     assert target.exists()
 
     target.write_bytes(b"existing")
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 0.0))
+    monkeypatch.setattr(
+        render_module,
+        "measure_loudness",
+        lambda path, **kwargs: Loudness(lufs=None, true_peak_db=0.0),
+    )
     with pytest.raises(PeakCeilingError, match="exceeds"):
         render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"
@@ -322,12 +326,20 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
 
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, None))
+    monkeypatch.setattr(
+        render_module,
+        "measure_loudness",
+        lambda path, **kwargs: Loudness(lufs=None, true_peak_db=None),
+    )
     with pytest.raises(FFmpegError, match="Could not measure encoded true peak"):
         render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"
 
-    monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 30.0))
+    monkeypatch.setattr(
+        render_module,
+        "measure_loudness",
+        lambda path, **kwargs: Loudness(lufs=None, true_peak_db=30.0),
+    )
     with pytest.raises(PeakCeilingError, match="ceiling could not be reached"):
         render(source, target, LIMITED)
     assert target.read_bytes() == b"existing"

@@ -143,7 +143,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             if ceiling is None or effective_ceiling is None:
                 break
             _check_cancelled(cancelled)
-            _, peak = measure_loudness(temporary, runtime=runtime)
+            peak = measure_loudness(temporary, runtime=runtime).true_peak_db
             if peak is None:
                 raise FFmpegError("Could not measure encoded true peak")
             if peak <= ceiling:

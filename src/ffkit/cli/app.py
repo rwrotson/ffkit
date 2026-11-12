@@ -17,10 +17,10 @@ from ffkit.audio import (
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
     Effects,
-    calculate_normalization_gain,
     detect_trim_bounds,
     extract_cover,
     measure_loudness,
+    measure_normalization_gain,
     probe,
     render,
 )
@@ -173,11 +173,11 @@ def probe_command(ctx: typer.Context, source: Path) -> None:
 @audio.command("loudness")
 def loudness_command(ctx: typer.Context, source: Path) -> None:
     """Measure integrated loudness and true peak."""
-    lufs, peak = measure_loudness(input_file(source), runtime=cli_state(ctx).runtime)
+    loudness = measure_loudness(input_file(source), runtime=cli_state(ctx).runtime)
     emit(
         ctx,
-        {"loudness_lufs": lufs, "true_peak_db": peak},
-        [f"Loudness: {lufs} LUFS", f"True peak: {peak} dBTP"],
+        {"loudness_lufs": loudness.lufs, "true_peak_db": loudness.true_peak_db},
+        [f"Loudness: {loudness.lufs} LUFS", f"True peak: {loudness.true_peak_db} dBTP"],
     )
 
 
@@ -196,13 +196,17 @@ def trim_bounds_command(
     if min_duration == 0:
         raise typer.BadParameter("must be greater than 0", param_hint="'--min-duration'")
 
-    start, end = detect_trim_bounds(
+    bounds = detect_trim_bounds(
         input_file(source),
         threshold_db=threshold_db,
         min_duration=min_duration,
         runtime=cli_state(ctx).runtime,
     )
-    emit(ctx, {"start": start, "end": end}, [f"Start: {start} s", f"End: {end} s"])
+    emit(
+        ctx,
+        {"start": bounds.start, "end": bounds.end},
+        [f"Start: {bounds.start} s", f"End: {bounds.end} s"],
+    )
 
 
 @audio.command("render")
@@ -271,7 +275,7 @@ def normalization_gain_command(
     ] = DEFAULT_PEAK_CEILING_DB,
 ) -> None:
     """Calculate a fixed gain that reaches the target loudness within the peak ceiling."""
-    gain = calculate_normalization_gain(
+    gain = measure_normalization_gain(
         input_file(source),
         target_lufs=target_lufs,
         peak_ceiling_db=peak_ceiling_db,

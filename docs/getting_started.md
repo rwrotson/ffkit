@@ -75,7 +75,7 @@ render(source, Path("song.mp3"), effects, tags={"title": "Song"})
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `SourceLoudness`, and `WaveformAnalysis`; they never modify their arguments. The
+`AudioInfo`, `Loudness`, `TrimBounds`, and `WaveformAnalysis`; they never modify their arguments. The
 application keeps track state in its own models.
 
 The source must always be the original audio file. To change processing, change `Effects` and render
@@ -116,8 +116,8 @@ runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=36
 info = probe(Path("song.flac"), runtime=runtime)
 ```
 
-`analyze_loudness()` returns source loudness, true peak, and the file fingerprint;
-`calculate_normalization_gain(known=...)` reuses that result while no filters apply and the file is
+`measure_loudness()` returns loudness, true peak, and, without filters, the file fingerprint;
+`measure_normalization_gain(known=...)` reuses that result while no filters apply and the file is
 unchanged.
 
 Configure logging in the application, or use the bundled helper from the `logs` extra:

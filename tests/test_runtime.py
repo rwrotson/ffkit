@@ -7,13 +7,12 @@ from pydantic import ValidationError
 
 from ffkit import FFmpegNotFoundError, FFmpegRuntime, FFmpegTimeoutError
 from ffkit.audio import (
-    analyze_loudness,
     analyze_peak_waveform,
     analyze_waveform_tempo,
-    calculate_normalization_gain,
     detect_trim_bounds,
     extract_cover,
     measure_loudness,
+    measure_normalization_gain,
     probe,
     render,
     stream_mp3,
@@ -66,9 +65,8 @@ ffprobe_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
 ]
 ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
     lambda source, _, runtime: measure_loudness(source, runtime=runtime),
-    lambda source, _, runtime: analyze_loudness(source, runtime=runtime),
     lambda source, _, runtime: analyze_waveform_tempo(source, 1, runtime=runtime),
-    lambda source, _, runtime: calculate_normalization_gain(source, runtime=runtime),
+    lambda source, _, runtime: measure_normalization_gain(source, runtime=runtime),
     lambda source, _, runtime: detect_trim_bounds(source, duration=1, runtime=runtime),
     lambda source, out, runtime: render(source, out / "out.mp3", runtime=runtime),
     lambda source, _, runtime: b"".join(stream_mp3(source, runtime=runtime)),

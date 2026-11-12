@@ -2,14 +2,13 @@
 
 from .analysis.cover import embedded_cover
 from .analysis.loudness import (
-    SourceLoudness,
-    analyze_loudness,
-    calculate_normalization_gain,
+    Loudness,
+    gain_for_target,
     measure_loudness,
-    normalization_gain,
+    measure_normalization_gain,
 )
 from .analysis.probe import AudioInfo, probe
-from .analysis.silence import detect_trim_bounds
+from .analysis.silence import TrimBounds, detect_trim_bounds
 from .analysis.waveform import (
     TempoSegment,
     WaveformAnalysis,
@@ -38,22 +37,22 @@ __all__ = [
     "DEFAULT_TRIM_MIN_DURATION",
     "AudioInfo",
     "Effects",
+    "Loudness",
     "MergedTags",
-    "SourceLoudness",
     "TempoSegment",
+    "TrimBounds",
     "WaveformAnalysis",
-    "analyze_loudness",
     "analyze_peak_waveform",
     "analyze_waveform_tempo",
     "audio_files",
     "audio_filters",
-    "calculate_normalization_gain",
     "detect_trim_bounds",
     "embedded_cover",
     "extract_cover",
+    "gain_for_target",
     "measure_loudness",
+    "measure_normalization_gain",
     "merge_tags",
-    "normalization_gain",
     "probe",
     "render",
     "safe_name",

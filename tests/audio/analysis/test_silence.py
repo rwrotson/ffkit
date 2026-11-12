@@ -14,7 +14,7 @@ from ffkit import (
     SilentAudioError,
 )
 from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT
-from ffkit.audio import Effects, detect_trim_bounds, probe
+from ffkit.audio import Effects, TrimBounds, detect_trim_bounds, probe
 from ffkit.audio.analysis.silence import SilenceScan
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
@@ -24,7 +24,7 @@ TOOLS = {"ffmpeg": "ffmpeg", "timeout": 30.0}
 def test_trim_bounds_of_full_tone(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    assert detect_trim_bounds(source, 2.0) == (0.0, None)
+    assert detect_trim_bounds(source, 2.0) == TrimBounds(start=0.0)
 
 
 def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
@@ -50,13 +50,13 @@ def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
         check=True,
     )
 
-    start, end = detect_trim_bounds(source)
-    assert 0.9 < start < 1.1
-    assert end is not None
-    assert 3.9 < end < 4.1
+    bounds = detect_trim_bounds(source)
+    assert 0.9 < bounds.start < 1.1
+    assert bounds.end is not None
+    assert 3.9 < bounds.end < 4.1
 
     duration = probe(source).duration
-    assert detect_trim_bounds(source, duration) == (start, end)
+    assert detect_trim_bounds(source, duration) == bounds
 
 
 def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
@@ -87,8 +87,8 @@ def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
     )
 
     duration = probe(source).duration
-    assert detect_trim_bounds(source) == (0.0, None)
-    assert detect_trim_bounds(source, duration) == (0.0, None)
+    assert detect_trim_bounds(source) == TrimBounds(start=0.0)
+    assert detect_trim_bounds(source, duration) == TrimBounds(start=0.0)
 
 
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:

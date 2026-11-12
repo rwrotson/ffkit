@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
 from ffkit import FFmpegNotFoundError, FFmpegProcessError, FFmpegRuntime
-from ffkit.audio import AudioInfo, Effects
+from ffkit.audio import AudioInfo, Effects, Loudness, TrimBounds
 from ffkit.cli.app import app
 from ffkit.main import main
 
@@ -116,8 +116,14 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
-    monkeypatch.setattr(cli_app, "measure_loudness", lambda path, *, runtime: (-14.2, -1.1))
-    monkeypatch.setattr(cli_app, "detect_trim_bounds", lambda path, **kwargs: (1.0, 9.0))
+    monkeypatch.setattr(
+        cli_app,
+        "measure_loudness",
+        lambda path, *, runtime: Loudness(lufs=-14.2, true_peak_db=-1.1),
+    )
+    monkeypatch.setattr(
+        cli_app, "detect_trim_bounds", lambda path, **kwargs: TrimBounds(start=1.0, end=9.0)
+    )
 
     loudness = runner.invoke(app, ["--output-format", "json", "audio", "loudness", str(source)])
     bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
@@ -236,7 +242,7 @@ def test_missing_ffmpeg_is_processing_error(
     source = tmp_path / "source.mp3"
     source.touch()
 
-    def missing_tool(path: Path, *, runtime: FFmpegRuntime) -> tuple[float | None, float | None]:
+    def missing_tool(path: Path, *, runtime: FFmpegRuntime) -> Loudness:
         raise FFmpegNotFoundError("ffmpeg")
 
     monkeypatch.setattr(cli_app, "measure_loudness", missing_tool)
@@ -306,7 +312,7 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         calls.append((target_lufs, peak_ceiling_db))
         return 2.5
 
-    monkeypatch.setattr(cli_app, "calculate_normalization_gain", fake_gain)
+    monkeypatch.setattr(cli_app, "measure_normalization_gain", fake_gain)
     result = runner.invoke(
         app,
         ["-f", "json", "audio", "normalization-gain", str(source), "--target-lufs", "-16"],
@@ -329,9 +335,9 @@ def test_commands_use_configured_runtime(monkeypatch: pytest.MonkeyPatch, tmp_pa
     monkeypatch.setenv("FFKIT_FFMPEG__PROCESS_TIMEOUT", "60")
     runtimes: list[FFmpegRuntime] = []
 
-    def fake_loudness(path: Path, *, runtime: FFmpegRuntime) -> tuple[float, float]:
+    def fake_loudness(path: Path, *, runtime: FFmpegRuntime) -> Loudness:
         runtimes.append(runtime)
-        return -14.0, -1.0
+        return Loudness(lufs=-14.0, true_peak_db=-1.0)
 
     monkeypatch.setattr(cli_app, "measure_loudness", fake_loudness)
     result = runner.invoke(app, ["audio", "loudness", str(source)])

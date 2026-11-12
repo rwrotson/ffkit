@@ -3,7 +3,7 @@ import math
 from collections.abc import Sequence
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import media_path, source_fingerprint
 from ffkit._ffmpeg.process import run
@@ -20,14 +20,18 @@ from ffkit.errors import SilentAudioError, SourceChangedError
 from ffkit.runtime import FFmpegRuntime
 
 
-class SourceLoudness(BaseModel):
-    """Source loudness, true peak, and the fingerprint of the measured file."""
+class Loudness(BaseModel):
+    """Integrated loudness and true peak; ``None`` when FFmpeg reports no finite value.
+
+    ``fingerprint`` identifies the measured file and is set only for unfiltered measurements, which
+    ``measure_normalization_gain(known=...)`` can reuse.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    lufs: float | None
-    true_peak_db: float | None
-    fingerprint: tuple[int, int, int]
+    lufs: float | None = Field(allow_inf_nan=False)
+    true_peak_db: float | None = Field(allow_inf_nan=False)
+    fingerprint: tuple[int, int, int] | None = None
 
 
 def measure_loudness(
@@ -35,8 +39,9 @@ def measure_loudness(
     *,
     filters: Sequence[str] = (),
     runtime: FFmpegRuntime = FFmpegRuntime(),
-) -> tuple[float | None, float | None]:
+) -> Loudness:
     """Measure integrated LUFS and true peak after applying filters before loudnorm."""
+    fingerprint = source_fingerprint(path)
     chain = [
         *filters,
         f"loudnorm=I={DEFAULT_TARGET_LUFS}:TP={LOUDNORM_TRUE_PEAK_DB}"
@@ -60,60 +65,58 @@ def measure_loudness(
     ]
     stderr = run(command, pipe="stderr", timeout=runtime.process_timeout).decode(errors="replace")
 
+    if source_fingerprint(path) != fingerprint:
+        raise SourceChangedError("Source audio changed during loudness measurement")
+
     marker = stderr.rfind('"input_i"')
-    if marker < 0:
-        return None, None
-    left = stderr.rfind("{", 0, marker)
-    right = stderr.find("}", marker)
-    data = json.loads(stderr[left : right + 1])
+    data: dict[str, object] = {}
+    if marker >= 0:
+        left = stderr.rfind("{", 0, marker)
+        right = stderr.find("}", marker)
+        data = json.loads(stderr[left : right + 1])
 
-    def finite(value: object) -> float | None:
-        try:
-            number = float(str(value))
-            return number if math.isfinite(number) else None
-        except ValueError:
-            return None
-
-    return finite(data.get("input_i")), finite(data.get("input_tp"))
+    return Loudness(
+        lufs=_finite(data.get("input_i")),
+        true_peak_db=_finite(data.get("input_tp")),
+        fingerprint=None if filters else fingerprint,
+    )
 
 
-def analyze_loudness(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> SourceLoudness:
-    """Measure source loudness and record the file fingerprint for normalization reuse."""
-    fingerprint = source_fingerprint(source)
-    lufs, peak = measure_loudness(source, runtime=runtime)
-    if source_fingerprint(source) != fingerprint:
-        raise SourceChangedError("Source audio changed during loudness analysis")
-    return SourceLoudness(lufs=lufs, true_peak_db=peak, fingerprint=fingerprint)
+def _finite(value: object) -> float | None:
+    try:
+        number = float(str(value))
+    except ValueError:
+        return None
+    return number if math.isfinite(number) else None
 
 
-def normalization_gain(
-    lufs: float | None,
-    peak: float | None,
-    target: float = DEFAULT_TARGET_LUFS,
-    ceiling: float = DEFAULT_PEAK_CEILING_DB,
+def gain_for_target(
+    loudness: Loudness,
+    *,
+    target_lufs: float = DEFAULT_TARGET_LUFS,
+    peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
 ) -> float:
-    """Return a fixed gain, keeping the measured true peak below the ceiling."""
-    if lufs is None or not math.isfinite(lufs):
+    """Return a fixed gain in 0.1 dB steps that reaches the target within the peak ceiling."""
+    lufs, peak = loudness.lufs, loudness.true_peak_db
+    if lufs is None:
         raise SilentAudioError("Cannot measure track loudness")
-    gain = target - lufs
+    gain = target_lufs - lufs
     if peak is not None:
-        if not math.isfinite(peak):
-            raise SilentAudioError("Cannot measure track true peak")
-        gain = min(gain, ceiling - peak)
+        gain = min(gain, peak_ceiling_db - peak)
 
     rounded = round(gain, 1)
-    if peak is not None and rounded > ceiling - peak:
+    if peak is not None and rounded > peak_ceiling_db - peak:
         rounded = round(rounded - 0.1, 1)
     return rounded
 
 
-def calculate_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmpeg runtime.
+def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmpeg runtime.
     source: Path,
     effects: Effects | None = None,
+    *,
     target_lufs: float = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
-    *,
-    known: SourceLoudness | None = None,
+    known: Loudness | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> float:
     """Measure processed audio and calculate a fixed gain within the true peak ceiling.
@@ -132,13 +135,11 @@ def calculate_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FF
         measured = measured.replace(trim_end=trailing_end)
     filters = audio_filters(measured, streaming=True)
 
-    lufs: float | None
-    peak: float | None
     if not filters and known is not None and known.fingerprint == fingerprint:
-        lufs, peak = known.lufs, known.true_peak_db
+        loudness = known
     else:
-        lufs, peak = measure_loudness(source, filters=filters, runtime=runtime)
+        loudness = measure_loudness(source, filters=filters, runtime=runtime)
 
     if source_fingerprint(source) != fingerprint:
         raise SourceChangedError("Source audio changed during normalization")
-    return normalization_gain(lufs, peak, target_lufs, peak_ceiling_db)
+    return gain_for_target(loudness, target_lufs=target_lufs, peak_ceiling_db=peak_ceiling_db)

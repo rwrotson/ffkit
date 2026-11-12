@@ -86,10 +86,10 @@ from pathlib import Path
 
 from ffkit.audio import (
     Effects,
-    analyze_loudness,
     audio_filters,
-    calculate_normalization_gain,
     extract_cover,
+    measure_loudness,
+    measure_normalization_gain,
     probe,
     render,
     stream_mp3,
@@ -99,8 +99,8 @@ source = Path("song.flac")
 info = probe(source)
 effects = Effects(gain_db=3)
 filters = audio_filters(effects)
-loudness = analyze_loudness(source)
-gain = calculate_normalization_gain(source, effects, known=loudness)
+loudness = measure_loudness(source)
+gain = measure_normalization_gain(source, effects, known=loudness)
 render(source, Path("song.mp3"), effects, tags={"title": "Song"})
 chunks = stream_mp3(source, effects, start=0.5)
 cover = extract_cover(source, Path("cover.jpg"))
@@ -110,7 +110,7 @@ render(source, Path("song-updated.mp3"), louder)
 ```
 
 Functions take source paths, `Effects`, and options, and return immutable results such as
-`AudioInfo`, `SourceLoudness`, and `WaveformAnalysis`; they never modify their arguments. The
+`AudioInfo`, `Loudness`, `TrimBounds`, and `WaveformAnalysis`; they never modify their arguments. The
 application keeps track state, such as tags, covers, and analysis results, in its own models.
 
 Always pass the original audio file as the source. To change processing, change `Effects` and render
@@ -157,9 +157,12 @@ info = probe(Path("song.flac"), runtime=runtime)
 ```
 
 Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
-would otherwise be exceeded. `analyze_loudness()` returns source loudness, true peak, and the file's
-`(st_size, st_mtime_ns, st_ctime_ns)` fingerprint. `calculate_normalization_gain(known=...)` reuses
+would otherwise be exceeded. `measure_loudness()` returns a `Loudness` with integrated loudness and
+true peak; for an unfiltered measurement it also records the file's
+`(st_size, st_mtime_ns, st_ctime_ns)` fingerprint. `measure_normalization_gain(known=...)` reuses
 that result instead of measuring only when no filters apply and the fingerprint still matches.
+`gain_for_target()` calculates the same gain from a `Loudness` without running FFmpeg. Measuring a
+file that changes during the run raises `SourceChangedError`.
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application with the `logs` extra can use the bundled helper:
 

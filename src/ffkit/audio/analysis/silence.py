@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from ffkit._ffmpeg.args import ffmpeg_number, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import probe
@@ -17,6 +19,15 @@ MIN_TRAILING_SILENCE = 0.01
 _EVENT = re.compile(rb"silence_(start|end): ([-\d.]+)")
 TRIM_EDGE_TOLERANCE = 0.1
 _DECODED = re.compile(rb"^out_time_us=(\d+)$")
+
+
+class TrimBounds(BaseModel):
+    """Audible start and end of a source; ``end`` is ``None`` when audio lasts until the end."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start: float = Field(ge=0)
+    end: float | None = Field(default=None, gt=0)
 
 
 @dataclass
@@ -148,7 +159,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     cancelled: Cancelled | None = None,
     *,
     runtime: FFmpegRuntime = FFmpegRuntime(),
-) -> tuple[float, float | None]:
+) -> TrimBounds:
     """Find audible bounds; retain pauses inside the track."""
     if duration is None:
         duration = probe(path, runtime=runtime).duration
@@ -181,7 +192,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     end = scan.trailing_start()
     if end is not None and end <= start:
         raise SilentAudioError("Track contains no audible audio")
-    return round(start, 3), round(end, 3) if end is not None else None
+    return TrimBounds(start=round(start, 3), end=None if end is None else round(end, 3))
 
 
 def trailing_trim_end(

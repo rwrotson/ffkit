@@ -3,16 +3,16 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from ffkit import SilentAudioError, SourceChangedError
 from ffkit.audio import (
     AudioInfo,
     Effects,
-    SourceLoudness,
-    analyze_loudness,
-    calculate_normalization_gain,
+    Loudness,
+    gain_for_target,
     measure_loudness,
-    normalization_gain,
+    measure_normalization_gain,
 )
 
 silence_module = importlib.import_module("ffkit.audio.analysis.silence")
@@ -22,72 +22,100 @@ loudness_module = importlib.import_module("ffkit.audio.analysis.loudness")
 def test_measure_loudness_on_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    lufs, peak = measure_loudness(source)
-    assert lufs is not None
-    assert peak is not None
-    louder, _ = measure_loudness(source, filters=["volume=6dB"])
-    assert louder is not None
-    assert 5 < louder - lufs < 7
+
+    loudness = measure_loudness(source)
+    louder = measure_loudness(source, filters=["volume=6dB"])
+
+    assert loudness.lufs is not None
+    assert loudness.true_peak_db is not None
+    stat = source.stat()
+    assert loudness.fingerprint == (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    assert louder.lufs is not None
+    assert 5 < louder.lufs - loudness.lufs < 7
+    assert louder.fingerprint is None
 
 
-def test_normalization_gain_limits_peak() -> None:
-    assert normalization_gain(-20, -5) == 4.0
-    assert normalization_gain(-18, None) == 4.0
-    assert normalization_gain(-18, -10, target=-16, ceiling=-3) == 2.0
-    assert normalization_gain(-14, -0.96) == -0.1
-    assert normalization_gain(-18, -5.04) == 4.0
-    assert normalization_gain(-18, -4.96) == 3.9
+def test_gain_for_target_limits_peak() -> None:
+    def gain(lufs: float | None, peak: float | None, **kwargs: float) -> float:
+        return gain_for_target(Loudness(lufs=lufs, true_peak_db=peak), **kwargs)
 
+    assert gain(-20, -5) == 4.0
+    assert gain(-18, None) == 4.0
+    assert gain(-18, -10, target_lufs=-16, peak_ceiling_db=-3) == 2.0
+    assert gain(-14, -0.96) == -0.1
+    assert gain(-18, -5.04) == 4.0
+    assert gain(-18, -4.96) == 3.9
     with pytest.raises(SilentAudioError, match="Cannot measure"):
-        normalization_gain(None, None)
-    with pytest.raises(SilentAudioError, match="Cannot measure"):
-        normalization_gain(float("nan"), None)
-    with pytest.raises(SilentAudioError, match="true peak"):
-        normalization_gain(-14, float("inf"))
+        gain(None, None)
+
+
+def test_loudness_rejects_nonfinite_values() -> None:
+    with pytest.raises(ValidationError):
+        Loudness(lufs=float("nan"), true_peak_db=None)
+    with pytest.raises(ValidationError):
+        Loudness(lufs=-14, true_peak_db=float("inf"))
 
 
 def test_measure_loudness_handles_missing_and_nonfinite_values(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    source = tmp_path / "song.wav"
+    source.touch()
     reports = iter([b"no loudnorm report", b'{"input_i": "inf", "input_tp": "not a number"}'])
     monkeypatch.setattr(loudness_module, "run", lambda *args, **kwargs: next(reports))
-    assert measure_loudness(Path("song.wav")) == (None, None)
-    assert measure_loudness(Path("song.wav")) == (None, None)
+
+    assert measure_loudness(source).lufs is None
+    assert measure_loudness(source).true_peak_db is None
 
 
-def test_calculate_normalization_gain_uses_processed_audio(
+def test_measure_loudness_rejects_changed_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "song.wav"
+    source.touch()
+
+    def change_source(*args: object, **kwargs: object) -> bytes:
+        source.write_bytes(b"changed")
+        return b""
+
+    monkeypatch.setattr(loudness_module, "run", change_source)
+    with pytest.raises(SourceChangedError, match="changed during loudness measurement"):
+        measure_loudness(source)
+
+
+def test_measure_normalization_gain_uses_processed_audio(
     make_tone: Callable[..., None], tmp_path: Path
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    known = analyze_loudness(source)
+    known = measure_loudness(source)
     effects = Effects()
 
-    expected = calculate_normalization_gain(source, effects, known=known)
+    expected = measure_normalization_gain(source, effects, known=known)
     effects = effects.replace(gain_db=6)
-    assert calculate_normalization_gain(source, effects, known=known) == expected
+    assert measure_normalization_gain(source, effects, known=known) == expected
     effects = effects.replace(trim_start=0.2)
-    assert isinstance(calculate_normalization_gain(source, effects, known=known), float)
+    assert isinstance(measure_normalization_gain(source, effects, known=known), float)
     effects = effects.replace(trim_silence=True)
-    assert isinstance(calculate_normalization_gain(source, effects), float)
+    assert isinstance(measure_normalization_gain(source, effects), float)
 
 
-def test_calculate_normalization_gain_rejects_changed_source(
+def test_measure_normalization_gain_rejects_changed_source(
     make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
 
-    def change_source(path: Path, **kwargs: object) -> tuple[float, float]:
+    def change_source(path: Path, **kwargs: object) -> Loudness:
         path.touch()
-        return -18, -5
+        return Loudness(lufs=-18, true_peak_db=-5)
 
     monkeypatch.setattr(loudness_module, "measure_loudness", change_source)
     with pytest.raises(SourceChangedError, match="Source audio changed"):
-        calculate_normalization_gain(source)
+        measure_normalization_gain(source)
 
 
-def test_calculate_normalization_gain_rejects_all_silence(
+def test_measure_normalization_gain_rejects_all_silence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "silent.wav"
@@ -97,49 +125,30 @@ def test_calculate_normalization_gain_rejects_all_silence(
     monkeypatch.setattr(silence_module, "probe", lambda path, **kwargs: AudioInfo(duration=1.0))
 
     with pytest.raises(SilentAudioError, match="no audible audio"):
-        calculate_normalization_gain(source, Effects(trim_silence=True))
+        measure_normalization_gain(source, Effects(trim_silence=True))
 
 
-def test_analyze_loudness_provides_normalization_cache(
+def test_measure_normalization_gain_reuses_known_loudness(
     make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-
-    known = analyze_loudness(source)
-    assert known.lufs is not None
-    assert known.true_peak_db is not None
-    stat = source.stat()
-    assert known.fingerprint == (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
-    expected = calculate_normalization_gain(source)
+    known = measure_loudness(source)
+    expected = measure_normalization_gain(source)
 
     def unexpected(*args: object, **kwargs: object) -> None:
         raise AssertionError("measure_loudness should not run")
 
     monkeypatch.setattr(loudness_module, "measure_loudness", unexpected)
-    assert calculate_normalization_gain(source, known=known) == expected
+    assert measure_normalization_gain(source, known=known) == expected
 
 
-def test_normalization_gain_ignores_stale_cache(
-    make_tone: Callable[..., None], tmp_path: Path
+@pytest.mark.parametrize("fingerprint", [(0, 0, 0), None])
+def test_measure_normalization_gain_ignores_stale_or_filtered_loudness(
+    make_tone: Callable[..., None], tmp_path: Path, fingerprint: tuple[int, int, int] | None
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source)
-    stale = SourceLoudness(lufs=-60, true_peak_db=-50, fingerprint=(0, 0, 0))
+    stale = Loudness(lufs=-60, true_peak_db=-50, fingerprint=fingerprint)
 
-    assert calculate_normalization_gain(source, known=stale) == calculate_normalization_gain(source)
-
-
-def test_analyze_loudness_rejects_changed_source(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = tmp_path / "source.wav"
-    make_tone(source)
-
-    def change_source(path: Path, **kwargs: object) -> tuple[float, float]:
-        source.write_bytes(source.read_bytes() + b"x")
-        return -20.0, -3.0
-
-    monkeypatch.setattr(loudness_module, "measure_loudness", change_source)
-    with pytest.raises(SourceChangedError, match="changed during loudness analysis"):
-        analyze_loudness(source)
+    assert measure_normalization_gain(source, known=stale) == measure_normalization_gain(source)
