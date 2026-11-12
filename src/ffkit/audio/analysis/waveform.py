@@ -11,6 +11,8 @@ from ffkit.runtime import FFmpegRuntime
 WAVEFORM_BINS = 400
 PEAK_OVERSAMPLING = 4
 
+type Waveform = tuple[float, ...]
+
 
 def peak_envelope(
     source: StrPath,
@@ -18,7 +20,7 @@ def peak_envelope(
     info: AudioInfo | None = None,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
-) -> tuple[float, ...]:
+) -> Waveform:
     """Measure a full-scale peak envelope from four-times oversampled audio.
 
     The source is probed for its duration, sample rate, and channels unless ``info`` is given.
@@ -76,7 +78,7 @@ def waveform(
     *,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
-) -> tuple[float, ...]:
+) -> Waveform:
     """Build a compact loudness envelope of up to 400 values scaled to the loudest point."""
     with energy(source, cancelled=cancelled, runtime=runtime) as hops:
         if not len(hops):
