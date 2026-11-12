@@ -10,10 +10,12 @@ from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
 from ffkit import FFmpegNotFoundError, FFmpegProcessError, FFmpegRuntime
-from ffkit.audio import AudioInfo, Effects, Loudness, TrimBounds
+from ffkit.audio import AudioInfo, Effects, Loudness, Mp3Encoding, TempoSegment, TrimBounds
 from ffkit.cli.app import app
+from ffkit.cli.settings import Settings
 from ffkit.main import main
 
+LOUDNESS = Loudness(lufs=-14.0, true_peak_db=-1.0)
 runner = CliRunner()
 
 
@@ -102,6 +104,11 @@ def test_probe_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert json.loads(result.stdout) == {
         "path": str(source),
         "duration": 12.5,
+        "sample_rate": 44100,
+        "channels": 1,
+        "codec": "pcm_s16le",
+        "bit_rate": None,
+        "has_cover": False,
         "tags": {"title": "Example"},
     }
 
@@ -139,7 +146,7 @@ def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
     loudness = runner.invoke(app, ["--output-format", "json", "audio", "loudness", str(source)])
     bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
-    assert json.loads(loudness.stdout) == {"loudness_lufs": -14.2, "true_peak_db": -1.1}
+    assert json.loads(loudness.stdout) == {"lufs": -14.2, "true_peak_db": -1.1}
     assert "Start: 1.0 s" in bounds.stdout
 
     for option, value in [
@@ -367,3 +374,76 @@ def test_missing_configured_ffprobe_is_processing_error(
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
     assert result.exit_code == 1
     assert json.loads(result.stderr)["error"]["type"] == "FFmpegNotFoundError"
+
+
+def test_verbose_raises_log_level_without_changing_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    settings = Settings()
+    levels: list[str] = []
+    monkeypatch.setattr(cli_app, "load_settings", lambda: settings)
+    monkeypatch.setattr(
+        cli_app, "setup_logging", lambda config, **kwargs: levels.append(config.level)
+    )
+    monkeypatch.setattr(cli_app, "measure_loudness", lambda path, *, runtime: LOUDNESS)
+
+    assert runner.invoke(app, ["-V", "audio", "loudness", str(source)]).exit_code == 0
+    assert runner.invoke(app, ["audio", "loudness", str(source)]).exit_code == 0
+    assert levels == ["DEBUG", "INFO"]
+    assert settings.log.level == "INFO"
+
+
+def test_render_encoding_and_silence_options(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(cli_app, "render", lambda source, path, **kwargs: calls.append(kwargs))
+    base = ["audio", "render", str(source)]
+
+    result = runner.invoke(
+        app,
+        [*base, str(tmp_path / "out.mp3"), "--vbr-quality", "2", "--silence-threshold-db", "-40"],
+    )
+
+    assert result.exit_code == 0
+    assert calls[0]["encoding"] == Mp3Encoding(vbr_quality=2)
+    effects = calls[0]["effects"]
+    assert isinstance(effects, Effects)
+    assert effects.silence_threshold_db == -40
+    for option, value in [("--vbr-quality", "10"), ("--bitrate-kbps", "8")]:
+        invalid = runner.invoke(app, [*base, str(tmp_path / "bad.mp3"), option, value])
+        assert invalid.exit_code == 2
+
+
+def test_waveform_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    monkeypatch.setattr(cli_app, "waveform", lambda path, *, runtime: (0.5, 1.0))
+    monkeypatch.setattr(cli_app, "peak_envelope", lambda path, *, runtime: (0.25,))
+
+    loudness = runner.invoke(app, ["-f", "json", "audio", "waveform", str(source)])
+    peaks = runner.invoke(app, ["audio", "waveform", str(source), "--peaks"])
+
+    assert json.loads(loudness.stdout) == {"values": [0.5, 1.0]}
+    assert peaks.stdout.strip() == "0.25"
+
+
+def test_tempo_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    segments = (TempoSegment(start=0, bpm=120, confidence=0.5),)
+    monkeypatch.setattr(cli_app, "estimate_tempo", lambda path, *, runtime: segments)
+
+    result = runner.invoke(app, ["-f", "json", "audio", "tempo", str(source)])
+    text = runner.invoke(app, ["audio", "tempo", str(source)])
+
+    assert json.loads(result.stdout) == {
+        "segments": [{"start": 0.0, "bpm": 120.0, "confidence": 0.5}]
+    }
+    assert "120.0 BPM" in text.stdout
+    monkeypatch.setattr(cli_app, "estimate_tempo", lambda path, *, runtime: ())
+    assert "No tempo found" in runner.invoke(app, ["audio", "tempo", str(source)]).stdout

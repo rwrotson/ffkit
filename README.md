@@ -71,12 +71,19 @@ ffkit audio render song.flac song.mp3 --gain-db 3 --target-lufs -14
 ffkit audio render song.flac song.mp3 --tag title=Intro --cover cover.jpg
 ffkit audio normalization-gain song.flac --target-lufs -14 --peak-ceiling-db -1
 ffkit audio extract-cover song.flac cover.jpg
+ffkit audio render song.flac song.mp3 --trim-silence --silence-threshold-db -45 --vbr-quality 2
+ffkit audio waveform song.flac --peaks
+ffkit -f json audio tempo song.flac
 ```
 
 `render` and `extract-cover` require `--force` to replace an existing output file.
 `render` embeds the source cover unless `--cover PATH` replaces it or `--no-cover` drops it;
 `--tag KEY=VALUE` sets a tag and may be repeated. `normalization-gain` prints the fixed gain that
-reaches the target loudness without exceeding the true-peak ceiling.
+reaches the target loudness without exceeding the true-peak ceiling. `render` encodes MP3 at
+`--bitrate-kbps` (320 by default) or LAME `--vbr-quality`. `waveform` prints 400 loudness values, or
+peaks with `--peaks`, and `tempo` prints rough tempo segments. JSON output uses the field names of the
+library result models, such as `lufs` and `true_peak_db`. Exit code 2 marks invalid input and 1 a
+processing failure.
 The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PATH` or
 `FFKIT_FFMPEG__FFPROBE_PATH` is set.
 
