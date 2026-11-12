@@ -1,19 +1,15 @@
-import os
 import re
-import selectors
-import subprocess
-import time
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
 from ffkit._ffmpeg.args import ffmpeg_number, media_path
-from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, stop
+from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import probe
 from ffkit.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
 from ffkit.audio.effects import Effects
-from ffkit.errors import CancelledError
+from ffkit.errors import FFmpegError, NoAudioError, SilentAudioError
 from ffkit.runtime import FFmpegRuntime
 
 END_TOLERANCE = 0.001
@@ -68,86 +64,40 @@ class SilenceScan:
         if self.last_event == "start":
             return self.last_start
         if self.decoded_end is None:
-            raise RuntimeError("FFmpeg did not report decoded duration")
+            raise FFmpegError("FFmpeg did not report decoded duration")
         if self.last_end is not None and self.last_end >= self.decoded_end - END_TOLERANCE:
             return self.last_start
         return None
 
 
-def _consume_scan_chunk(scan: SilenceScan, pending: bytes, chunk: bytes) -> bytes:
-    pending += chunk
-    while b"\n" in pending:
-        line, pending = pending.split(b"\n", 1)
-        scan.read_line(line)
-    return pending[-8192:]
-
-
-def _read_scan_stream(
-    process: subprocess.Popen[bytes],
-    command: list[str],
-    cancelled: Callable[[], bool] | None,
-    *,
-    timeout: float,
-) -> tuple[SilenceScan, bytes]:
+def scan_silence(command: list[str], cancelled: Cancelled | None, *, timeout: float) -> SilenceScan:
+    """Run an FFmpeg silencedetect command and parse its stderr with bounded memory."""
     scan = SilenceScan()
     pending = b""
-    tail = b""
-
-    if process.stderr is None:
-        raise RuntimeError("FFmpeg stderr is unavailable")
-    deadline = time.monotonic() + timeout
-    with selectors.DefaultSelector() as selector:
-        selector.register(process.stderr, selectors.EVENT_READ)
-        while selector.get_map():
-            if cancelled and cancelled():
-                raise CancelledError("Export cancelled")
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise subprocess.TimeoutExpired(command, timeout)
-            for key, _ in selector.select(min(0.1, remaining)):
-                chunk = os.read(key.fd, 65536)
-                if not chunk:
-                    selector.unregister(key.fileobj)
-                    continue
-                tail = (tail + chunk)[-ERROR_TAIL_LIMIT:]
-                pending = _consume_scan_chunk(scan, pending, chunk)
-
+    for chunk in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
+        pending += chunk
+        while b"\n" in pending:
+            line, pending = pending.split(b"\n", 1)
+            scan.read_line(line)
+        # Bound memory when FFmpeg writes a long line without a newline.
+        pending = pending[-8192:]
     if pending:
         scan.read_line(pending)
-    return scan, tail
-
-
-def scan_silence(
-    command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
-) -> SilenceScan:
-    """Run an FFmpeg silencedetect command and parse its stderr with bounded memory."""
-    process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate arguments.
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-    )
-    try:
-        deadline = time.monotonic() + timeout
-        scan, tail = _read_scan_stream(process, command, cancelled, timeout=timeout)
-        if process.wait(timeout=max(0, deadline - time.monotonic())):
-            raise subprocess.CalledProcessError(
-                process.returncode, command, stderr=tail.decode(errors="replace")
-            )
-        return scan
-    finally:
-        stop(process)
+    return scan
 
 
 def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and timeout it uses.
     effects: Effects,
     source: Path,
     duration: float | None,
-    cancelled: Callable[[], bool] | None = None,
+    cancelled: Cancelled | None = None,
     *,
     ffmpeg: str,
     timeout: float,
 ) -> float | None:
     """Return the source position where trailing silence in the trimmed range starts."""
     if duration is None:
-        raise ValueError("Track duration is unavailable")
+        raise NoAudioError("Track duration is unavailable")
 
     start = effects.trim_start
     end = min(effects.trim_end or duration, duration)
@@ -183,7 +133,7 @@ def trailing_silence_end(  # noqa: PLR0913 - Receives only the FFmpeg path and t
     if trailing is None:
         return None
     if scan.decoded_end is None:
-        raise RuntimeError("FFmpeg did not report decoded duration")
+        raise FFmpegError("FFmpeg did not report decoded duration")
     if scan.decoded_end - trailing >= MIN_TRAILING_SILENCE:
         return round(start + trailing, 6)
     return None
@@ -194,7 +144,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     duration: float | None = None,
     threshold_db: float = DEFAULT_SILENCE_THRESHOLD_DB,
     min_duration: float = DEFAULT_TRIM_MIN_DURATION,
-    cancelled: Callable[[], bool] | None = None,
+    cancelled: Cancelled | None = None,
     *,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> tuple[float, float | None]:
@@ -202,7 +152,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     if duration is None:
         duration = probe(path, runtime=runtime).duration
     if not duration or duration <= 0:
-        raise ValueError("Track duration is unavailable")
+        raise NoAudioError("Track duration is unavailable")
 
     command = [
         runtime.ffmpeg_path,
@@ -229,14 +179,14 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     start = scan.first_end if leading and scan.first_end is not None else 0.0
     end = scan.trailing_start()
     if end is not None and end <= start:
-        raise ValueError("Track contains no audible audio")
+        raise SilentAudioError("Track contains no audible audio")
     return round(start, 3), round(end, 3) if end is not None else None
 
 
 def trailing_trim_end(
     effects: Effects,
     source: Path,
-    cancelled: Callable[[], bool] | None = None,
+    cancelled: Cancelled | None = None,
     *,
     runtime: FFmpegRuntime,
 ) -> float | None:
@@ -255,5 +205,5 @@ def trailing_trim_end(
     )
 
     if trailing_end is not None and trailing_end <= effects.trim_start + MIN_TRAILING_SILENCE:
-        raise ValueError("Track contains no audible audio")
+        raise SilentAudioError("Track contains no audible audio")
     return trailing_end

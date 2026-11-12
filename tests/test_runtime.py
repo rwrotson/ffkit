@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from ffkit import FFmpegRuntime
+from ffkit import FFmpegNotFoundError, FFmpegRuntime, FFmpegTimeoutError
 from ffkit.audio import (
     analyze_loudness,
     analyze_peak_waveform,
@@ -80,9 +80,9 @@ def test_functions_use_configured_ffprobe(
     call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
 ) -> None:
     missing = str(tmp_path / "missing-ffprobe")
-    with pytest.raises(FileNotFoundError) as error:
+    with pytest.raises(FFmpegNotFoundError) as error:
         call(source, tmp_path, FFmpegRuntime(ffprobe_path=missing))
-    assert error.value.filename == missing
+    assert error.value.executable == missing
 
 
 @pytest.mark.parametrize("call", ffmpeg_calls)
@@ -90,20 +90,20 @@ def test_functions_use_configured_ffmpeg(
     call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
 ) -> None:
     missing = str(tmp_path / "missing-ffmpeg")
-    with pytest.raises(FileNotFoundError) as error:
+    with pytest.raises(FFmpegNotFoundError) as error:
         call(source, tmp_path, FFmpegRuntime(ffmpeg_path=missing))
-    assert error.value.filename == missing
+    assert error.value.executable == missing
 
 
 def test_extract_cover_uses_configured_ffmpeg(source: Path, tmp_path: Path) -> None:
     missing = str(tmp_path / "missing-ffmpeg")
-    with pytest.raises(FileNotFoundError) as error:
+    with pytest.raises(FFmpegNotFoundError) as error:
         extract_cover(
             source,
             tmp_path / "cover.jpg",
             runtime=FFmpegRuntime(ffmpeg_path=missing),
         )
-    assert error.value.filename == missing
+    assert error.value.executable == missing
 
 
 def test_stream_uses_idle_timeout(source: Path, tmp_path: Path) -> None:
@@ -111,5 +111,5 @@ def test_stream_uses_idle_timeout(source: Path, tmp_path: Path) -> None:
     silent_encoder.write_text("#!/bin/sh\nsleep 10\n")
     silent_encoder.chmod(0o755)
     runtime = FFmpegRuntime(ffmpeg_path=str(silent_encoder), stream_idle_timeout=0.1)
-    with pytest.raises(TimeoutError, match="stopped responding"):
+    with pytest.raises(FFmpegTimeoutError, match="no output"):
         b"".join(stream_mp3(source, runtime=runtime))

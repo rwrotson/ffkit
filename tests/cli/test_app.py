@@ -1,6 +1,5 @@
 import builtins
 import json
-import subprocess
 from collections.abc import Mapping, Sequence
 from importlib.metadata import version
 from pathlib import Path
@@ -10,7 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
-from ffkit import FFmpegRuntime
+from ffkit import FFmpegNotFoundError, FFmpegProcessError, FFmpegRuntime
 from ffkit.audio import AudioInfo, Effects
 from ffkit.cli.app import app
 from ffkit.main import main
@@ -52,7 +51,7 @@ def test_json_processing_failure_has_one_error_object(
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert json.loads(result.stderr)["error"]["type"] == "CalledProcessError"
+    assert json.loads(result.stderr)["error"]["type"] == "FFmpegProcessError"
     assert "audio_render_failed" in (tmp_path / "logs" / "ffkit.log").read_text()
 
 
@@ -153,7 +152,7 @@ def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert destination.read_bytes() == b"rendered"
 
     def fail_render(source: Path, path: Path, effects: Effects, **kwargs: object) -> None:
-        raise subprocess.CalledProcessError(1, ["ffmpeg"])
+        raise FFmpegProcessError(1, "failed", command=["ffmpeg"])
 
     monkeypatch.setattr(cli_app, "render", fail_render)
     failed = runner.invoke(app, ["audio", "render", str(source), str(destination), "--force"])
@@ -238,7 +237,7 @@ def test_missing_ffmpeg_is_processing_error(
     source.touch()
 
     def missing_tool(path: Path, *, runtime: FFmpegRuntime) -> tuple[float | None, float | None]:
-        raise FileNotFoundError(2, "No such file or directory", "ffmpeg")
+        raise FFmpegNotFoundError("ffmpeg")
 
     monkeypatch.setattr(cli_app, "measure_loudness", missing_tool)
     result = runner.invoke(app, ["audio", "loudness", str(source)])
@@ -349,4 +348,4 @@ def test_missing_configured_ffprobe_is_processing_error(
     monkeypatch.setenv("FFKIT_FFMPEG__FFPROBE_PATH", str(missing))
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
     assert result.exit_code == 1
-    assert json.loads(result.stderr)["error"]["type"] == "FileNotFoundError"
+    assert json.loads(result.stderr)["error"]["type"] == "FFmpegNotFoundError"

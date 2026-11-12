@@ -1,12 +1,12 @@
 import json
 import math
-import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
 from ffkit._ffmpeg.args import media_path, source_fingerprint
+from ffkit._ffmpeg.process import run
 from ffkit.audio.analysis.silence import trailing_trim_end
 from ffkit.audio.defaults import (
     DEFAULT_PEAK_CEILING_DB,
@@ -16,6 +16,7 @@ from ffkit.audio.defaults import (
 )
 from ffkit.audio.effects import Effects
 from ffkit.audio.filters import audio_filters
+from ffkit.errors import SilentAudioError, SourceChangedError
 from ffkit.runtime import FFmpegRuntime
 
 
@@ -42,33 +43,29 @@ def measure_loudness(
         f":LRA={LOUDNORM_RANGE}:print_format=json",
     ]
 
-    result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [
-            runtime.ffmpeg_path,
-            "-hide_banner",
-            "-i",
-            media_path(path),
-            "-map",
-            "0:a:0",
-            "-vn",
-            "-af",
-            ",".join(chain),
-            "-f",
-            "null",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=runtime.process_timeout,
-    )
+    command = [
+        runtime.ffmpeg_path,
+        "-hide_banner",
+        "-nostats",
+        "-i",
+        media_path(path),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-af",
+        ",".join(chain),
+        "-f",
+        "null",
+        "-",
+    ]
+    stderr = run(command, pipe="stderr", timeout=runtime.process_timeout).decode(errors="replace")
 
-    marker = result.stderr.rfind('"input_i"')
+    marker = stderr.rfind('"input_i"')
     if marker < 0:
         return None, None
-    left = result.stderr.rfind("{", 0, marker)
-    right = result.stderr.find("}", marker)
-    data = json.loads(result.stderr[left : right + 1])
+    left = stderr.rfind("{", 0, marker)
+    right = stderr.find("}", marker)
+    data = json.loads(stderr[left : right + 1])
 
     def finite(value: object) -> float | None:
         try:
@@ -85,7 +82,7 @@ def analyze_loudness(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) 
     fingerprint = source_fingerprint(source)
     lufs, peak = measure_loudness(source, runtime=runtime)
     if source_fingerprint(source) != fingerprint:
-        raise ValueError("Source audio changed during loudness analysis")
+        raise SourceChangedError("Source audio changed during loudness analysis")
     return SourceLoudness(lufs=lufs, true_peak_db=peak, fingerprint=fingerprint)
 
 
@@ -97,11 +94,11 @@ def normalization_gain(
 ) -> float:
     """Return a fixed gain, keeping the measured true peak below the ceiling."""
     if lufs is None or not math.isfinite(lufs):
-        raise ValueError("Cannot measure track loudness")
+        raise SilentAudioError("Cannot measure track loudness")
     gain = target - lufs
     if peak is not None:
         if not math.isfinite(peak):
-            raise ValueError("Cannot measure track true peak")
+            raise SilentAudioError("Cannot measure track true peak")
         gain = min(gain, ceiling - peak)
 
     rounded = round(gain, 1)
@@ -144,5 +141,5 @@ def calculate_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FF
         lufs, peak = measure_loudness(source, filters=filters, runtime=runtime)
 
     if source_fingerprint(source) != fingerprint:
-        raise ValueError("Source audio changed during normalization")
+        raise SourceChangedError("Source audio changed during normalization")
     return normalization_gain(lufs, peak, target_lufs, peak_ceiling_db)

@@ -1,15 +1,13 @@
 import logging
-import os
-import selectors
-import subprocess
 from collections.abc import Generator
 from pathlib import Path
 
 from ffkit._ffmpeg.args import ffmpeg_number, media_path
-from ffkit._ffmpeg.process import stop
+from ffkit._ffmpeg.process import iter_output
 from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
 from ffkit.audio.filters import audio_filters
+from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
 log = logging.getLogger(__name__)
@@ -46,7 +44,7 @@ def stream_mp3(  # noqa: PLR0913 - Stream options plus the keyword-only FFmpeg r
 ) -> Generator[bytes]:
     """Stream original source audio from a position after its trim start."""
     if start < 0:
-        raise ValueError("Stream start must not be negative")
+        raise InvalidInputError("Stream start must not be negative")
     return _stream(
         source,
         effects or Effects(),
@@ -92,27 +90,8 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         command += ["-af", ",".join(filters)]
     command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]
 
-    process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
-        command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-    )
     try:
-        stdout = process.stdout
-        if stdout is None:
-            raise RuntimeError("FFmpeg stdout is unavailable")
-        with selectors.DefaultSelector() as selector:
-            selector.register(stdout, selectors.EVENT_READ)
-            while selector.select(idle_timeout):
-                chunk = os.read(stdout.fileno(), 8192)
-                if not chunk:
-                    break
-                yield chunk
-            else:
-                raise TimeoutError("Audio stream stopped responding")
-
-        if process.wait(timeout=5):
-            raise RuntimeError(f"Audio encoder exited with status {process.returncode}")
+        yield from iter_output(command, idle_timeout=idle_timeout)
     except Exception:
         log.exception("audio_stream_failed source=%s", source)
         raise
-    finally:
-        stop(process, grace=2)

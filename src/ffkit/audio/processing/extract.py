@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from ffkit.audio.analysis.cover import embedded_cover
+from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
 
@@ -13,7 +14,7 @@ def extract_cover(
     if source.resolve() == destination.resolve() or (
         source.exists() and destination.exists() and source.samefile(destination)
     ):
-        raise ValueError("Output path must differ from source audio")
+        raise InvalidInputError("Output path must differ from source audio")
 
     image = embedded_cover(source, runtime=runtime)
     if image is None:

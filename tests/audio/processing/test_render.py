@@ -1,17 +1,36 @@
 import importlib
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
-from typing import BinaryIO
+from typing import Any
 
 import pytest
 
-from ffkit import CancelledError, FFmpegRuntime
-from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT
+from ffkit import (
+    CancelledError,
+    FFmpegError,
+    FFmpegProcessError,
+    FFmpegRuntime,
+    FFmpegTimeoutError,
+    InvalidInputError,
+    PeakCeilingError,
+    SilentAudioError,
+    SourceNotFoundError,
+)
+from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT, iter_output
 from ffkit.audio import Effects, audio_filters, measure_loudness, probe, render
 
 render_module = importlib.import_module("ffkit.audio.processing.render")
+
+
+def _replace_command(monkeypatch: pytest.MonkeyPatch, command: list[str]) -> None:
+    """Run another command in place of the FFmpeg encoder."""
+
+    def replaced(_command: Sequence[str], **kwargs: Any) -> Iterator[bytes]:  # noqa: ANN401
+        return iter_output(command, **kwargs)
+
+    monkeypatch.setattr(render_module, "iter_output", replaced)
 
 
 def test_render_protects_source_and_existing_output(
@@ -22,10 +41,10 @@ def test_render_protects_source_and_existing_output(
     alias = tmp_path / "alias.wav"
     alias.symlink_to(source)
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(SourceNotFoundError):
         render(tmp_path / "missing.wav", tmp_path / "out.mp3")
     for destination in (source, alias):
-        with pytest.raises(ValueError, match="Output path must differ"):
+        with pytest.raises(InvalidInputError, match="Output path must differ"):
             render(source, destination)
 
     broken = tmp_path / "broken.mp3"
@@ -33,7 +52,7 @@ def test_render_protects_source_and_existing_output(
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
 
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(FFmpegProcessError):
         render(broken, target)
     assert target.read_bytes() == b"existing"
     assert not list(tmp_path.glob("*.tmp.mp3"))
@@ -135,7 +154,7 @@ def test_render_rejects_all_silence_with_trim(tmp_path: Path) -> None:
     effects = Effects()
     effects.trim_silence = True
 
-    with pytest.raises(ValueError, match="no audible audio"):
+    with pytest.raises(SilentAudioError, match="no audible audio"):
         render(source, tmp_path / "out.mp3", effects)
 
 
@@ -198,14 +217,13 @@ def test_render_retries_from_source(
     target = tmp_path / "out.mp3"
     measured = iter([(None, 0.0), (None, -2.0)])
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: next(measured))
-    original_popen = subprocess.Popen
-    commands: list[list[str]] = []
+    commands: list[Sequence[str]] = []
 
-    def record(command: list[str], *, stdout: int, stderr: BinaryIO) -> subprocess.Popen[bytes]:
+    def record(command: Sequence[str], **kwargs: Any) -> Iterator[bytes]:  # noqa: ANN401
         commands.append(command)
-        return original_popen(command, stdout=stdout, stderr=stderr)
+        return iter_output(command, **kwargs)
 
-    monkeypatch.setattr(subprocess, "Popen", record)
+    monkeypatch.setattr(render_module, "iter_output", record)
 
     render(source, target, limiter_db=-1)
     assert len(commands) == 2
@@ -214,7 +232,7 @@ def test_render_retries_from_source(
 
     target.write_bytes(b"existing")
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 0.0))
-    with pytest.raises(RuntimeError, match="exceeds"):
+    with pytest.raises(PeakCeilingError, match="exceeds"):
         render(source, target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
 
@@ -225,20 +243,12 @@ def test_render_keeps_only_error_tail(
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
-    original_popen = subprocess.Popen
+    _replace_command(
+        monkeypatch,
+        [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(7)"],
+    )
 
-    def noisy_process(
-        _command: list[str], *, stdout: int, stderr: BinaryIO
-    ) -> subprocess.Popen[bytes]:
-        return original_popen(
-            [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(7)"],
-            stdout=stdout,
-            stderr=stderr,
-        )
-
-    monkeypatch.setattr(subprocess, "Popen", noisy_process)
-
-    with pytest.raises(subprocess.CalledProcessError) as error:
+    with pytest.raises(FFmpegProcessError) as error:
         render(source, tmp_path / "out.mp3", cancelled=cancelled)
     assert error.value.returncode == 7
     assert len(error.value.stderr) == ERROR_TAIL_LIMIT
@@ -249,17 +259,8 @@ def test_render_encoder_timeout_kills_process(
 ) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"source")
-    original_popen = subprocess.Popen
-
-    def slow_process(
-        _command: list[str], *, stdout: int, stderr: BinaryIO
-    ) -> subprocess.Popen[bytes]:
-        return original_popen(
-            [sys.executable, "-c", "import time; time.sleep(10)"], stdout=stdout, stderr=stderr
-        )
-
-    monkeypatch.setattr(subprocess, "Popen", slow_process)
-    with pytest.raises(subprocess.TimeoutExpired):
+    _replace_command(monkeypatch, [sys.executable, "-c", "import time; time.sleep(10)"])
+    with pytest.raises(FFmpegTimeoutError):
         render(
             source,
             tmp_path / "out.mp3",
@@ -300,37 +301,19 @@ def test_render_cover_choices(make_tone: Callable[..., None], tmp_path: Path) ->
     render(with_cover, without_cover, cover="none")
     assert kept_cover.stat().st_size > without_cover.stat().st_size
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(SourceNotFoundError):
         render(source, tmp_path / "missing-cover.mp3", cover=tmp_path / "missing.jpg")
 
 
 def test_render_cancellation_preserves_output(
-    make_tone: Callable[..., None], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_tone: Callable[..., None], tmp_path: Path
 ) -> None:
     source = tmp_path / "source.wav"
     make_tone(source, duration=1)
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
 
-    class PendingProcess:
-        returncode = 0
-        stdout = None
-        stderr = None
-
-        def poll(self) -> None:
-            return None
-
-        def terminate(self) -> None:
-            pass
-
-        def kill(self) -> None:
-            pass
-
-        def wait(self, timeout: float | None = None) -> int:
-            return 0
-
-    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: PendingProcess())
-    with pytest.raises(CancelledError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
@@ -344,12 +327,12 @@ def test_render_rejects_unmeasurable_or_unreachable_peak(
     target.write_bytes(b"existing")
 
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, None))
-    with pytest.raises(RuntimeError, match="Could not measure encoded true peak"):
+    with pytest.raises(FFmpegError, match="Could not measure encoded true peak"):
         render(source, target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
 
     monkeypatch.setattr(render_module, "measure_loudness", lambda path, **kwargs: (None, 30.0))
-    with pytest.raises(RuntimeError, match="ceiling could not be reached"):
+    with pytest.raises(PeakCeilingError, match="ceiling could not be reached"):
         render(source, target, limiter_db=-1)
     assert target.read_bytes() == b"existing"
 
@@ -362,16 +345,9 @@ def test_render_cancellation_after_encoding(
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
 
-    class CompletedProcess:
-        returncode = 0
-        stdout = None
-        stderr = None
-
-        def poll(self) -> int:
-            return 0
-
-    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
-    with pytest.raises(CancelledError, match="Export cancelled"):
+    # Encoding finishes without output; cancellation is noticed afterwards.
+    monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
+    with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, limiter_db=-1, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"
 
@@ -384,15 +360,8 @@ def test_render_cancellation_before_replace_without_limiter(
     target = tmp_path / "out.mp3"
     target.write_bytes(b"existing")
 
-    class CompletedProcess:
-        returncode = 0
-        stdout = None
-        stderr = None
-
-        def poll(self) -> int:
-            return 0
-
-    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: CompletedProcess())
-    with pytest.raises(CancelledError, match="Export cancelled"):
+    # Encoding finishes without output; cancellation is noticed afterwards.
+    monkeypatch.setattr(render_module, "iter_output", lambda *args, **kwargs: iter(()))
+    with pytest.raises(CancelledError, match="Operation cancelled"):
         render(source, target, cancelled=lambda: True)
     assert target.read_bytes() == b"existing"

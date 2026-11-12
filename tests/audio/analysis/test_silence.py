@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from ffkit import CancelledError
+from ffkit import (
+    CancelledError,
+    FFmpegProcessError,
+    FFmpegTimeoutError,
+    NoAudioError,
+    SilentAudioError,
+)
 from ffkit._ffmpeg.process import ERROR_TAIL_LIMIT
 from ffkit.audio import Effects, detect_trim_bounds, probe
 from ffkit.audio.analysis.silence import SilenceScan
@@ -88,7 +94,7 @@ def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
 def test_trim_rejects_all_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     scan = SilenceScan.from_lines([b"silence_start: 0", b"silence_end: 2", b"silence_start: 2"])
     monkeypatch.setattr("ffkit.audio.analysis.silence.scan_silence", lambda *args, **kwargs: scan)
-    with pytest.raises(ValueError, match="no audible audio"):
+    with pytest.raises(SilentAudioError, match="no audible audio"):
         detect_trim_bounds(Path("silent.wav"), duration=2)
 
 
@@ -108,7 +114,7 @@ def test_trailing_silence_scan_handles_no_silence_and_empty_trim(
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     effects.trim_start = 2
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
-    with pytest.raises(ValueError, match="duration is unavailable"):
+    with pytest.raises(NoAudioError, match="duration is unavailable"):
         silence_module.trailing_silence_end(effects, source, None, **TOOLS)
 
 
@@ -117,16 +123,16 @@ def test_trailing_silence_scan_respects_cancellation(
 ) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source, duration=1)
-    with pytest.raises(CancelledError, match="Export cancelled"):
+    with pytest.raises(CancelledError, match="Operation cancelled"):
         silence_module.trailing_silence_end(Effects(), source, 1.0, lambda: True, **TOOLS)
 
 
 def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout() -> None:
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(FFmpegProcessError):
         silence_module.scan_silence(
             ["ffmpeg", "-v", "error", "-i", "missing.wav", "-f", "null", "-"], None, timeout=30
         )
-    with pytest.raises(subprocess.TimeoutExpired):
+    with pytest.raises(FFmpegTimeoutError):
         silence_module.scan_silence(
             [sys.executable, "-c", "import time; time.sleep(10)"], None, timeout=0.01
         )
@@ -134,6 +140,6 @@ def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout() -> None:
 
 def test_trailing_silence_scan_bounds_error_output() -> None:
     command = [sys.executable, "-c", "import sys; sys.stderr.write('x' * 200000); sys.exit(2)"]
-    with pytest.raises(subprocess.CalledProcessError) as error:
+    with pytest.raises(FFmpegProcessError) as error:
         silence_module.scan_silence(command, None, timeout=30)
     assert len(error.value.stderr) == ERROR_TAIL_LIMIT

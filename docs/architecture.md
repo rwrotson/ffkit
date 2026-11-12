@@ -98,9 +98,22 @@ Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on 
 | --- | --- | --- |
 | `FFKitError` | `Exception` | Base for every expected library failure |
 | `InvalidInputError` | `FFKitError`, `ValueError` | The input cannot be processed |
-| `CancelledError` | `FFKitError`, `RuntimeError` | A `cancelled` callback stopped rendering or silence scanning |
+| `SourceNotFoundError` | `InvalidInputError`, `FileNotFoundError` | An input file does not exist |
+| `NoAudioError` | `InvalidInputError` | The source has no decodable audio stream or no measurable duration |
+| `SilentAudioError` | `InvalidInputError` | The source or its selected range has no audible audio |
+| `SourceChangedError` | `FFKitError` | The source file changed during an operation |
+| `PeakCeilingError` | `FFKitError` | Rendered output cannot be kept below the true peak ceiling |
+| `CancelledError` | `FFKitError`, `RuntimeError` | A `cancelled` callback stopped the operation |
+| `FFmpegError` | `FFKitError` | FFmpeg or FFprobe failed or produced unusable output; `command` holds the arguments |
+| `FFmpegNotFoundError` | `FFmpegError` | The configured executable cannot be started; `executable` names it |
+| `FFmpegTimeoutError` | `FFmpegError`, `TimeoutError` | A run exceeded `process_timeout` or a stream `stream_idle_timeout` |
+| `FFmpegProcessError` | `FFmpegError` | The process exited with a non-zero status; `returncode` and the `stderr` tail are kept |
 
-Existing audio helpers raise built-in and subprocess exceptions, except cancellation, which raises `CancelledError`. New APIs may use `FFKitError` subclasses for expected failures. Unexpected exceptions are not wrapped.
+All FFmpeg and FFprobe runs go through `ffkit._ffmpeg.process`, which closes stdin, logs each
+command at debug level, enforces time limits and cancellation, and translates process failures to
+`FFmpegError` subclasses. Pydantic `ValidationError` from models is not wrapped, nor are unexpected
+exceptions. The CLI exits with code 2 for `ValueError` and `FileNotFoundError` and 1 for other
+errors.
 
 ## Adding functionality
 

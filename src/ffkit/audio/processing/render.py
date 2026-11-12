@@ -1,28 +1,31 @@
 import logging
 import os
-import subprocess
-import tempfile
-import time
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from ffkit._ffmpeg.args import media_path
-from ffkit._ffmpeg.process import error_tail, stop
+from ffkit._ffmpeg.args import existing_file, media_path
+from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.silence import trailing_trim_end
 from ffkit.audio.defaults import MP3_ENCODER_ARGS
 from ffkit.audio.effects import Effects
 from ffkit.audio.filters import audio_filters
-from ffkit.errors import CancelledError
+from ffkit.errors import (
+    CancelledError,
+    FFmpegError,
+    FFmpegProcessError,
+    FFmpegTimeoutError,
+    InvalidInputError,
+    PeakCeilingError,
+)
 from ffkit.runtime import FFmpegRuntime
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 5
 MIN_CEILING_DB = -20
 CEILING_MARGIN_DB = 0.2
-CANCEL_POLL_INTERVAL = 0.1
 
 type CoverChoice = Literal["source", "none"]
 
@@ -60,73 +63,40 @@ def _command_parts(
     return inputs, outputs
 
 
-def _run_encoder(
-    command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
-) -> None:
-    with tempfile.TemporaryFile() as errors:
-        process = subprocess.Popen(  # noqa: S603 - Fixed FFmpeg command with separate path arguments.
-            command, stdout=subprocess.DEVNULL, stderr=errors
-        )
-        try:
-            deadline = time.monotonic() + timeout
-            while process.poll() is None:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise subprocess.TimeoutExpired(command, timeout)
-                if cancelled is not None and cancelled():
-                    process.terminate()
-                    process.wait()
-                    raise CancelledError("Export cancelled")
-
-                wait = remaining if cancelled is None else min(CANCEL_POLL_INTERVAL, remaining)
-                try:
-                    process.wait(timeout=wait)
-                except subprocess.TimeoutExpired:
-                    continue
-
-            if process.returncode:
-                raise subprocess.CalledProcessError(
-                    process.returncode, command, stderr=error_tail(errors)
-                )
-        finally:
-            stop(process)
-
-
-def _check_cancelled(cancelled: Callable[[], bool] | None) -> None:
+def _check_cancelled(cancelled: Cancelled | None) -> None:
     if cancelled is not None and cancelled():
-        raise CancelledError("Export cancelled")
+        raise CancelledError("Operation cancelled")
 
 
 def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> float:
     """Lower the limiter ceiling by the measured overshoot, or fail when out of attempts."""
     if attempt == MAX_ATTEMPTS - 1:
-        raise RuntimeError(f"Encoded true peak {peak:.2f} dBTP exceeds {ceiling:.2f} dBTP")
+        raise PeakCeilingError(f"Encoded true peak {peak:.2f} dBTP exceeds {ceiling:.2f} dBTP")
     lowered = max(MIN_CEILING_DB, current - (peak - ceiling) - CEILING_MARGIN_DB)
     if lowered <= MIN_CEILING_DB:
-        raise RuntimeError("True peak ceiling could not be reached")
+        raise PeakCeilingError("True peak ceiling could not be reached")
     return lowered
 
 
 def _encode(
-    source: Path, command: list[str], cancelled: Callable[[], bool] | None, *, timeout: float
+    source: Path, command: list[str], cancelled: Cancelled | None, *, timeout: float
 ) -> None:
     try:
-        _run_encoder(command, cancelled, timeout=timeout)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        detail = error.stderr or "FFmpeg timed out"
-        log.error("audio_render_failed source=%s error=%s", source, detail)
+        for _ in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
+            pass
+    except (FFmpegProcessError, FFmpegTimeoutError) as error:
+        log.error("audio_render_failed source=%s error=%s", source, error)
         raise
 
 
 def _check_paths(source: Path, destination: Path, cover: Path | CoverChoice) -> None:
-    if not source.is_file():
-        raise FileNotFoundError(source)
-    if isinstance(cover, Path) and not cover.is_file():
-        raise FileNotFoundError(cover)
+    existing_file(source)
+    if isinstance(cover, Path):
+        existing_file(cover)
     if source.resolve() == destination.resolve() or (
         destination.exists() and source.samefile(destination)
     ):
-        raise ValueError("Output path must differ from source audio")
+        raise InvalidInputError("Output path must differ from source audio")
 
 
 def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runtime.
@@ -138,7 +108,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     tags: Mapping[str, str] | None = None,
     cover: Path | CoverChoice = "source",
     limiter_db: float | None = None,
-    cancelled: Callable[[], bool] | None = None,
+    cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> None:
     """Apply effects to the original source and render a separate MP3 file.
@@ -178,7 +148,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             _check_cancelled(cancelled)
             _, peak = measure_loudness(temporary, runtime=runtime)
             if peak is None:
-                raise RuntimeError("Could not measure encoded true peak")
+                raise FFmpegError("Could not measure encoded true peak")
             if peak <= ceiling:
                 break
             effective_ceiling = _next_ceiling(effective_ceiling, ceiling, peak, attempt)

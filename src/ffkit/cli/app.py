@@ -1,5 +1,4 @@
 import json
-import subprocess
 from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.metadata import version
@@ -11,7 +10,7 @@ from pydantic import ValidationError
 from rich.console import Console
 from typer.core import TyperGroup
 
-from ffkit import FFmpegRuntime
+from ffkit import FFKitError, FFmpegRuntime
 from ffkit.audio import (
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_THRESHOLD_DB,
@@ -59,22 +58,10 @@ class CLIGroup(TyperGroup):
             return super().invoke(ctx)
         except typer.Exit:
             raise
-        except (
-            ValueError,
-            OSError,
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            RuntimeError,
-        ) as error:
+        except (FFKitError, ValueError, OSError) as error:
             state = cli_state(ctx)
-            missing_tool = isinstance(error, FileNotFoundError) and error.filename in {
-                state.runtime.ffmpeg_path,
-                state.runtime.ffprobe_path,
-            }
-
-            code = (
-                2 if isinstance(error, (ValueError, FileNotFoundError)) and not missing_tool else 1
-            )
+            # Invalid input is a usage error; FFmpeg and other failures are processing errors.
+            code = 2 if isinstance(error, (ValueError, FileNotFoundError)) else 1
 
             if state.output_format == OutputFormat.json:
                 typer.echo(
@@ -304,5 +291,5 @@ def extract_cover_command(
     source = input_file(source)
     destination = output_file(destination, force)
     if extract_cover(source, destination, runtime=cli_state(ctx).runtime) is None:
-        raise RuntimeError("No embedded cover found")
+        raise FFKitError("No embedded cover found")
     emit(ctx, {"path": str(destination)}, [str(destination)])

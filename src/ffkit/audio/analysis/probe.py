@@ -1,11 +1,12 @@
 import json
 import math
-import subprocess
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import media_path
+from ffkit._ffmpeg.args import existing_file, media_path
+from ffkit._ffmpeg.process import run
+from ffkit.errors import NoAudioError
 from ffkit.runtime import FFmpegRuntime
 
 
@@ -20,38 +21,28 @@ class AudioInfo(BaseModel):
 
 def probe(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> AudioInfo:
     """Read duration and tags from the first audio stream; stream tags override container tags."""
-    if not source.is_file():
-        raise FileNotFoundError(source)
-
-    result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [
-            runtime.ffprobe_path,
-            "-v",
-            "error",
-            "-show_format",
-            "-show_streams",
-            "-of",
-            "json",
-            media_path(source),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=runtime.process_timeout,
-    )
-
-    report = json.loads(result.stdout)
+    command = [
+        runtime.ffprobe_path,
+        "-v",
+        "error",
+        "-show_format",
+        "-show_streams",
+        "-of",
+        "json",
+        media_path(existing_file(source)),
+    ]
+    report = json.loads(run(command, timeout=runtime.process_timeout))
     audio_stream = next(
         (stream for stream in report.get("streams", []) if stream.get("codec_type") == "audio"),
         None,
     )
     if audio_stream is None:
-        raise ValueError("File has no decodable audio stream")
+        raise NoAudioError("File has no decodable audio stream")
 
     info = report["format"]
     duration = float(info.get("duration", 0))
     if not math.isfinite(duration) or duration <= 0:
-        raise ValueError("File has no measurable audio duration")
+        raise NoAudioError("File has no measurable audio duration")
 
     format_tags = {str(key).lower(): str(value) for key, value in info.get("tags", {}).items()}
     stream_tags = {

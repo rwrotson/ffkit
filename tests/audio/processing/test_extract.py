@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from ffkit import FFmpegTimeoutError, InvalidInputError
 from ffkit.audio import extract_cover, render
 
 
@@ -25,12 +26,12 @@ def test_extract_cover_timeout_removes_partial_file(
         timeout = kwargs["timeout"]
         assert isinstance(timeout, (int, float))
         assert timeout > 0
-        raise subprocess.TimeoutExpired(command, timeout)
+        raise FFmpegTimeoutError("timed out", command=command)
 
     target.write_bytes(b"previous cover")
-    monkeypatch.setattr("ffkit.audio.analysis.cover.subprocess.run", time_out)
+    monkeypatch.setattr("ffkit.audio.analysis.cover.run", time_out)
 
-    with pytest.raises(subprocess.TimeoutExpired):
+    with pytest.raises(FFmpegTimeoutError):
         extract_cover(Path("source.mp3"), target)
     assert target.read_bytes() == b"previous cover"
     assert not list(tmp_path.glob("*.tmp.jpg"))
@@ -83,7 +84,7 @@ def test_extract_embedded_cover(make_tone: Callable[..., None], tmp_path: Path) 
     alias = tmp_path / "alias.mp3"
     alias.symlink_to(embedded)
     for destination in (embedded, alias):
-        with pytest.raises(ValueError, match="Output path must differ"):
+        with pytest.raises(InvalidInputError, match="Output path must differ"):
             extract_cover(embedded, destination)
     assert embedded.read_bytes() == original_mp3
 

@@ -2,7 +2,6 @@ import array
 import json
 import math
 import mmap
-import subprocess
 import tempfile
 from pathlib import Path
 from statistics import median
@@ -11,8 +10,9 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ffkit._ffmpeg.args import media_path
-from ffkit._ffmpeg.process import stdout_chunks, stop
+from ffkit._ffmpeg.process import iter_output, run
 from ffkit.audio.analysis.probe import probe
+from ffkit.errors import NoAudioError
 from ffkit.runtime import FFmpegRuntime
 
 WAVEFORM_BINS = 400
@@ -59,9 +59,9 @@ def analyze_peak_waveform(
     if duration is None:
         duration = probe(source, runtime=runtime).duration
     if not math.isfinite(duration) or duration <= 0:
-        raise ValueError("Track duration is unavailable")
+        raise NoAudioError("Track duration is unavailable")
 
-    info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
+    info = run(
         [
             runtime.ffprobe_path,
             "-v",
@@ -74,119 +74,100 @@ def analyze_peak_waveform(
             "json",
             media_path(source),
         ],
-        capture_output=True,
-        text=True,
-        check=True,
         timeout=runtime.process_timeout,
     )
 
-    stream = json.loads(info.stdout)["streams"][0]
+    stream = json.loads(info)["streams"][0]
     channels = int(stream["channels"])
     rate = int(stream["sample_rate"]) * PEAK_OVERSAMPLING
     frames_per_bin = max(1, math.ceil(duration * rate / WAVEFORM_BINS))
     peaks = [0.0] * WAVEFORM_BINS
 
-    process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [
-            runtime.ffmpeg_path,
-            "-v",
-            "error",
-            "-i",
-            media_path(source),
-            "-map",
-            "0:a:0",
-            "-vn",
-            "-ar",
-            str(rate),
-            "-ac",
-            str(channels),
-            "-f",
-            "f32le",
-            "-",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
+    command = [
+        runtime.ffmpeg_path,
+        "-v",
+        "error",
+        "-i",
+        media_path(source),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-ar",
+        str(rate),
+        "-ac",
+        str(channels),
+        "-f",
+        "f32le",
+        "-",
+    ]
 
     frame_bytes = channels * 4
     frame_index = 0
     pending = b""
-    try:
-        for chunk in stdout_chunks(process, timeout=runtime.process_timeout):
-            pending += chunk
-            while len(pending) >= frame_bytes:
-                boundary = frames_per_bin - frame_index % frames_per_bin
-                count = min(boundary, len(pending) // frame_bytes)
-                size = count * frame_bytes
-                values = array.array("f")
-                values.frombytes(pending[:size])
-                pending = pending[size:]
-                bin_index = min(WAVEFORM_BINS - 1, frame_index // frames_per_bin)
-                # Builtin max/min over the array run in C; per-sample abs() in Python is slow.
-                loudest, quietest = max(values), min(values)
-                peaks[bin_index] = max(peaks[bin_index], loudest, -quietest)
-                frame_index += count
-    finally:
-        stop(process)
+    for chunk in iter_output(command, timeout=runtime.process_timeout):
+        pending += chunk
+        while len(pending) >= frame_bytes:
+            boundary = frames_per_bin - frame_index % frames_per_bin
+            count = min(boundary, len(pending) // frame_bytes)
+            size = count * frame_bytes
+            values = array.array("f")
+            values.frombytes(pending[:size])
+            pending = pending[size:]
+            bin_index = min(WAVEFORM_BINS - 1, frame_index // frames_per_bin)
+            # Builtin max/min over the array run in C; per-sample abs() in Python is slow.
+            loudest, quietest = max(values), min(values)
+            peaks[bin_index] = max(peaks[bin_index], loudest, -quietest)
+            frame_index += count
 
     return tuple(round(value, 5) for value in peaks)
 
 
-def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analysis.
+def analyze_waveform_tempo(  # noqa: C901 - Single-pass streaming analysis.
     source: Path, duration: float | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
 ) -> WaveformAnalysis:
     """Build a compact waveform, a peak envelope, and rough tempo segments of a source."""
-    process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
-        [
-            runtime.ffmpeg_path,
-            "-v",
-            "error",
-            "-i",
-            media_path(source),
-            "-map",
-            "0:a:0",
-            "-vn",
-            "-ac",
-            "1",
-            "-ar",
-            "2000",
-            "-f",
-            "s16le",
-            "-",
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
+    command = [
+        runtime.ffmpeg_path,
+        "-v",
+        "error",
+        "-i",
+        media_path(source),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "2000",
+        "-f",
+        "s16le",
+        "-",
+    ]
 
     hop = 200
     with tempfile.TemporaryFile() as energy_file:
         remaining_bytes = b""
         energy_count = 0
         peak = 0.0
-        try:
-            if process.stdout is None:
-                raise RuntimeError("FFmpeg stdout is unavailable")
-            for chunk in stdout_chunks(process, timeout=runtime.process_timeout):
-                data = remaining_bytes + chunk
-                complete = len(data) // (hop * 2) * (hop * 2)
-                for offset in range(0, complete, hop * 2):
-                    samples = array.array("h")
-                    samples.frombytes(data[offset : offset + hop * 2])
-                    value = sum(abs(sample) for sample in samples) / (hop * 32768)
-                    energy_file.write(array.array("d", [value]).tobytes())
-                    energy_count += 1
-                    peak = max(peak, value)
-                remaining_bytes = data[complete:]
-
-            if remaining_bytes:
+        for chunk in iter_output(command, timeout=runtime.process_timeout):
+            data = remaining_bytes + chunk
+            complete = len(data) // (hop * 2) * (hop * 2)
+            for offset in range(0, complete, hop * 2):
                 samples = array.array("h")
-                samples.frombytes(remaining_bytes)
+                samples.frombytes(data[offset : offset + hop * 2])
                 value = sum(abs(sample) for sample in samples) / (hop * 32768)
                 energy_file.write(array.array("d", [value]).tobytes())
                 energy_count += 1
                 peak = max(peak, value)
-        finally:
-            stop(process)
+            remaining_bytes = data[complete:]
+
+        if remaining_bytes:
+            samples = array.array("h")
+            samples.frombytes(remaining_bytes)
+            value = sum(abs(sample) for sample in samples) / (hop * 32768)
+            energy_file.write(array.array("d", [value]).tobytes())
+            energy_count += 1
+            peak = max(peak, value)
 
         if not energy_count:
             return WaveformAnalysis()

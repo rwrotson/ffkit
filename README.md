@@ -121,7 +121,7 @@ the remaining effects. Leading silence removal applies only when streaming from 
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
 `probe()` combines container tags with tags from the first audio stream; stream tags take precedence
-over container tags. It raises `FileNotFoundError` for a missing source. `merge_tags()` refreshes
+over container tags. It raises `SourceNotFoundError` for a missing source. `merge_tags()` refreshes
 source tags after a repeated probe while keeping tags the caller changed: pass the current tags, the
 new and previous source tags, and the overrides from the previous `MergedTags`.
 `render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
@@ -142,7 +142,7 @@ given. `Effects` validates trim bounds when they are changed as well as when the
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
 for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
-(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `TimeoutError`
+(`process_timeout=900`) deadline. `stream_mp3()` has no total deadline; it raises `FFmpegTimeoutError`
 when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
 
 ```python

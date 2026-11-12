@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ffkit import FFmpegProcessError, InvalidInputError
 from ffkit.audio import Effects, audio_filters, render, stream_mp3
 
 stream_module = importlib.import_module("ffkit.audio.processing.stream")
@@ -99,7 +100,7 @@ def test_stream_uses_streaming_filters(
 def test_stream_reports_failed_encoder_and_closes_early(
     make_tone: Callable[..., None], tmp_path: Path
 ) -> None:
-    with pytest.raises(RuntimeError, match="Audio encoder exited"):
+    with pytest.raises(FFmpegProcessError):
         b"".join(stream_mp3(tmp_path / "missing.wav"))
 
     source = tmp_path / "source.wav"
@@ -110,7 +111,7 @@ def test_stream_reports_failed_encoder_and_closes_early(
 
 
 def test_stream_rejects_negative_start_on_call(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="must not be negative"):
+    with pytest.raises(InvalidInputError, match="must not be negative"):
         stream_mp3(tmp_path / "source.wav", start=-1)
 
 
