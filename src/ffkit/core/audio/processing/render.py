@@ -151,7 +151,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             if trailing_end is not None:
                 attempt_track.effects.trim_end = trailing_end
 
-            filters = audio_filters(attempt_track, group_gain_db, streaming=True)
+            filters = audio_filters(attempt_track.effects, group_gain_db, streaming=True)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             _encode(
                 track,

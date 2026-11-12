@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 import ffkit.cli.app as cli_app
-from ffkit import FFmpegRuntime, Track
+from ffkit import AudioInfo, FFmpegRuntime, Track
 from ffkit.cli.app import app
 from ffkit.main import main
 
@@ -87,10 +87,8 @@ def test_probe_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.write_bytes(b"input")
 
-    def fake_probe(track: Track, *, runtime: FFmpegRuntime) -> Track:
-        track.duration = 12.5
-        track.tags = {"title": "Example"}
-        return track
+    def fake_probe(path: Path, *, runtime: FFmpegRuntime) -> AudioInfo:
+        return AudioInfo(duration=12.5, tags={"title": "Example"})
 
     monkeypatch.setattr(cli_app, "probe", fake_probe)
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", str(source)])
@@ -106,10 +104,8 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
 
-    def fake_probe(track: Track, *, runtime: FFmpegRuntime) -> Track:
-        track.duration = 5
-        track.tags = {"title": "[red]Example[/red]"}
-        return track
+    def fake_probe(path: Path, *, runtime: FFmpegRuntime) -> AudioInfo:
+        return AudioInfo(duration=5, tags={"title": "[red]Example[/red]"})
 
     monkeypatch.setattr(cli_app, "probe", fake_probe)
     result = runner.invoke(app, ["audio", "probe", str(source)])
@@ -298,8 +294,10 @@ def test_normalization_gain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     source.touch()
     calls: list[tuple[float, float]] = []
 
-    def fake_gain(track: Track, target: float, ceiling: float, *, runtime: FFmpegRuntime) -> float:
-        calls.append((target, ceiling))
+    def fake_gain(
+        path: Path, *, target_lufs: float, peak_ceiling_db: float, runtime: FFmpegRuntime
+    ) -> float:
+        calls.append((target_lufs, peak_ceiling_db))
         return 2.5
 
     monkeypatch.setattr(cli_app, "calculate_normalization_gain", fake_gain)

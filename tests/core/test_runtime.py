@@ -61,39 +61,38 @@ def test_runtime_is_frozen() -> None:
         runtime.ffmpeg_path = "other"  # type: ignore[misc]  # Checks the frozen model at runtime.
 
 
-ffprobe_calls: list[Callable[[Track, Path, FFmpegRuntime], object]] = [
-    lambda track, _, runtime: probe(track, runtime=runtime),
-    lambda track, _, runtime: analyze_peak_waveform(track, runtime=runtime),
+ffprobe_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
+    lambda source, _, runtime: probe(source, runtime=runtime),
+    lambda source, _, runtime: analyze_peak_waveform(source, runtime=runtime),
 ]
-ffmpeg_calls: list[Callable[[Track, Path, FFmpegRuntime], object]] = [
-    lambda track, _, runtime: measure_loudness(Path(track.path), runtime=runtime),
-    lambda track, _, runtime: analyze_loudness(track, runtime=runtime),
-    lambda track, _, runtime: analyze_waveform_tempo(track, runtime=runtime),
-    lambda track, _, runtime: calculate_normalization_gain(track, runtime=runtime),
-    lambda track, _, runtime: detect_trim_bounds(Path(track.path), duration=1, runtime=runtime),
-    lambda track, out, runtime: render(track, out / "out.mp3", runtime=runtime),
-    lambda track, _, runtime: b"".join(stream_mp3(track, runtime=runtime)),
+ffmpeg_calls: list[Callable[[Path, Path, FFmpegRuntime], object]] = [
+    lambda source, _, runtime: measure_loudness(source, runtime=runtime),
+    lambda source, _, runtime: analyze_loudness(source, runtime=runtime),
+    lambda source, _, runtime: analyze_waveform_tempo(source, 1, runtime=runtime),
+    lambda source, _, runtime: calculate_normalization_gain(source, runtime=runtime),
+    lambda source, _, runtime: detect_trim_bounds(source, duration=1, runtime=runtime),
+    lambda source, out, runtime: render(Track(path=str(source)), out / "out.mp3", runtime=runtime),
+    lambda source, _, runtime: b"".join(stream_mp3(Track(path=str(source)), runtime=runtime)),
 ]
 
 
 @pytest.mark.parametrize("call", ffprobe_calls)
 def test_functions_use_configured_ffprobe(
-    call: Callable[[Track, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+    call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
 ) -> None:
     missing = str(tmp_path / "missing-ffprobe")
     with pytest.raises(FileNotFoundError) as error:
-        call(Track(path=str(source)), tmp_path, FFmpegRuntime(ffprobe_path=missing))
+        call(source, tmp_path, FFmpegRuntime(ffprobe_path=missing))
     assert error.value.filename == missing
 
 
 @pytest.mark.parametrize("call", ffmpeg_calls)
 def test_functions_use_configured_ffmpeg(
-    call: Callable[[Track, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
+    call: Callable[[Path, Path, FFmpegRuntime], object], source: Path, tmp_path: Path
 ) -> None:
     missing = str(tmp_path / "missing-ffmpeg")
-    track = Track(path=str(source), duration=1)
     with pytest.raises(FileNotFoundError) as error:
-        call(track, tmp_path, FFmpegRuntime(ffmpeg_path=missing))
+        call(source, tmp_path, FFmpegRuntime(ffmpeg_path=missing))
     assert error.value.filename == missing
 
 

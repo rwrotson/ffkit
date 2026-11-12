@@ -3,18 +3,17 @@ from ffkit.core.audio._constants import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB
 from ffkit.core.audio.defaults import (
     DEFAULT_SILENCE_THRESHOLD_DB,
 )
-from ffkit.core.audio.models import Track
+from ffkit.core.audio.models import Effects
 
 
 def audio_filters(
-    track: Track,
+    effects: Effects,
     group_gain_db: float = 0,
     *,
     streaming: bool = False,
     limiter_db: float | None = None,
 ) -> list[str]:
-    """Build the FFmpeg audio filter chain for a track."""
-    effects = track.effects
+    """Build the FFmpeg audio filter chain for effects."""
     filters: list[str] = []
 
     if effects.trim_start or effects.trim_end is not None:

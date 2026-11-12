@@ -4,12 +4,13 @@ import math
 import mmap
 import subprocess
 import tempfile
+from pathlib import Path
 from statistics import median
 
 from ffkit.core._ffmpeg import media_path
 from ffkit.core._process import stdout_chunks, stop
 from ffkit.core.audio.analysis.probe import probe
-from ffkit.core.audio.models import TempoSegment, Track
+from ffkit.core.audio.models import TempoSegment, WaveformAnalysis
 from ffkit.core.runtime import FFmpegRuntime
 
 WAVEFORM_BINS = 400
@@ -21,12 +22,13 @@ TEMPO_MIN_WINDOW = 160
 TEMPO_MIN_CONFIDENCE = 0.1
 
 
-def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> list[float]:
+def analyze_peak_waveform(
+    source: Path, duration: float | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
+) -> tuple[float, ...]:
     """Measure a full-scale peak envelope from four-times oversampled audio."""
-    duration = track.duration
     if duration is None:
-        duration = probe(Track(path=track.path), runtime=runtime).duration
-    if duration is None or not math.isfinite(duration) or duration <= 0:
+        duration = probe(source, runtime=runtime).duration
+    if not math.isfinite(duration) or duration <= 0:
         raise ValueError("Track duration is unavailable")
 
     info = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
@@ -40,7 +42,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
             "stream=sample_rate,channels",
             "-of",
             "json",
-            media_path(track.path),
+            media_path(source),
         ],
         capture_output=True,
         text=True,
@@ -60,7 +62,7 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
             "-v",
             "error",
             "-i",
-            media_path(track.path),
+            media_path(source),
             "-map",
             "0:a:0",
             "-vn",
@@ -97,20 +99,20 @@ def analyze_peak_waveform(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntim
     finally:
         stop(process)
 
-    return [round(value, 5) for value in peaks]
+    return tuple(round(value, 5) for value in peaks)
 
 
 def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analysis.
-    track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()
-) -> Track:
-    """Build a compact waveform and rough tempo segments from decoded mono audio."""
+    source: Path, duration: float | None = None, *, runtime: FFmpegRuntime = FFmpegRuntime()
+) -> WaveformAnalysis:
+    """Build a compact waveform, a peak envelope, and rough tempo segments of a source."""
     process = subprocess.Popen(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
             runtime.ffmpeg_path,
             "-v",
             "error",
             "-i",
-            media_path(track.path),
+            media_path(source),
             "-map",
             "0:a:0",
             "-vn",
@@ -157,21 +159,21 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
             stop(process)
 
         if not energy_count:
-            return track
+            return WaveformAnalysis()
         energy_file.flush()
         with mmap.mmap(energy_file.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
             energy = memoryview(mapped).cast("d")
             try:
                 width = max(1, math.ceil(energy_count / WAVEFORM_BINS))
-                track.waveform = [
+                waveform = tuple(
                     round(max(energy[pos : pos + width]) / (peak or 1), 3)
                     for pos in range(0, energy_count, width)
-                ]
+                )
                 estimates = tempo_estimates(energy)
             finally:
                 energy.release()
 
-    track.waveform_peak = analyze_peak_waveform(track, runtime=runtime)
+    peaks = analyze_peak_waveform(source, duration, runtime=runtime)
 
     segments: list[TempoSegment] = []
     if estimates:
@@ -197,8 +199,7 @@ def analyze_waveform_tempo(  # noqa: C901, PLR0915 - Single-pass streaming analy
                     TempoSegment(start=estimates[index][0], bpm=bpm, confidence=estimates[index][2])
                 )
 
-    track.tempo = segments
-    return track
+    return WaveformAnalysis(waveform=waveform, peaks=peaks, tempo=tuple(segments))
 
 
 def tempo_estimates(energy: memoryview[float]) -> list[tuple[float, float, float]]:

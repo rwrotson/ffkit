@@ -84,7 +84,7 @@ def _stream(  # noqa: PLR0913 - Receives only the runtime fields it uses.
         "0:a:0",
     ]
 
-    filters = audio_filters(snapshot, gain, streaming=True, limiter_db=limiter_db)
+    filters = audio_filters(snapshot.effects, gain, streaming=True, limiter_db=limiter_db)
     if filters:
         command += ["-af", ",".join(filters)]
     command += [*MP3_ENCODER_ARGS, "-f", "mp3", "pipe:1"]

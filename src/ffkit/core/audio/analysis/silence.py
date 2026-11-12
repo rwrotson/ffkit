@@ -12,7 +12,7 @@ from ffkit.core._ffmpeg import ffmpeg_number, media_path
 from ffkit.core._process import ERROR_TAIL_LIMIT, stop
 from ffkit.core.audio.analysis.probe import probe
 from ffkit.core.audio.defaults import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION
-from ffkit.core.audio.models import Effects, Track
+from ffkit.core.audio.models import Effects
 from ffkit.core.errors import CancelledError
 from ffkit.core.runtime import FFmpegRuntime
 
@@ -200,7 +200,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
 ) -> tuple[float, float | None]:
     """Find audible bounds; retain pauses inside the track."""
     if duration is None:
-        duration = probe(Track(path=str(path)), runtime=runtime).duration
+        duration = probe(path, runtime=runtime).duration
     if not duration or duration <= 0:
         raise ValueError("Track duration is unavailable")
 
@@ -244,7 +244,7 @@ def trailing_trim_end(
     if not effects.trim_silence:
         return None
 
-    duration = probe(Track(path=str(source)), runtime=runtime).duration
+    duration = probe(source, runtime=runtime).duration
     trailing_end = trailing_silence_end(
         effects,
         source,

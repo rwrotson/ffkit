@@ -1,13 +1,11 @@
 from ffkit import (
     Effects,
-    Track,
     audio_filters,
 )
 
 
 def test_filters_use_fixed_notation_for_small_values() -> None:
-    track = Track(path="song.flac", effects=Effects(trim_start=1e-5, gain_db=1e-5))
-    assert audio_filters(track) == [
+    assert audio_filters(Effects(trim_start=1e-5, gain_db=1e-5)) == [
         "atrim=start=0.00001",
         "asetpts=PTS-STARTPTS",
         "volume=0.00001dB",
@@ -15,12 +13,9 @@ def test_filters_use_fixed_notation_for_small_values() -> None:
 
 
 def test_filters_keep_order_and_stream_rule() -> None:
-    track = Track(path="song.flac")
-    assert audio_filters(track) == []
+    assert audio_filters(Effects()) == []
 
-    track.effects = Effects(
-        trim_start=1, trim_end=4, trim_silence=True, gain_db=2, normalize_lufs=-14
-    )
+    effects = Effects(trim_start=1, trim_end=4, trim_silence=True, gain_db=2, normalize_lufs=-14)
     expected = [
         "atrim=start=1.0:end=4.0",
         "asetpts=PTS-STARTPTS",
@@ -33,14 +28,19 @@ def test_filters_keep_order_and_stream_rule() -> None:
         "alimiter=limit=0.89125094:level=false:latency=true",
     ]
 
-    assert audio_filters(track, 3, limiter_db=-1) == expected
-    assert audio_filters(track, 3, streaming=True, limiter_db=-1) == [*expected[:3], *expected[6:]]
+    assert audio_filters(effects, 3, limiter_db=-1) == expected
+    assert audio_filters(effects, 3, streaming=True, limiter_db=-1) == [
+        *expected[:3],
+        *expected[6:],
+    ]
 
-    track.effects.limiter_ceiling_db = -3
+    effects.limiter_ceiling_db = -3
     assert (
-        audio_filters(track, limiter_db=-1)[-1]
+        audio_filters(effects, limiter_db=-1)[-1]
         == "alimiter=limit=0.70794578:level=false:latency=true"
     )
 
-    track.effects = Effects(trim_end=4)
-    assert audio_filters(track)[:2] == ["atrim=start=0.0:end=4.0", "asetpts=PTS-STARTPTS"]
+    assert audio_filters(Effects(trim_end=4))[:2] == [
+        "atrim=start=0.0:end=4.0",
+        "asetpts=PTS-STARTPTS",
+    ]

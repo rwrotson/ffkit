@@ -9,8 +9,8 @@ def test_embedded_cover_without_image(make_tone: Callable[..., None], tmp_path: 
     source = tmp_path / "source.wav"
     make_tone(source)
 
-    assert embedded_cover(Track(path=str(source))) is None
-    assert embedded_cover(Track(path=str(tmp_path / "missing.mp3"))) is None
+    assert embedded_cover(source) is None
+    assert embedded_cover(tmp_path / "missing.mp3") is None
 
 
 def test_embedded_cover_reads_jpeg_bytes(make_tone: Callable[..., None], tmp_path: Path) -> None:
@@ -36,9 +36,7 @@ def test_embedded_cover_reads_jpeg_bytes(make_tone: Callable[..., None], tmp_pat
     encoded = tmp_path / "with-cover.mp3"
     render(Track(path=str(source), cover_path=str(image)), encoded)
 
-    cover = embedded_cover(Track(path=str(encoded)))
+    cover = embedded_cover(encoded)
 
     assert cover is not None
     assert cover.startswith(b"\xff\xd8")
-    assert embedded_cover(Track(path=str(encoded), cover_removed=True)) == cover
-    assert embedded_cover(Track(path=str(encoded), cover_path=str(image))) == cover

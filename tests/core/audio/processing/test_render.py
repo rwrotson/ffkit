@@ -9,6 +9,7 @@ import pytest
 
 from ffkit import (
     CancelledError,
+    Effects,
     FFmpegRuntime,
     Group,
     Track,
@@ -58,7 +59,7 @@ def test_render_mp3_with_trim_tags_and_gain(make_tone: Callable[..., None], tmp_
     target = tmp_path / "nested" / "out.mp3"
     render(track, target, group_gain_db=1)
 
-    output = probe(Track(path=str(target)))
+    output = probe(target)
     assert output.duration is not None
     assert 0.5 < output.duration < 0.8
     assert output.tags["title"] == "New"
@@ -72,14 +73,12 @@ def test_render_relative_colon_path_and_tag_overrides(
     monkeypatch.chdir(tmp_path)
     source = Path("Song: Live.wav")
     make_tone(tmp_path / source, duration=1)
-    track = probe(Track(path=str(source), tags={"album_artist": "Band"}))
-    track.tags["comment"] = "kept"
-    track.tag_overrides["comment"] = "kept"
+    track = Track(path=str(source), tags={"album_artist": "Band", "comment": "kept"})
 
     target = Path("Out: Live.mp3")
     render(track, target)
 
-    output = probe(Track(path=str(target)))
+    output = probe(target)
     assert output.duration is not None
     assert output.tags["album_artist"] == "Band"
     assert output.tags["comment"] == "kept"
@@ -114,7 +113,7 @@ def test_render_trims_edges_without_reversing_audio(
     track.effects.trim_end = 4.5
     track.effects.trim_silence = True
 
-    def checked_filters(current: Track, gain: float, *, streaming: bool) -> list[str]:
+    def checked_filters(current: Effects, gain: float, *, streaming: bool) -> list[str]:
         assert streaming is True
         filters = audio_filters(current, gain, streaming=streaming)
         assert "areverse" not in filters
@@ -125,7 +124,7 @@ def test_render_trims_edges_without_reversing_audio(
     target = tmp_path / "trimmed.mp3"
     render(track, target)
 
-    duration = probe(Track(path=str(target))).duration
+    duration = probe(target).duration
     assert duration is not None
     assert 2.9 < duration < 3.2
 
@@ -187,7 +186,7 @@ def test_render_keeps_short_audible_tail_after_pause(tmp_path: Path) -> None:
     target = tmp_path / "rendered.mp3"
     render(track, target)
 
-    duration = probe(Track(path=str(target))).duration
+    duration = probe(target).duration
     assert duration is not None
     assert 2.0 < duration < 2.15
 

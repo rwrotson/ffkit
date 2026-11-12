@@ -170,15 +170,16 @@ def output_file(path: Path, force: bool) -> Path:
 @audio.command("probe")
 def probe_command(ctx: typer.Context, source: Path) -> None:
     """Read audio duration and tags."""
-    track = probe(Track(path=str(input_file(source))), runtime=cli_state(ctx).runtime)
-    data: dict[str, object] = {"path": track.path, "duration": track.duration, "tags": track.tags}
+    source = input_file(source)
+    info = probe(source, runtime=cli_state(ctx).runtime)
+    data: dict[str, object] = {"path": str(source), "duration": info.duration, "tags": info.tags}
     emit(
         ctx,
         data,
         [
-            f"Path: {track.path}",
-            f"Duration: {track.duration} s",
-            *[f"{key}: {value}" for key, value in track.tags.items()],
+            f"Path: {source}",
+            f"Duration: {info.duration} s",
+            *[f"{key}: {value}" for key, value in info.tags.items()],
         ],
     )
 
@@ -282,9 +283,9 @@ def normalization_gain_command(
 ) -> None:
     """Calculate a fixed gain that reaches the target loudness within the peak ceiling."""
     gain = calculate_normalization_gain(
-        Track(path=str(input_file(source))),
-        target_lufs,
-        peak_ceiling_db,
+        input_file(source),
+        target_lufs=target_lufs,
+        peak_ceiling_db=peak_ceiling_db,
         runtime=cli_state(ctx).runtime,
     )
     emit(ctx, {"gain_db": gain}, [f"Gain: {gain} dB"])

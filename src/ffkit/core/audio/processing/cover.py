@@ -23,7 +23,7 @@ def extract_cover(
     ):
         raise ValueError("Output path must differ from source audio")
 
-    image = embedded_cover(track, runtime=runtime)
+    image = embedded_cover(source, runtime=runtime)
     if image is None:
         return None
 

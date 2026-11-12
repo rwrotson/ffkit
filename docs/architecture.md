@@ -49,7 +49,7 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 | | Errors | `errors` |
 | `core.audio` | Processing | `processing` |
 | | Analysis | `analysis` |
-| | Primitives | `filters \| files` |
+| | Primitives | `filters \| files \| tags` |
 | | Models | `models` |
 | | Constants | `defaults \| _constants` |
 | `core.audio.analysis` | Measurement | `loudness \| waveform` |

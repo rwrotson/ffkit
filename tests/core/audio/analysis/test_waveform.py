@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from ffkit import (
-    Track,
     analyze_peak_waveform,
     analyze_waveform_tempo,
     probe,
@@ -17,13 +16,14 @@ from ffkit import (
 def test_waveform_and_tempo_on_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    track = probe(Track(path=str(source)))
-    assert len(analyze_peak_waveform(track)) == 400
-    analyzed = analyze_waveform_tempo(track)
-    assert analyzed is track
+    duration = probe(source).duration
+    assert len(analyze_peak_waveform(source, duration)) == 400
+
+    analyzed = analyze_waveform_tempo(source, duration)
+
     assert analyzed.waveform
-    assert len(analyzed.waveform_peak) == 400
-    assert analyzed.waveform_peak[0] > 0
+    assert len(analyzed.peaks) == 400
+    assert analyzed.peaks[0] > 0
 
 
 def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
@@ -45,7 +45,7 @@ def test_peak_waveform_probes_missing_duration(tmp_path: Path) -> None:
         check=True,
     )
 
-    peaks = analyze_peak_waveform(Track(path=str(source)))
+    peaks = analyze_peak_waveform(source)
     assert len(peaks) == 400
     assert 100 < next(index for index, peak in enumerate(peaks) if peak > 0) < 150
 
@@ -74,7 +74,7 @@ def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
         check=True,
     )
 
-    assert analyze_waveform_tempo(probe(Track(path=str(short)))).waveform
+    assert analyze_waveform_tempo(short).waveform
 
     silent = tmp_path / "silent.wav"
     subprocess.run(  # noqa: S603 - Fixed FFmpeg test fixture command.
@@ -92,7 +92,7 @@ def test_short_and_silent_audio_analysis(tmp_path: Path) -> None:
         check=True,
     )
 
-    analyzed = analyze_waveform_tempo(probe(Track(path=str(silent))))
+    analyzed = analyze_waveform_tempo(silent)
     assert analyzed.waveform
     assert max(analyzed.waveform) == 0
 
@@ -107,8 +107,8 @@ def test_tempo_segment_transitions(
         "ffkit.core.audio.analysis.waveform.tempo_estimates", lambda energy: estimates
     )
 
-    track = analyze_waveform_tempo(probe(Track(path=str(source))))
-    assert [(segment.start, segment.bpm) for segment in track.tempo] == [
+    analyzed = analyze_waveform_tempo(source)
+    assert [(segment.start, segment.bpm) for segment in analyzed.tempo] == [
         (0.0, 90.0),
         (60.0, 140.0),
     ]

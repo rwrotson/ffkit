@@ -256,7 +256,7 @@ containers = ["ffkit.core.audio"]
 layers = [
     "processing",
     "analysis",
-    "filters | files",
+    "filters | files | tags",
     "models",
     "defaults | _constants",
 ]

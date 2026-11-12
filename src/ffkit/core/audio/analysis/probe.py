@@ -4,16 +4,14 @@ import subprocess
 from pathlib import Path
 
 from ffkit.core._ffmpeg import media_path
-from ffkit.core.audio.models import Track
+from ffkit.core.audio.models import AudioInfo
 from ffkit.core.runtime import FFmpegRuntime
 
 
-def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
-    """Read duration and tags from the first audio stream."""
-    source = Path(track.path)
+def probe(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> AudioInfo:
+    """Read duration and tags from the first audio stream; stream tags override container tags."""
     if not source.is_file():
-        track.error = "Source file is missing"
-        return track
+        raise FileNotFoundError(source)
 
     result = subprocess.run(  # noqa: S603 - Fixed executable and argument list; paths stay separate.
         [
@@ -41,14 +39,12 @@ def probe(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
         raise ValueError("File has no decodable audio stream")
 
     info = report["format"]
-    track.duration = float(info.get("duration", 0))
-    if not math.isfinite(track.duration) or track.duration <= 0:
+    duration = float(info.get("duration", 0))
+    if not math.isfinite(duration) or duration <= 0:
         raise ValueError("File has no measurable audio duration")
 
     format_tags = {str(key).lower(): str(value) for key, value in info.get("tags", {}).items()}
     stream_tags = {
         str(key).lower(): str(value) for key, value in audio_stream.get("tags", {}).items()
     }
-    track.merge_probed_tags({**format_tags, **stream_tags})
-    track.error = None
-    return track
+    return AudioInfo(duration=duration, tags={**format_tags, **stream_tags})

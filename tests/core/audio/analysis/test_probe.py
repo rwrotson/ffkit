@@ -5,21 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from ffkit import (
-    Track,
-    detect_trim_bounds,
-    probe,
-)
+from ffkit import detect_trim_bounds, probe
 
 
 def test_probe_reads_real_audio(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source)
-    track = probe(Track(path=str(source), tags={"title": "Custom"}))
-    assert track.duration is not None
-    assert 1.9 < track.duration < 2.1
-    assert track.tags["title"] == "Custom"
-    assert track.error is None
+
+    info = probe(source)
+
+    assert 1.9 < info.duration < 2.1
 
 
 def test_probe_reads_audio_stream_tags(tmp_path: Path) -> None:
@@ -43,7 +38,7 @@ def test_probe_reads_audio_stream_tags(tmp_path: Path) -> None:
         check=True,
     )
 
-    assert probe(Track(path=str(source))).tags["title"] == "Stream title"
+    assert probe(source).tags["title"] == "Stream title"
 
 
 def test_probe_tag_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,78 +53,18 @@ def test_probe_tag_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         "ffkit.core.audio.analysis.probe.subprocess.run", lambda *args, **kwargs: result
     )
 
-    tags = probe(Track(path=str(source), tags={"artist": "Custom"})).tags
-    assert tags == {"title": "Stream", "artist": "Custom", "album": "Album"}
-
-
-def test_reprobe_refreshes_source_tags_and_keeps_overrides(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = tmp_path / "source.wav"
-    source.touch()
-    reports = iter(
-        [
-            {"title": "Old", "artist": "Artist", "album": "Old album"},
-            {"title": "New", "artist": "New artist", "genre": "Rock"},
-            {"title": "Latest", "artist": "Final artist"},
-        ]
-    )
-
-    def fake_probe(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        report = {
-            "streams": [{"codec_type": "audio"}],
-            "format": {"duration": "1", "tags": next(reports)},
-        }
-        return subprocess.CompletedProcess([], 0, stdout=json.dumps(report))
-
-    monkeypatch.setattr("ffkit.core.audio.analysis.probe.subprocess.run", fake_probe)
-    track = Track(path=str(source), tags={"artist": "Artist"})
-    probe(track)
-    assert track.tags == {"title": "Old", "artist": "Artist", "album": "Old album"}
-
-    track.tags["genre"] = "Custom genre"
-    probe(track)
-    assert track.tags == {"title": "New", "artist": "Artist", "genre": "Custom genre"}
-
-    del track.tags["artist"]
-    track.tags["title"] = "Edited title"
-    probe(track)
-    assert track.tags == {
-        "title": "Edited title",
-        "artist": "Final artist",
-        "genre": "Custom genre",
-    }
-
-
-def test_reprobe_after_json_round_trip_refreshes_source_tags(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = tmp_path / "source.wav"
-    source.touch()
-    titles = iter(("Old", "New"))
-
-    def fake_probe(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        report = {
-            "streams": [{"codec_type": "audio"}],
-            "format": {"duration": "1", "tags": {"title": next(titles), "artist": "Source"}},
-        }
-        return subprocess.CompletedProcess([], 0, stdout=json.dumps(report))
-
-    monkeypatch.setattr("ffkit.core.audio.analysis.probe.subprocess.run", fake_probe)
-    original = probe(Track(path=str(source), tags={"artist": "Custom"}))
-    restored = Track.model_validate_json(original.model_dump_json())
-    probe(restored)
-    assert restored.tags == {"title": "New", "artist": "Custom"}
+    tags = probe(source).tags
+    assert tags == {"title": "Stream", "artist": "Singer", "album": "Album"}
 
 
 def test_probe_missing_and_bad_audio(tmp_path: Path) -> None:
-    missing = probe(Track(path=str(tmp_path / "missing.wav")))
-    assert missing.error == "Source file is missing"
+    with pytest.raises(FileNotFoundError):
+        probe(tmp_path / "missing.wav")
 
     broken = tmp_path / "broken.wav"
     broken.write_bytes(b"invalid")
     with pytest.raises(subprocess.CalledProcessError):
-        probe(Track(path=str(broken)))
+        probe(broken)
     with pytest.raises(ValueError, match="duration"):
         detect_trim_bounds(broken, duration=0)
 
@@ -147,7 +82,7 @@ def test_probe_rejects_missing_audio_stream(
     )
 
     with pytest.raises(ValueError, match="no decodable audio"):
-        probe(Track(path=str(source)))
+        probe(source)
 
 
 def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -163,4 +98,4 @@ def test_probe_rejects_zero_duration(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
 
     with pytest.raises(ValueError, match="measurable audio duration"):
-        probe(Track(path=str(source)))
+        probe(source)

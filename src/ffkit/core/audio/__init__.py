@@ -16,20 +16,34 @@ from .defaults import (
 )
 from .files import audio_files, safe_name
 from .filters import audio_filters
-from .models import Effects, Group, TempoSegment, Track
+from .models import (
+    AudioInfo,
+    Effects,
+    Group,
+    MergedTags,
+    SourceLoudness,
+    TempoSegment,
+    Track,
+    WaveformAnalysis,
+)
 from .processing.cover import extract_cover
 from .processing.render import render
 from .processing.stream import stream_mp3
+from .tags import merge_tags
 
 __all__ = [
     "DEFAULT_PEAK_CEILING_DB",
     "DEFAULT_SILENCE_THRESHOLD_DB",
     "DEFAULT_TARGET_LUFS",
     "DEFAULT_TRIM_MIN_DURATION",
+    "AudioInfo",
     "Effects",
     "Group",
+    "MergedTags",
+    "SourceLoudness",
     "TempoSegment",
     "Track",
+    "WaveformAnalysis",
     "analyze_loudness",
     "analyze_peak_waveform",
     "analyze_waveform_tempo",
@@ -40,6 +54,7 @@ __all__ = [
     "embedded_cover",
     "extract_cover",
     "measure_loudness",
+    "merge_tags",
     "normalization_gain",
     "probe",
     "render",

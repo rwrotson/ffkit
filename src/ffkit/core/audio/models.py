@@ -14,6 +14,8 @@ from ffkit.core.audio.defaults import (
 class TempoSegment(BaseModel):
     """A timed BPM estimate."""
 
+    model_config = ConfigDict(frozen=True)
+
     start: float = Field(default=0, ge=0)
     bpm: float = Field(gt=0, le=400)
     confidence: float | None = Field(default=None, ge=0, le=1)
@@ -57,6 +59,52 @@ class Effects(BaseModel):
         return self.limiter_ceiling_db if self.limiter_ceiling_db is not None else default
 
 
+class AudioInfo(BaseModel):
+    """Duration and tags of the first audio stream."""
+
+    model_config = ConfigDict(frozen=True)
+
+    duration: float = Field(gt=0)
+    tags: dict[str, str] = Field(default_factory=dict)
+
+
+class SourceLoudness(BaseModel):
+    """Source loudness, true peak, and the fingerprint of the measured file."""
+
+    model_config = ConfigDict(frozen=True)
+
+    lufs: float | None
+    true_peak_db: float | None
+    fingerprint: tuple[int, int, int]
+
+
+class WaveformAnalysis(BaseModel):
+    """Waveform envelopes and tempo segments of a source."""
+
+    model_config = ConfigDict(frozen=True)
+
+    waveform: tuple[float, ...] = ()
+    peaks: tuple[float, ...] = ()
+    tempo: tuple[TempoSegment, ...] = ()
+
+    @model_validator(mode="after")
+    def ordered_tempo(self) -> Self:
+        """Check tempo ordering."""
+        starts = [segment.start for segment in self.tempo]
+        if starts != sorted(set(starts)):
+            raise ValueError("Tempo segments must have unique, increasing start times")
+        return self
+
+
+class MergedTags(BaseModel):
+    """Tags after a probe and the subset that overrides source tags."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tags: dict[str, str]
+    overrides: dict[str, str]
+
+
 class Track(BaseModel):
     """Original audio source, metadata, and analysis results."""
 
@@ -77,24 +125,6 @@ class Track(BaseModel):
     waveform_peak: list[float] = Field(default_factory=list)
     effects: Effects = Field(default_factory=Effects)
     error: str | None = None
-
-    def merge_probed_tags(self, source_tags: dict[str, str]) -> None:
-        """Replace source tags with probed ones and keep tags the caller changed."""
-        if self.probed_source_tags is None:
-            overrides = self.tags.copy()
-        else:
-            overrides = {
-                key: value for key, value in self.tags.items() if key in self.tag_overrides
-            }
-            overrides.update(
-                (key, value)
-                for key, value in self.tags.items()
-                if key not in self.tag_overrides and self.probed_source_tags.get(key) != value
-            )
-
-        self.probed_source_tags = source_tags.copy()
-        self.tag_overrides = overrides
-        self.tags = {**source_tags, **overrides}
 
     @model_validator(mode="after")
     def valid_edits(self) -> Self:

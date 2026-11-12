@@ -9,7 +9,7 @@ from ffkit.core.audio._constants import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB
 from ffkit.core.audio.analysis.silence import trailing_trim_end
 from ffkit.core.audio.defaults import DEFAULT_PEAK_CEILING_DB, DEFAULT_TARGET_LUFS
 from ffkit.core.audio.filters import audio_filters
-from ffkit.core.audio.models import Track
+from ffkit.core.audio.models import Effects, SourceLoudness
 from ffkit.core.runtime import FFmpegRuntime
 
 
@@ -64,18 +64,13 @@ def measure_loudness(
     return finite(data.get("input_i")), finite(data.get("input_tp"))
 
 
-def analyze_loudness(track: Track, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Track:
+def analyze_loudness(source: Path, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> SourceLoudness:
     """Measure source loudness and record the file fingerprint for normalization reuse."""
-    source = Path(track.path)
     fingerprint = source_fingerprint(source)
     lufs, peak = measure_loudness(source, runtime=runtime)
     if source_fingerprint(source) != fingerprint:
         raise ValueError("Source audio changed during loudness analysis")
-
-    track.loudness_lufs = lufs
-    track.true_peak_db = peak
-    track.analysis_source_stat = fingerprint
-    return track
+    return SourceLoudness(lufs=lufs, true_peak_db=peak, fingerprint=fingerprint)
 
 
 def normalization_gain(
@@ -99,38 +94,36 @@ def normalization_gain(
     return rounded
 
 
-def calculate_normalization_gain(
-    track: Track,
+def calculate_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmpeg runtime.
+    source: Path,
+    effects: Effects | None = None,
     target_lufs: float = DEFAULT_TARGET_LUFS,
     peak_ceiling_db: float = DEFAULT_PEAK_CEILING_DB,
     *,
+    known: SourceLoudness | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> float:
     """Measure processed audio and calculate a fixed gain within the true peak ceiling.
 
-    Stored ``loudness_lufs`` and ``true_peak_db`` are reused instead of measuring only when no
-    filters apply and ``analysis_source_stat`` matches the source file's size, mtime, and ctime.
+    Gain, loudness normalization, and the limiter of ``effects`` are ignored; trims apply.
+    ``known`` is used instead of measuring only when no filters apply and its fingerprint matches
+    the source file's size, mtime, and ctime.
     """
-    measured = track.model_copy(deep=True)
-    measured.effects.normalize_lufs = None
-    measured.effects.limiter_ceiling_db = None
-    measured.effects.gain_db = 0
+    measured = (effects or Effects()).model_copy()
+    measured.gain_db = 0
+    measured.normalize_lufs = None
+    measured.limiter_ceiling_db = None
 
-    source = Path(measured.path)
     fingerprint = source_fingerprint(source)
-    trailing_end = trailing_trim_end(measured.effects, source, runtime=runtime)
+    trailing_end = trailing_trim_end(measured, source, runtime=runtime)
     if trailing_end is not None:
-        measured.effects.trim_end = trailing_end
+        measured.trim_end = trailing_end
     filters = audio_filters(measured, streaming=True, limiter_db=None)
 
     lufs: float | None
     peak: float | None
-    if (
-        not filters
-        and track.analysis_source_stat == fingerprint
-        and track.loudness_lufs is not None
-    ):
-        lufs, peak = track.loudness_lufs, track.true_peak_db
+    if not filters and known is not None and known.fingerprint == fingerprint:
+        lufs, peak = known.lufs, known.true_peak_db
     else:
         lufs, peak = measure_loudness(source, filters=filters, runtime=runtime)
 

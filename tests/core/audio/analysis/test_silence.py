@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ffkit import CancelledError, Track, detect_trim_bounds, probe
+from ffkit import CancelledError, Effects, detect_trim_bounds, probe
 from ffkit.core._process import ERROR_TAIL_LIMIT
 from ffkit.core.audio.analysis.silence import SilenceScan
 
@@ -48,8 +48,7 @@ def test_trim_bounds_keep_internal_pause(tmp_path: Path) -> None:
     assert end is not None
     assert 3.9 < end < 4.1
 
-    duration = probe(Track(path=str(source))).duration
-    assert duration is not None
+    duration = probe(source).duration
     assert detect_trim_bounds(source, duration) == (start, end)
 
 
@@ -80,8 +79,7 @@ def test_trim_bounds_preserve_short_audible_tail(tmp_path: Path) -> None:
         check=True,
     )
 
-    duration = probe(Track(path=str(source))).duration
-    assert duration is not None
+    duration = probe(source).duration
     assert detect_trim_bounds(source) == (0.0, None)
     assert detect_trim_bounds(source, duration) == (0.0, None)
 
@@ -107,7 +105,7 @@ def test_trailing_silence_scan_handles_no_silence_and_empty_trim(
 ) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source, duration=1)
-    effects = Track(path=str(source)).effects
+    effects = Effects()
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
     effects.trim_start = 2
     assert silence_module.trailing_silence_end(effects, source, 1.0, **TOOLS) is None
@@ -121,9 +119,7 @@ def test_trailing_silence_scan_respects_cancellation(
     source = tmp_path / "tone.wav"
     make_tone(source, duration=1)
     with pytest.raises(CancelledError, match="Export cancelled"):
-        silence_module.trailing_silence_end(
-            Track(path=str(source)).effects, source, 1.0, lambda: True, **TOOLS
-        )
+        silence_module.trailing_silence_end(Effects(), source, 1.0, lambda: True, **TOOLS)
 
 
 def test_trailing_silence_scan_handles_ffmpeg_failure_and_timeout() -> None:

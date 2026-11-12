@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import (
+    Effects,
     Track,
     audio_filters,
     render,
@@ -90,7 +91,7 @@ def test_stream_uses_streaming_filters(
     original = audio_filters
 
     def check_filters(
-        current: Track, gain: float, *, streaming: bool, limiter_db: float | None
+        current: Effects, gain: float, *, streaming: bool, limiter_db: float | None
     ) -> list[str]:
         assert streaming is True
         filters = original(current, gain, streaming=streaming, limiter_db=limiter_db)
