@@ -63,32 +63,42 @@ ffkit audio render song.flac song.mp3 --trim-start 1.5 --limiter-ceiling-db -1
 ## Using the Library
 
 ```python
-from ffkit import Effects, Track, audio_filters
+from pathlib import Path
 
-track = Track(path="song.flac", effects=Effects(gain_db=3))
-filters = audio_filters(track)
+from ffkit import Effects, audio_filters, probe, render
+
+source = Path("song.flac")
+info = probe(source)
+effects = Effects(gain_db=3)
+filters = audio_filters(effects)
+render(source, Path("song.mp3"), effects, tags={"title": "Song"})
 ```
 
-`Track.path` must always refer to the original audio file. To change processing, update
-`track.effects` and render or stream from that same original source. Never feed an earlier render
-back into the track: doing so applies effects again to processed audio. Trim bounds refer to the
-original file, and `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
-the remaining effects. Leading silence removal applies only when streaming from `start=0`.
+Functions take source paths, `Effects`, and options, and return immutable results such as
+`AudioInfo`, `SourceLoudness`, and `WaveformAnalysis`; they never modify their arguments. The
+application keeps track state in its own models.
+
+The source must always be the original audio file. To change processing, change `Effects` and render
+or stream from that same original source. Never use an earlier render as the source: doing so
+applies effects again to processed audio. Trim bounds refer to the original file, and
+`stream_mp3(start=...)` seeks from `trim_start` in that file before applying the remaining effects.
+Leading silence removal applies only when streaming from `start=0`.
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
-`probe()` reads container tags and tags from the first audio stream. Stream tags override container
-tags; explicitly provided `Track.tags` override both. Re-probing refreshes source tags and preserves
-explicit overrides, including after a JSON round trip. The serialized `probed_source_tags` and
-`tag_overrides` fields retain tag provenance. With `trim_silence` enabled, rendering and
-normalization scan for trailing silence before processing with bounded memory.
-Direct `audio_filters(track)` calls with `trim_silence=True` and the default `streaming=False`
+`probe()` reads container tags and tags from the first audio stream; stream tags override container
+tags. A missing source raises `FileNotFoundError`. `merge_tags()` refreshes source tags after a
+repeated probe and keeps tags the caller changed; the application stores the previous source tags
+and the returned overrides between probes. `render()` writes `tags` over the source metadata, and
+its `cover` option is `"source"`, an image `Path`, or `"none"`.
+With `trim_silence` enabled, rendering and normalization scan for trailing silence before
+processing with bounded memory.
+Direct `audio_filters(effects)` calls with `trim_silence=True` and the default `streaming=False`
 still emit `areverse`, which can buffer the full decoded track.
 An audible tail after an internal pause remains in the output.
 `detect_trim_bounds()` keeps the same tail when reporting audible bounds.
-Older Track JSON without these fields cannot distinguish source tags from explicit overrides.
 
-`Effects` checks trim bounds on assignment. `analyze_peak_waveform()` also accepts a track whose
-duration has not yet been populated by `probe()`.
+`Effects` checks trim bounds on assignment. Waveform analysis probes the source when `duration` is
+not given.
 Normalization gains are rounded to 0.1 dB without exceeding the measured true-peak ceiling.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
@@ -97,18 +107,17 @@ for probing, analysis, silence scanning, rendering, and cover extraction has a 1
 when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
 
 ```python
-from ffkit import FFmpegRuntime, Track, probe
+from pathlib import Path
+
+from ffkit import FFmpegRuntime, probe
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
-track = probe(Track(path="song.flac"), runtime=runtime)
+info = probe(Path("song.flac"), runtime=runtime)
 ```
-`Group` holds shared settings for an application. The library reads only `gain_db`,
-`normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
-`limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
-`normalize_peak_ceiling_db`, `trim_threshold_db`, and `trim_min_duration` are application state that
-callers pass to the corresponding functions themselves.
-`analyze_loudness()` stores source loudness, true peak, and the file fingerprint on the track;
-`calculate_normalization_gain()` reuses them while no filters apply and the file is unchanged.
+
+`analyze_loudness()` returns source loudness, true peak, and the file fingerprint;
+`calculate_normalization_gain(known=...)` reuses that result while no filters apply and the file is
+unchanged.
 
 Configure logging in the application, or use the bundled helper from the `logs` extra:
 

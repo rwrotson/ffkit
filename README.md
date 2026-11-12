@@ -86,7 +86,7 @@ from pathlib import Path
 
 from ffkit import (
     Effects,
-    Track,
+    analyze_loudness,
     audio_filters,
     calculate_normalization_gain,
     extract_cover,
@@ -95,31 +95,40 @@ from ffkit import (
     stream_mp3,
 )
 
-track = probe(Track(path="song.flac", effects=Effects(gain_db=3)))
-filters = audio_filters(track)
-gain = calculate_normalization_gain(track)
-render(track, Path("song.mp3"))
-chunks = stream_mp3(track, start=0.5)
-cover = extract_cover(track, Path("cover.jpg"))
+source = Path("song.flac")
+info = probe(source)
+effects = Effects(gain_db=3)
+filters = audio_filters(effects)
+loudness = analyze_loudness(source)
+gain = calculate_normalization_gain(source, effects, known=loudness)
+render(source, Path("song.mp3"), effects, tags={"title": "Song"})
+chunks = stream_mp3(source, effects, start=0.5)
+cover = extract_cover(source, Path("cover.jpg"))
 
-track.effects.gain_db = 6
-render(track, Path("song-updated.mp3"))
+effects.gain_db = 6
+render(source, Path("song-updated.mp3"), effects)
 ```
 
-Keep `Track.path` pointed at the original audio file. Change `Effects` on that track and render or
-stream from the original again. Never use a rendered output as the input for another effect change:
+Functions take source paths, `Effects`, and options, and return immutable results such as
+`AudioInfo`, `SourceLoudness`, and `WaveformAnalysis`; they never modify their arguments. The
+application keeps track state, such as tags, covers, and analysis results, in its own models.
+
+Always pass the original audio file as the source. To change processing, change `Effects` and render
+or stream from the original again. Never use a rendered output as the input for another effect change:
 that would apply effects a second time to already processed audio. Effect trim bounds are positions
 in the original file; `stream_mp3(start=...)` seeks from `trim_start` in that file before applying
 the remaining effects. Leading silence removal applies only when streaming from `start=0`.
 `audio_files()` skips hidden files, such as macOS `._*` files and in-progress render outputs.
 
-`probe()` combines container tags with tags from the first audio stream. Stream tags take precedence
-over container tags, and tags explicitly set on `Track` take precedence over both. Re-probing a track
-refreshes source tags while preserving explicit tag overrides, including after a JSON round trip of
-`Track`. The model includes `probed_source_tags` and `tag_overrides` to retain that distinction.
+`probe()` combines container tags with tags from the first audio stream; stream tags take precedence
+over container tags. It raises `FileNotFoundError` for a missing source. `merge_tags()` refreshes
+source tags after a repeated probe while keeping tags the caller changed: pass the current tags, the
+new and previous source tags, and the overrides from the previous `MergedTags`.
+`render()` copies source metadata and writes `tags` over it. Its `cover` option keeps the source
+cover (`"source"`, the default), embeds an image file (`Path`), or writes no cover (`"none"`).
 Rendering and normalization scan for trailing silence before processing when `trim_silence` is
 enabled, so long tracks do not require buffering decoded audio in `areverse`.
-Calling `audio_filters(track)` directly with `trim_silence=True` and the default
+Calling `audio_filters(effects)` directly with `trim_silence=True` and the default
 `streaming=False` still emits `areverse`, which can buffer the full decoded track.
 An audible ending is retained even when it follows a pause close to the end of the selected range.
 `detect_trim_bounds()` likewise keeps short audible tails after an internal pause.
@@ -128,8 +137,8 @@ source; if no image exists, it returns `None` and preserves the destination. The
 differ from the source audio file. `embedded_cover()` returns the first embedded image as JPEG
 bytes without writing a file.
 
-`analyze_peak_waveform()` reads the source duration when the track has not been probed.
-`Effects` validates trim bounds when they are changed as well as when the model is created.
+`analyze_peak_waveform()` and `analyze_waveform_tempo()` probe the source when `duration` is not
+given. `Effects` validates trim bounds when they are changed as well as when the model is created.
 Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRuntime`, which sets the
 executables and time limits. By default, `ffmpeg` and `ffprobe` are resolved from `PATH`, and each run
 for probing, analysis, silence scanning, rendering, and cover extraction has a 15-minute
@@ -137,21 +146,18 @@ for probing, analysis, silence scanning, rendering, and cover extraction has a 1
 when the encoder produces no output for `stream_idle_timeout` seconds (30 by default).
 
 ```python
-from ffkit import FFmpegRuntime, Track, probe
+from pathlib import Path
+
+from ffkit import FFmpegRuntime, probe
 
 runtime = FFmpegRuntime(ffmpeg_path="/opt/ffmpeg/bin/ffmpeg", process_timeout=3600)
-track = probe(Track(path="song.flac"), runtime=runtime)
+info = probe(Path("song.flac"), runtime=runtime)
 ```
-`Group` holds shared settings for an application. The library reads only `gain_db`,
-`normalization_gain_db`, `limiter_enabled`, and `limiter_ceiling_db` through `effective_gain_db` and
-`limiter_for()`; `view`, `normalization_target`, `normalize_target_lufs`,
-`normalize_peak_ceiling_db`, `trim_threshold_db`, and `trim_min_duration` are application state that
-callers pass to the corresponding functions themselves.
+
 Normalization gains use 0.1 dB steps and round toward attenuation when a measured true-peak ceiling
-would otherwise be exceeded. `calculate_normalization_gain()` reuses `Track.loudness_lufs` and
-`Track.true_peak_db` only when no filters apply and `Track.analysis_source_stat` matches the source
-file's `(st_size, st_mtime_ns, st_ctime_ns)`. `analyze_loudness()` measures the source and fills
-all three fields.
+would otherwise be exceeded. `analyze_loudness()` returns source loudness, true peak, and the file's
+`(st_size, st_mtime_ns, st_ctime_ns)` fingerprint. `calculate_normalization_gain(known=...)` reuses
+that result instead of measuring only when no filters apply and the fingerprint still matches.
 
 The library logs through stdlib loggers under `ffkit` and stays silent until the application configures logging. An application with the `logs` extra can use the bundled helper:
 

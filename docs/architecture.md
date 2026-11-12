@@ -37,7 +37,8 @@ lives in `core` below them; `core.errors` imports nothing from `ffkit`.
 
 `core.audio` has two subpackages of operations on top of a shared base:
 
-- `analysis` measures audio and returns data or fills a `Track`; it never creates output files.
+- `analysis` measures audio and returns data or immutable result models; it never creates output
+  files or modifies its arguments.
 - `processing` transforms audio into a new file or stream; it may use `analysis`.
 
 Layers are listed from top to bottom. Modules joined by `|` may not import each other:
@@ -70,7 +71,7 @@ in `pyproject.toml`. Rules that the contracts do not cover are checked in review
 
 Everything listed in `ffkit.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `ffkit.logs`, which applications use for setup. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
 
-Audio effects are non-destructive: `Track.path` remains the original source, and each render or
+Audio effects are non-destructive: the source path is always the original file, and each render or
 stream applies the current effects to that source. Changing an effect must never use a previous
 render as input. Effect trim positions are relative to the original file.
 
