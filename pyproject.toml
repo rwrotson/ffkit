@@ -18,6 +18,8 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
@@ -308,7 +310,7 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "The library uses only Pydantic among third-party packages"
+name = "The library uses only Pydantic and NumPy among third-party packages"
 type = "forbidden"
 source_modules = ["ffkit.audio", "ffkit.runtime", "ffkit._ffmpeg", "ffkit.errors"]
 forbidden_modules = ["pydantic_settings", "structlog", "typer", "rich"]

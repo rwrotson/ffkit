@@ -6,6 +6,7 @@
 - Git for installation from the repository
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) for development
 - `ffmpeg` and `ffprobe` on `PATH`, or paths configured through `FFmpegRuntime`, for audio operations
+- Linux or macOS; process pipes are read with `selectors`, which Windows does not support for pipes
 
 ## Installation
 
@@ -15,7 +16,7 @@ Install a release tag directly from GitHub (replace `vX.Y.Z` with a release tag)
 pip install "ffkit @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
 ```
 
-The base install provides the audio API and depends only on Pydantic. Extras add application layers:
+The base install provides the audio API and depends on Pydantic and NumPy. Extras add application layers:
 
 | Extra | Adds | Packages |
 | --- | --- | --- |
@@ -46,8 +47,8 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 ## Optional CLI
 
 Install with `pip install "ffkit[cli] @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"`, then run `ffkit audio --help`.
-The `audio` group includes `probe`, `loudness`, `trim-bounds`, `normalization-gain`, `render`, and
-`extract-cover`. `render` accepts `--cover PATH`, `--no-cover`, and repeated `--tag KEY=VALUE`.
+The `audio` group includes `probe`, `loudness`, `trim-bounds`, `normalization-gain`, `render`,
+`extract-cover`, `waveform`, and `tempo`. `render` accepts `--cover PATH`, `--no-cover`, and repeated `--tag KEY=VALUE`.
 Use `--output-format json` before `audio` for machine-readable output. Output files are protected
 against replacement unless `--force` is passed.
 Library `extract_cover()` replaces its destination only after successful extraction and keeps the
@@ -94,8 +95,8 @@ render("song.flac", "song-quiet.mp3", effects=effects.replace(gain_db=-3), runti
 - `detect_trim_bounds()` and `waveform()` accept an earlier `AudioInfo` as `info=` instead of
   probing again.
 - FFmpeg runs have a 15-minute deadline by default (`process_timeout`); `stream()` instead fails
-  after `stream_idle_timeout` seconds without output. Long-running operations accept a `cancelled`
-  callback.
+  after `stream_idle_timeout` seconds without output. Long-running operations, including `stream()`,
+  accept a `cancelled` callback.
 - Expected failures raise `FFKitError` subclasses; see [Architecture](architecture.md#errors).
 
 Configure logging in the application, or use the bundled helper from the `logs` extra:

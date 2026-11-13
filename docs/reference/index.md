@@ -1,6 +1,6 @@
 # API Reference
 
-The pages below are generated from public objects in `src/ffkit/`. Names exported from `ffkit` and `ffkit.audio` are the supported public API.
+The pages below are generated from public objects in `src/ffkit/`. Names exported from `ffkit`, `ffkit.audio`, and `ffkit.audio.library` are the supported public API.
 
 | Module | Purpose |
 |--------|---------|

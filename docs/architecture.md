@@ -12,7 +12,7 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Entry point | `ffkit/main.py` | `ffkit` console script; reports a missing `cli` extra | — | base |
 | CLI | `ffkit/cli/` | Composition root: loads `FFKIT_*` settings, sets up logging, passes values to the library, maps errors to exit codes | Pydantic Settings, Typer, Rich | `ffkit[cli]` |
 | Logging setup | `ffkit/logs/` | `LogSettings` and `setup_logging()` for applications | structlog | `ffkit[logs]` |
-| Media domains | `ffkit/audio/` | Audio models, helpers, and defaults | Pydantic | base |
+| Media domains | `ffkit/audio/` | Audio models, helpers, and defaults | Pydantic, NumPy | base |
 | FFmpeg | `ffkit/runtime.py`, `ffkit/_ffmpeg/` | `FFmpegRuntime`; private argument and process helpers | Pydantic | base |
 | Errors | `ffkit/errors.py` | The `FFKitError` hierarchy | — | base |
 
@@ -132,8 +132,8 @@ errors.
   `ffkit/_ffmpeg/`. Place a new module in one of the layers above, and raise a `FFKitError`
   subclass for expected failures.
 - Accept values as arguments; do not read the environment.
-- Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime` that defaults to `FFmpegRuntime()`.
-  Internal helpers receive only the fields they use, such as `ffmpeg` or `timeout`.
+- Public functions that run FFmpeg or FFprobe take a keyword-only `runtime: FFmpegRuntime` that defaults to `FFmpegRuntime()`
+  and pass it on to internal helpers. They check the source with `existing_file()` before running FFmpeg.
 - Export public names from `ffkit/audio/__init__.py` and add them to its `__all__`.
 - Put default values that callers may need in `ffkit/audio/defaults.py`.
 - Test the behaviour in `tests/`, in a file that mirrors the module path.
