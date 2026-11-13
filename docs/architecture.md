@@ -65,6 +65,9 @@ Layers are listed from top to bottom. Modules joined by `|` may not import each 
 | | Probe | `probe \| cover` |
 | `ffkit.audio.processing` | Output | `render \| stream \| extract` |
 | `ffkit.audio.library` | Helpers | `files \| tags` |
+| `ffkit.cli` | Root command | `app` |
+| | Command groups | `audio` |
+| | Shared | `_shared \| settings` |
 
 Every module in these packages must belong to one of their layers. The `__init__.py` files of
 `analysis` and `processing` are empty; `ffkit/audio/__init__.py` re-exports from their modules, and

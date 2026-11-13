@@ -281,6 +281,13 @@ layers = ["render | stream | extract"]
 exhaustive = true
 
 [[tool.importlinter.contracts]]
+name = "CLI layers"
+type = "layers"
+containers = ["ffkit.cli"]
+layers = ["app", "audio", "_shared | settings"]
+exhaustive = true
+
+[[tool.importlinter.contracts]]
 name = "Applications use the library only through its public packages"
 type = "forbidden"
 source_modules = ["ffkit.main", "ffkit.cli", "ffkit.logs"]

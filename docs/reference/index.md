@@ -22,6 +22,7 @@ The pages below are generated from public objects in `src/ffkit/`. Names exporte
 | `ffkit.audio.processing.extract` | Extract an embedded cover image to a file |
 | `ffkit.logs.settings` | Define logging settings |
 | `ffkit.logs.setup` | Configure console and file logging for applications |
-| `ffkit.cli.app` | Provide the optional Typer audio commands |
+| `ffkit.cli.app` | Define the root command, its options, and error exits |
+| `ffkit.cli.audio` | Provide the optional Typer audio commands |
 | `ffkit.cli.settings` | Define and load `FFKIT_*` settings of the command |
 | `ffkit.main` | Start the optional CLI |
