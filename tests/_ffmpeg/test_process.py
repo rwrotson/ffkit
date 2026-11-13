@@ -2,6 +2,7 @@ import logging
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -98,6 +99,16 @@ def test_idle_timeout_resets_on_output() -> None:
 
     with pytest.raises(FFmpegTimeoutError, match="no output"):
         list(iter_output(_python("import time; time.sleep(10)"), idle_timeout=0.1))
+
+
+def test_idle_timeout_ignores_consumer_pauses() -> None:
+    code = "import time\nfor _ in range(3):\n    print(flush=True); time.sleep(0.05)"
+    output = iter_output(_python(code), idle_timeout=0.3)
+
+    first = next(output)
+    time.sleep(0.6)
+
+    assert len(first + b"".join(output)) == 3
 
 
 def test_cancellation_stops_process() -> None:

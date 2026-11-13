@@ -132,10 +132,12 @@ def iter_output(  # noqa: C901 - One loop handles deadlines, idle time, and canc
                     chunk = os.read(output.fileno(), CHUNK_SIZE)
                     if not chunk:
                         break
-                    idle_since = time.monotonic()
                     if pipe == "stderr":
                         tail = (tail + chunk)[-ERROR_TAIL_LIMIT:]
                     yield chunk
+
+                    # Time the consumer holds the generator is not FFmpeg idle time.
+                    idle_since = time.monotonic()
 
             remaining = EXIT_GRACE if deadline is None else max(0, deadline - time.monotonic())
             try:
