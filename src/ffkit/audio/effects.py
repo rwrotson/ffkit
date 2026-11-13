@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ffkit.audio.defaults import (
     DEFAULT_SILENCE_PADDING,
     DEFAULT_SILENCE_THRESHOLD_DB,
+    DEFAULT_TRIM_MIN_DURATION,
     LOUDNORM_MAX_LUFS,
     LOUDNORM_MIN_LUFS,
     MIN_LIMITER_CEILING_DB,
@@ -37,6 +38,7 @@ class Effects(BaseModel):
     silence_threshold_db: float = Field(default=DEFAULT_SILENCE_THRESHOLD_DB, ge=-100, le=0)
     silence_threshold_reference: SilenceReference = "full_scale"
     silence_padding: float = Field(default=DEFAULT_SILENCE_PADDING, ge=0, le=1)
+    silence_min_duration: float = Field(default=DEFAULT_TRIM_MIN_DURATION, ge=0)
     limiter_ceiling_db: float | None = Field(
         default=None,
         ge=MIN_LIMITER_CEILING_DB,

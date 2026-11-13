@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ffkit import FFmpegProcessError, InvalidInputError
+from ffkit import CancelledError, FFmpegProcessError, InvalidInputError
 from ffkit.audio import Effects, probe, render, stream
 from ffkit.audio._filters import audio_filters
 
@@ -185,3 +185,19 @@ def test_stream_keeps_source_sample_rate_after_normalization(
     target.write_bytes(b"".join(stream(source, effects=Effects(normalize_lufs=-14))))
 
     assert probe(target).sample_rate == 44100
+
+
+@pytest.mark.parametrize("effects", [Effects(), Effects(trim_silence=True)])
+def test_stream_respects_cancellation_without_failure_log(
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    effects: Effects,
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source, duration=1)
+
+    with pytest.raises(CancelledError):
+        b"".join(stream(source, effects=effects, cancelled=lambda: True))
+
+    assert "audio_stream_failed" not in caplog.text

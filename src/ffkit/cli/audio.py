@@ -44,6 +44,15 @@ SILENCE_REFERENCES: dict[ThresholdReference, SilenceReference] = {
 audio = typer.Typer(help="Inspect and process audio files.")
 
 
+def _check_min_duration(value: float, option: str) -> None:
+    if value == 0:
+        raise typer.BadParameter("must be greater than 0", param_hint=f"'{option}'")
+
+
+def _optional(value: object, unit: str, missing: str = "unknown") -> str:
+    return missing if value is None else f"{value} {unit}".rstrip()
+
+
 @audio.command("probe")
 def probe_command(ctx: typer.Context, source: Path) -> None:
     """Read audio stream properties and tags."""
@@ -58,7 +67,7 @@ def probe_command(ctx: typer.Context, source: Path) -> None:
             f"Codec: {info.codec}",
             f"Sample rate: {info.sample_rate} Hz",
             f"Channels: {info.channels}",
-            f"Bit rate: {info.bit_rate} bit/s",
+            f"Bit rate: {_optional(info.bit_rate, 'bit/s')}",
             f"Cover: {'yes' if info.has_cover else 'no'}",
             *[f"{key}: {value}" for key, value in info.tags.items()],
         ],
@@ -72,7 +81,10 @@ def loudness_command(ctx: typer.Context, source: Path) -> None:
     emit(
         ctx,
         loudness.model_dump(exclude={"fingerprint"}),
-        [f"Loudness: {loudness.lufs} LUFS", f"True peak: {loudness.true_peak_db} dBTP"],
+        [
+            f"Loudness: {_optional(loudness.lufs, 'LUFS', 'below gate')}",
+            f"True peak: {_optional(loudness.true_peak_db, 'dBTP')}",
+        ],
     )
 
 
@@ -98,8 +110,7 @@ def trim_bounds_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter t
     ] = DEFAULT_SILENCE_PADDING,
 ) -> None:
     """Find audible start and end positions."""
-    if min_duration == 0:
-        raise typer.BadParameter("must be greater than 0", param_hint="'--min-duration'")
+    _check_min_duration(min_duration, "--min-duration")
 
     bounds = detect_trim_bounds(
         input_file(source),
@@ -112,7 +123,7 @@ def trim_bounds_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter t
     emit(
         ctx,
         bounds.model_dump(),
-        [f"Start: {bounds.start} s", f"End: {bounds.end} s"],
+        [f"Start: {bounds.start} s", f"End: {_optional(bounds.end, 's', 'end of file')}"],
     )
 
 
@@ -138,6 +149,15 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         float,
         typer.Option("--silence-padding", min=0, max=1, help="Silence kept by --trim-silence."),
     ] = DEFAULT_SILENCE_PADDING,
+    silence_min_duration: Annotated[
+        float,
+        typer.Option(
+            "--silence-min-duration",
+            min=0,
+            max=10,
+            help="Shortest edge silence removed by --trim-silence.",
+        ),
+    ] = DEFAULT_TRIM_MIN_DURATION,
     limiter_ceiling_db: Annotated[float | None, typer.Option("--limiter-ceiling-db")] = None,
     cover: Annotated[
         Path | None,
@@ -162,6 +182,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     force: Annotated[bool, typer.Option("--force")] = False,
 ) -> None:
     """Render audio as an MP3 with optional effects."""
+    _check_min_duration(silence_min_duration, "--silence-min-duration")
     if cover is not None and no_cover:
         raise typer.BadParameter("cannot be combined with --no-cover", param_hint="'--cover'")
 
@@ -181,6 +202,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
         silence_threshold_db=silence_threshold_db,
         silence_threshold_reference=SILENCE_REFERENCES[silence_threshold_reference],
         silence_padding=silence_padding,
+        silence_min_duration=silence_min_duration,
         limiter_ceiling_db=limiter_ceiling_db,
     )
     encoding = Mp3Encoding(bitrate_kbps=bitrate_kbps, vbr_quality=vbr_quality)
@@ -249,8 +271,8 @@ def waveform_command(
         ctx,
         result.model_dump(exclude={"loudness": {"fingerprint"}}),
         [
-            f"Loudness: {result.loudness.lufs} LUFS",
-            f"True peak: {result.loudness.true_peak_db} dBTP",
+            f"Loudness: {_optional(result.loudness.lufs, 'LUFS', 'below gate')}",
+            f"True peak: {_optional(result.loudness.true_peak_db, 'dBTP')}",
             "Peaks: "
             + " ".join(
                 str(level) for level in result.peak_levels(floor_db=DEFAULT_DISPLAY_FLOOR_DB)
@@ -268,7 +290,7 @@ def tempo_command(ctx: typer.Context, source: Path) -> None:
         ctx,
         {"segments": [segment.model_dump() for segment in segments]},
         [
-            f"{segment.start} s: {segment.bpm} BPM (confidence {segment.confidence})"
+            f"{segment.start} s: {segment.bpm} BPM (confidence {_optional(segment.confidence, '')})"
             for segment in segments
         ]
         or ["No tempo found"],

@@ -3,13 +3,13 @@ from collections.abc import Generator
 from pathlib import Path
 
 from ffkit._ffmpeg.args import StrPath, existing_file, ffmpeg_number, media_path
-from ffkit._ffmpeg.process import iter_output
+from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.probe import probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
-from ffkit.errors import InvalidInputError
+from ffkit.errors import CancelledError, InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
 log = logging.getLogger(__name__)
@@ -29,12 +29,13 @@ def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | N
     return seeked, source_offset
 
 
-def stream(
+def stream(  # noqa: PLR0913 - Stream options plus the keyword-only FFmpeg runtime.
     source: StrPath,
     *,
     effects: Effects | None = None,
     start: float = 0,
     encoding: Encoding = Mp3Encoding(),
+    cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),
 ) -> Generator[bytes]:
     """Stream encoded source audio from a position after its trim start.
@@ -49,15 +50,17 @@ def stream(
         effects or Effects(),
         start,
         encoding,
+        cancelled,
         runtime=runtime,
     )
 
 
-def _stream(
+def _stream(  # noqa: PLR0913 - Arguments of stream() passed through.
     source: Path,
     effects: Effects,
     start: float,
     encoding: Encoding,
+    cancelled: Cancelled | None,
     *,
     runtime: FFmpegRuntime,
 ) -> Generator[bytes]:
@@ -66,7 +69,7 @@ def _stream(
         if effects.trim_silence or effects.normalize_lufs is not None
         else None
     )
-    effects = resolve_silence_trim(effects, source, info=info, runtime=runtime)
+    effects = resolve_silence_trim(effects, source, cancelled, info=info, runtime=runtime)
     seeked = _seeked_effects(effects, start)
     if seeked is None:
         return
@@ -92,7 +95,13 @@ def _stream(
     command += [*encoding.codec_args(), "-f", encoding.muxer, "pipe:1"]
 
     try:
-        yield from iter_output(command, idle_timeout=runtime.stream_idle_timeout)
+        yield from iter_output(
+            command,
+            idle_timeout=runtime.stream_idle_timeout,
+            cancelled=cancelled,
+        )
+    except CancelledError:
+        raise
     except Exception:
         log.exception("audio_stream_failed source=%s", source)
         raise

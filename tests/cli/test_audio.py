@@ -343,3 +343,65 @@ def test_tempo_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert "120.0 BPM" in text.stdout
     monkeypatch.setattr(cli_audio, "estimate_tempo", lambda path, *, runtime: ())
     assert "No tempo found" in runner.invoke(app, ["audio", "tempo", str(source)]).stdout
+
+
+def test_text_output_names_missing_values(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    monkeypatch.setattr(
+        cli_audio,
+        "probe",
+        lambda path, *, runtime: AudioInfo(
+            duration=5,
+            sample_rate=44100,
+            channels=1,
+            codec="pcm_s16le",
+        ),
+    )
+    monkeypatch.setattr(
+        cli_audio,
+        "measure_loudness",
+        lambda path, *, runtime: Loudness(lufs=None, true_peak_db=None),
+    )
+    monkeypatch.setattr(
+        cli_audio,
+        "detect_trim_bounds",
+        lambda path, **kwargs: TrimBounds(start=0.5),
+    )
+
+    probed = runner.invoke(app, ["audio", "probe", str(source)])
+    loudness = runner.invoke(app, ["audio", "loudness", str(source)])
+    bounds = runner.invoke(app, ["audio", "trim-bounds", str(source)])
+
+    assert "Bit rate: unknown" in probed.stdout
+    assert "Loudness: below gate" in loudness.stdout
+    assert "True peak: unknown" in loudness.stdout
+    assert "End: end of file" in bounds.stdout
+    assert "None" not in probed.stdout + loudness.stdout + bounds.stdout
+
+
+def test_render_silence_min_duration(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    source = tmp_path / "source.mp3"
+    source.touch()
+    received: list[Effects] = []
+
+    def fake_render(source: Path, path: Path, effects: Effects, **kwargs: object) -> None:
+        received.append(effects)
+
+    monkeypatch.setattr(cli_audio, "render", fake_render)
+    base = ["audio", "render", str(source)]
+
+    result = runner.invoke(
+        app,
+        [*base, str(tmp_path / "a.mp3"), "--trim-silence", "--silence-min-duration", "0.5"],
+    )
+
+    assert result.exit_code == 0
+    assert received[0].silence_min_duration == 0.5
+    for value in ("0", "11"):
+        invalid = runner.invoke(
+            app,
+            [*base, str(tmp_path / "b.mp3"), "--silence-min-duration", value],
+        )
+        assert invalid.exit_code == 2
+        assert "--silence-min-duration" in invalid.output

@@ -207,6 +207,10 @@ def test_resolve_silence_trim_uses_trimmed_range(tmp_path: Path) -> None:
     assert resolved.trim_end is not None
     assert 4.0 <= resolved.trim_end <= 4.02
 
+    keep_short_edges = effects.replace(silence_min_duration=1)
+    kept = silence_module.resolve_silence_trim(keep_short_edges, source, runtime=RUNTIME)
+    assert (kept.trim_start, kept.trim_end) == (0.5, 4.5)
+
     tail = Effects(trim_start=3.5, trim_silence=True, silence_padding=0)
     assert silence_module.resolve_silence_trim(tail, source, runtime=RUNTIME).trim_end == (
         pytest.approx(4.0, abs=0.02)
