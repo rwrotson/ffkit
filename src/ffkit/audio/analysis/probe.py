@@ -1,11 +1,13 @@
 import json
 import math
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import run
-from ffkit.errors import NoAudioError
+from ffkit.errors import FFmpegProcessError, NoAudioError
 from ffkit.runtime import FFmpegRuntime
 
 
@@ -69,3 +71,35 @@ def probe(source: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime()) -> Audio
         has_cover=any(stream.get("disposition", {}).get("attached_pic") == 1 for stream in streams),
         tags={**format_tags, **stream_tags},
     )
+
+
+def _has_audio_stream(source: StrPath, runtime: FFmpegRuntime) -> bool | None:
+    """Return whether FFprobe finds an audio stream, or None when it cannot read the source."""
+    command = [
+        runtime.ffprobe_path,
+        "-v",
+        "error",
+        "-select_streams",
+        "a",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "json",
+        media_path(source),
+    ]
+    try:
+        report = json.loads(run(command, timeout=runtime.process_timeout))
+    except FFmpegProcessError:
+        return None
+    return bool(report.get("streams"))
+
+
+@contextmanager
+def audio_stream_required(source: StrPath, *, runtime: FFmpegRuntime) -> Iterator[None]:
+    """Raise ``NoAudioError`` instead of an FFmpeg failure when the source has no audio stream."""
+    try:
+        yield
+    except FFmpegProcessError as error:
+        if _has_audio_stream(source, runtime) is False:
+            raise NoAudioError("File has no decodable audio stream") from error
+        raise

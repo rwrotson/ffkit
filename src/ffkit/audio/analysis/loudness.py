@@ -6,6 +6,7 @@ from ffkit._ffmpeg.args import StrPath, existing_file, media_path, source_finger
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis._ebur128 import EBUR128_FILTERS, Report, iter_lines
+from ffkit.audio.analysis.probe import audio_stream_required
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.defaults import DEFAULT_PEAK_CEILING_DB, DEFAULT_TARGET_LUFS
 from ffkit.audio.effects import Effects
@@ -66,8 +67,9 @@ def measure_loudness(
         timeout=runtime.process_timeout,
         cancelled=cancelled,
     )
-    for line in iter_lines(output):
-        report.read_line(line)
+    with audio_stream_required(source, runtime=runtime):
+        for line in iter_lines(output):
+            report.read_line(line)
 
     if source_fingerprint(source) != fingerprint:
         raise SourceChangedError("Source audio changed during loudness measurement")

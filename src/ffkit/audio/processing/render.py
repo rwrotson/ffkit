@@ -14,7 +14,7 @@ from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.cover import attached_picture_index
 from ffkit.audio.analysis.loudness import measure_loudness
-from ffkit.audio.analysis.probe import probe
+from ffkit.audio.analysis.probe import audio_stream_required, probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.defaults import MIN_LIMITER_CEILING_DB
 from ffkit.audio.effects import Effects
@@ -182,12 +182,13 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             attempt_effects = effects.replace(limiter_ceiling_db=effective_ceiling)
             filters = audio_filters(attempt_effects, sample_rate=sample_rate)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
-            _encode(
-                source,
-                [*command, *outputs, media_path(temporary)],
-                cancelled,
-                timeout=runtime.process_timeout,
-            )
+            with audio_stream_required(source, runtime=runtime):
+                _encode(
+                    source,
+                    [*command, *outputs, media_path(temporary)],
+                    cancelled,
+                    timeout=runtime.process_timeout,
+                )
 
             if ceiling is None or effective_ceiling is None:
                 break

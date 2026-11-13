@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import FFmpegProcessError, NoAudioError, SourceNotFoundError
-from ffkit.audio import detect_trim_bounds, probe, render
+from ffkit.audio import detect_trim_bounds, estimate_tempo, measure_loudness, probe, render, stream
 
 STREAM = {"codec_type": "audio", "codec_name": "pcm_s16le", "sample_rate": "44100", "channels": 1}
 
@@ -151,3 +151,51 @@ def test_probe_rejects_stream_without_sample_rate(
 
     with pytest.raises(NoAudioError, match="no decodable audio"):
         probe(source)
+
+
+def _image(path: Path) -> Path:
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=blue:s=32x32:d=0.1",
+            "-frames:v",
+            "1",
+            "-y",
+            str(path),
+        ],
+        check=True,
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(lambda source, tmp: measure_loudness(source), id="measure_loudness"),
+        pytest.param(lambda source, tmp: estimate_tempo(source), id="estimate_tempo"),
+        pytest.param(lambda source, tmp: render(source, tmp / "out.mp3"), id="render"),
+        pytest.param(lambda source, tmp: b"".join(stream(source)), id="stream"),
+    ],
+)
+def test_source_without_audio_raises_no_audio_error(
+    operation: Callable[[Path, Path], object],
+    tmp_path: Path,
+) -> None:
+    source = _image(tmp_path / "image.png")
+
+    with pytest.raises(NoAudioError):
+        operation(source, tmp_path)
+
+
+def test_unreadable_source_keeps_ffmpeg_error(tmp_path: Path) -> None:
+    source = tmp_path / "broken.mp3"
+    source.write_bytes(b"not audio")
+
+    with pytest.raises(FFmpegProcessError) as error:
+        measure_loudness(source)
+    assert not isinstance(error.value, NoAudioError)

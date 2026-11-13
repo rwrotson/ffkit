@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
+from ffkit.audio.analysis.probe import audio_stream_required
 from ffkit.runtime import FFmpegRuntime
 
 type FloatArray = NDArray[np.float64]
@@ -99,23 +100,24 @@ def _onset_strength(
     previous: FloatArray | None = None
     flux: list[FloatArray] = []
 
-    for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
-        data = pending + chunk
-        usable = len(data) // 4 * 4
-        pending = data[usable:]
-        samples = np.concatenate((samples, np.frombuffer(data[:usable], dtype="<f4")))
-        if len(samples) < FRAME:
-            continue
+    with audio_stream_required(source, runtime=runtime):
+        for chunk in iter_output(command, timeout=runtime.process_timeout, cancelled=cancelled):
+            data = pending + chunk
+            usable = len(data) // 4 * 4
+            pending = data[usable:]
+            samples = np.concatenate((samples, np.frombuffer(data[:usable], dtype="<f4")))
+            if len(samples) < FRAME:
+                continue
 
-        count = (len(samples) - FRAME) // HOP + 1
-        frames = sliding_window_view(samples, FRAME)[::HOP][:count]
-        spectrum = np.log1p(1000 * np.abs(np.fft.rfft(frames * window, axis=1)))
-        if previous is None:
-            previous = spectrum[0]
-        steps = np.diff(spectrum, axis=0, prepend=previous[np.newaxis])
-        flux.append(np.maximum(steps, 0).sum(axis=1))
-        previous = spectrum[-1]
-        samples = samples[count * HOP :]
+            count = (len(samples) - FRAME) // HOP + 1
+            frames = sliding_window_view(samples, FRAME)[::HOP][:count]
+            spectrum = np.log1p(1000 * np.abs(np.fft.rfft(frames * window, axis=1)))
+            if previous is None:
+                previous = spectrum[0]
+            steps = np.diff(spectrum, axis=0, prepend=previous[np.newaxis])
+            flux.append(np.maximum(steps, 0).sum(axis=1))
+            previous = spectrum[-1]
+            samples = samples[count * HOP :]
 
     if not flux:
         return np.zeros(0)
