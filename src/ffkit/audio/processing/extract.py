@@ -1,10 +1,8 @@
 import os
 from pathlib import Path
-from uuid import uuid4
 
-from ffkit._ffmpeg.args import StrPath, existing_file
+from ffkit._ffmpeg.args import StrPath, ensure_distinct, existing_file, temporary_sibling
 from ffkit.audio.analysis.cover import embedded_cover
-from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
 
 
@@ -16,17 +14,14 @@ def extract_cover(
 ) -> Path | None:
     """Atomically extract the first embedded image as JPEG; return None when there is none."""
     source, destination = existing_file(source), Path(destination)
-    if source.resolve() == destination.resolve() or (
-        source.exists() and destination.exists() and source.samefile(destination)
-    ):
-        raise InvalidInputError("Output path must differ from source audio")
+    ensure_distinct(source, destination)
 
     image = embedded_cover(source, runtime=runtime)
     if image is None:
         return None
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp.jpg")
+    temporary = temporary_sibling(destination, ".jpg")
     try:
         temporary.write_bytes(image)
         os.replace(temporary, destination)

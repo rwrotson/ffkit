@@ -2,14 +2,20 @@ import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from uuid import uuid4
 
-from ffkit._ffmpeg.args import StrPath, existing_file, media_path
+from ffkit._ffmpeg.args import (
+    StrPath,
+    ensure_distinct,
+    existing_file,
+    media_path,
+    temporary_sibling,
+)
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.probe import probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
+from ffkit.audio.defaults import MIN_LIMITER_CEILING_DB
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
 from ffkit.errors import (
@@ -17,7 +23,6 @@ from ffkit.errors import (
     FFmpegError,
     FFmpegProcessError,
     FFmpegTimeoutError,
-    InvalidInputError,
     PeakCeilingError,
 )
 from ffkit.runtime import FFmpegRuntime
@@ -25,7 +30,6 @@ from ffkit.runtime import FFmpegRuntime
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 5
-MIN_CEILING_DB = -20
 CEILING_MARGIN_DB = 0.2
 
 
@@ -85,8 +89,8 @@ def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> 
     """Lower the limiter ceiling by the measured overshoot, or fail when out of attempts."""
     if attempt == MAX_ATTEMPTS - 1:
         raise PeakCeilingError(f"Encoded true peak {peak:.2f} dBTP exceeds {ceiling:.2f} dBTP")
-    lowered = max(MIN_CEILING_DB, current - (peak - ceiling) - CEILING_MARGIN_DB)
-    if lowered <= MIN_CEILING_DB:
+    lowered = max(MIN_LIMITER_CEILING_DB, current - (peak - ceiling) - CEILING_MARGIN_DB)
+    if lowered <= MIN_LIMITER_CEILING_DB:
         raise PeakCeilingError("True peak ceiling could not be reached")
     return lowered
 
@@ -110,10 +114,7 @@ def _check_paths(source: Path, destination: Path, cover: Path | bool) -> None:
     existing_file(source)
     if isinstance(cover, Path):
         existing_file(cover)
-    if source.resolve() == destination.resolve() or (
-        destination.exists() and source.samefile(destination)
-    ):
-        raise InvalidInputError("Output path must differ from source audio")
+    ensure_distinct(source, destination)
 
 
 def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runtime.
@@ -147,7 +148,7 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
         encoding,
         ffmpeg=runtime.ffmpeg_path,
     )
-    temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{encoding.extension}")
+    temporary = temporary_sibling(destination, encoding.extension)
 
     try:
         info = (

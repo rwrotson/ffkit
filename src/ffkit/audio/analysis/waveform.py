@@ -18,19 +18,15 @@ from ffkit.audio.analysis._ebur128 import (
 )
 from ffkit.audio.analysis.loudness import Loudness
 from ffkit.audio.analysis.probe import AudioInfo, probe
+from ffkit.audio.defaults import DEFAULT_DISPLAY_FLOOR_DB, DEFAULT_WAVEFORM_BINS
 from ffkit.errors import InvalidInputError, SourceChangedError
 from ffkit.runtime import FFmpegRuntime
-
-WAVEFORM_BINS = 400
 
 # ebur128 upsamples to this rate to measure true peaks.
 TRUE_PEAK_RATE = 192000
 
 # Longest astats frame; a bin longer than this is measured from several frames.
 MAX_FRAME_SAMPLES = 192000
-
-# Default floor of the 0..1 display scales.
-DISPLAY_FLOOR_DB = -60.0
 
 _ASTATS = re.compile(rb"lavfi\.astats\.(\d+)\.(Min|Max)_level=(\S+)")
 
@@ -66,7 +62,7 @@ class Waveform(BaseModel):
             levels = _decibel_scale(20 * np.log10(np.maximum(levels, 1e-12)), floor_db)
         return tuple(round(float(level), 3) for level in np.minimum(levels, 1))
 
-    def loudness_levels(self, *, floor_lufs: float = DISPLAY_FLOOR_DB) -> tuple[float, ...]:
+    def loudness_levels(self, *, floor_lufs: float = DEFAULT_DISPLAY_FLOOR_DB) -> tuple[float, ...]:
         """Scale momentary loudness from ``floor_lufs``..0 LUFS to 0..1."""
         values = np.array([floor_lufs if value is None else value for value in self.momentary_lufs])
         return tuple(round(float(level), 3) for level in _decibel_scale(values, floor_lufs))
@@ -165,7 +161,7 @@ class _Peaks:
 def waveform(
     source: StrPath,
     *,
-    bins: int = WAVEFORM_BINS,
+    bins: int = DEFAULT_WAVEFORM_BINS,
     info: AudioInfo | None = None,
     cancelled: Cancelled | None = None,
     runtime: FFmpegRuntime = FFmpegRuntime(),

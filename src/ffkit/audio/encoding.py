@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ffkit.audio.defaults import DEFAULT_MP3_BITRATE_KBPS
+
 
 class Mp3Encoding(BaseModel):
     """MP3 output through LAME at a constant bit rate, or variable when ``vbr_quality`` is set."""
@@ -9,7 +11,12 @@ class Mp3Encoding(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     format: Literal["mp3"] = "mp3"
-    bitrate_kbps: int = Field(default=320, ge=32, le=320, description="Constant bit rate")
+    bitrate_kbps: int = Field(
+        default=DEFAULT_MP3_BITRATE_KBPS,
+        ge=32,
+        le=320,
+        description="Constant bit rate",
+    )
     vbr_quality: int | None = Field(
         default=None,
         ge=0,

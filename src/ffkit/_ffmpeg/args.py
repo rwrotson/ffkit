@@ -1,8 +1,9 @@
 import errno
 import os
 from pathlib import Path
+from uuid import uuid4
 
-from ffkit.errors import SourceNotFoundError
+from ffkit.errors import InvalidInputError, SourceNotFoundError
 
 type StrPath = str | os.PathLike[str]
 
@@ -30,3 +31,16 @@ def existing_file(path: StrPath) -> Path:
     if not path.is_file():
         raise SourceNotFoundError(errno.ENOENT, "Input file not found", str(path))
     return path
+
+
+def ensure_distinct(source: Path, destination: Path) -> None:
+    """Raise ``InvalidInputError`` when the destination is the existing source file."""
+    if source.resolve() == destination.resolve() or (
+        destination.exists() and source.samefile(destination)
+    ):
+        raise InvalidInputError("Output path must differ from the source")
+
+
+def temporary_sibling(destination: Path, suffix: str) -> Path:
+    """Return a unique hidden path next to the destination for an atomic replace."""
+    return destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{suffix}")

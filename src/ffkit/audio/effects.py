@@ -7,6 +7,7 @@ from ffkit.audio.defaults import (
     DEFAULT_SILENCE_THRESHOLD_DB,
     LOUDNORM_MAX_LUFS,
     LOUDNORM_MIN_LUFS,
+    MIN_LIMITER_CEILING_DB,
 )
 
 # Level that a silence threshold is relative to: digital full scale or the loudest window.
@@ -36,7 +37,11 @@ class Effects(BaseModel):
     silence_threshold_db: float = Field(default=DEFAULT_SILENCE_THRESHOLD_DB, ge=-100, le=0)
     silence_threshold_reference: SilenceReference = "full_scale"
     silence_padding: float = Field(default=DEFAULT_SILENCE_PADDING, ge=0, le=1)
-    limiter_ceiling_db: float | None = Field(default=None, ge=-20, le=-0.1)
+    limiter_ceiling_db: float | None = Field(
+        default=None,
+        ge=MIN_LIMITER_CEILING_DB,
+        le=-0.1,
+    )
 
     @model_validator(mode="before")
     @classmethod

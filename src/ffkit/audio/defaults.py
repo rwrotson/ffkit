@@ -10,6 +10,16 @@ DEFAULT_SILENCE_PADDING = 0.05
 DEFAULT_TARGET_LUFS = -14
 DEFAULT_PEAK_CEILING_DB = -1
 
+# Lowest limiter ceiling accepted by effects and reached by render retries.
+MIN_LIMITER_CEILING_DB = -20
+
+DEFAULT_WAVEFORM_BINS = 400
+
+# Floor of the 0..1 waveform display scales.
+DEFAULT_DISPLAY_FLOOR_DB = -60.0
+
+DEFAULT_MP3_BITRATE_KBPS = 320
+
 LOUDNORM_TRUE_PEAK_DB = -1
 
 # Integrated loudness targets accepted by the FFmpeg loudnorm filter.

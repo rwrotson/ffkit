@@ -6,11 +6,14 @@ import typer
 
 from ffkit import FFKitError
 from ffkit.audio import (
+    DEFAULT_DISPLAY_FLOOR_DB,
+    DEFAULT_MP3_BITRATE_KBPS,
     DEFAULT_PEAK_CEILING_DB,
     DEFAULT_SILENCE_PADDING,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TARGET_LUFS,
     DEFAULT_TRIM_MIN_DURATION,
+    DEFAULT_WAVEFORM_BINS,
     Effects,
     Mp3Encoding,
     SilenceReference,
@@ -151,7 +154,7 @@ def render_command(  # noqa: PLR0913, PLR0917 - Typer maps each parameter to a u
     bitrate_kbps: Annotated[
         int,
         typer.Option("--bitrate-kbps", help="MP3 constant bit rate."),
-    ] = 320,
+    ] = DEFAULT_MP3_BITRATE_KBPS,
     vbr_quality: Annotated[
         int | None,
         typer.Option("--vbr-quality", help="LAME VBR quality 0-9; replaces the bit rate."),
@@ -238,7 +241,7 @@ def waveform_command(
     bins: Annotated[
         int,
         typer.Option("--bins", min=1, max=100_000, help="Number of time bins."),
-    ] = 400,
+    ] = DEFAULT_WAVEFORM_BINS,
 ) -> None:
     """Report loudness, momentary loudness, and per-channel true peaks per time bin."""
     result = waveform(input_file(source), bins=bins, runtime=cli_state(ctx).runtime)
@@ -248,7 +251,10 @@ def waveform_command(
         [
             f"Loudness: {result.loudness.lufs} LUFS",
             f"True peak: {result.loudness.true_peak_db} dBTP",
-            "Peaks: " + " ".join(str(level) for level in result.peak_levels(floor_db=-60)),
+            "Peaks: "
+            + " ".join(
+                str(level) for level in result.peak_levels(floor_db=DEFAULT_DISPLAY_FLOOR_DB)
+            ),
             "Momentary: " + " ".join(str(level) for level in result.loudness_levels()),
         ],
     )
