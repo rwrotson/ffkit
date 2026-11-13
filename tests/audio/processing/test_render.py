@@ -288,6 +288,18 @@ def test_render_encoder_timeout_kills_process(
     assert not list(tmp_path.glob("*.tmp.mp3"))
 
 
+def test_render_ignores_video_track(make_video: Callable[..., None], tmp_path: Path) -> None:
+    source = tmp_path / "video.mp4"
+    make_video(source)
+    target = tmp_path / "audio.mp3"
+
+    render(source, target)
+
+    info = probe(target)
+    assert info.codec == "mp3"
+    assert not info.has_cover
+
+
 def test_render_cover_choices(make_tone: Callable[..., None], tmp_path: Path) -> None:
     source = tmp_path / "tone.wav"
     make_tone(source, duration=1)

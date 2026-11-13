@@ -12,6 +12,7 @@ from ffkit._ffmpeg.args import (
 )
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
+from ffkit.audio.analysis.cover import attached_picture_index
 from ffkit.audio.analysis.loudness import measure_loudness
 from ffkit.audio.analysis.probe import probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
@@ -36,14 +37,17 @@ CEILING_MARGIN_DB = 0.2
 def _command_parts(
     source: Path,
     tags: Mapping[str, str],
-    cover: Path | bool,
+    cover: Path | int | None,
     encoding: Encoding,
     *,
     ffmpeg: str,
 ) -> tuple[list[str], list[str]]:
-    """Return the FFmpeg arguments before and after the audio filter option."""
+    """Return the FFmpeg arguments before and after the audio filter option.
+
+    ``cover`` is an image file, the stream index of the source cover, or None for no cover.
+    """
     inputs = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", media_path(source)]
-    if cover is False:
+    if cover is None:
         inputs.extend(["-vn", "-map", "0:a:0"])
     elif isinstance(cover, Path):
         inputs.extend(
@@ -62,7 +66,16 @@ def _command_parts(
         )
     else:
         inputs.extend(
-            ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"],
+            [
+                "-map",
+                "0:a:0",
+                "-map",
+                f"0:{cover}",
+                "-c:v",
+                "copy",
+                "-disposition:v:0",
+                "attached_pic",
+            ],
         )
 
     # Ogg and Opus keep tags on the audio stream; the first mapping wins on conflicting keys.
@@ -141,10 +154,15 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
 
     ceiling = effects.limiter_ceiling_db
     destination.parent.mkdir(parents=True, exist_ok=True)
+    cover_input: Path | int | None = None
+    if isinstance(cover, Path):
+        cover_input = cover
+    elif cover:
+        cover_input = attached_picture_index(source, runtime=runtime)
     inputs, outputs = _command_parts(
         source,
         tags or {},
-        cover,
+        cover_input,
         encoding,
         ffmpeg=runtime.ffmpeg_path,
     )

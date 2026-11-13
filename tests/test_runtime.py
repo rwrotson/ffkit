@@ -98,13 +98,13 @@ def test_functions_use_configured_ffmpeg(
     assert error.value.executable == missing
 
 
-def test_extract_cover_uses_configured_ffmpeg(source: Path, tmp_path: Path) -> None:
-    missing = str(tmp_path / "missing-ffmpeg")
+def test_extract_cover_uses_configured_ffprobe(source: Path, tmp_path: Path) -> None:
+    missing = str(tmp_path / "missing-ffprobe")
     with pytest.raises(FFmpegNotFoundError) as error:
         extract_cover(
             source,
             tmp_path / "cover.jpg",
-            runtime=FFmpegRuntime(ffmpeg_path=missing),
+            runtime=FFmpegRuntime(ffprobe_path=missing),
         )
     assert error.value.executable == missing
 
