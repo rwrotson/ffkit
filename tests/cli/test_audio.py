@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 import ffkit.cli.audio as cli_audio
@@ -140,7 +141,7 @@ def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     ]:
         invalid = runner.invoke(app, ["audio", "trim-bounds", str(source), option, value])
         assert invalid.exit_code == 2
-        assert option in invalid.output
+        assert option in Text.from_ansi(invalid.output).plain
 
 
 def test_render_force_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -431,4 +432,4 @@ def test_render_silence_min_duration(monkeypatch: pytest.MonkeyPatch, tmp_path: 
             [*base, str(tmp_path / "b.mp3"), "--silence-min-duration", value],
         )
         assert invalid.exit_code == 2
-        assert "--silence-min-duration" in invalid.output
+        assert "--silence-min-duration" in Text.from_ansi(invalid.output).plain
