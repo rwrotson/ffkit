@@ -26,6 +26,9 @@ WAVEFORM_BINS = 400
 # ebur128 upsamples to this rate to measure true peaks.
 TRUE_PEAK_RATE = 192000
 
+# Longest astats frame; a bin longer than this is measured from several frames.
+MAX_FRAME_SAMPLES = 192000
+
 # Default floor of the 0..1 display scales.
 DISPLAY_FLOOR_DB = -60.0
 
@@ -120,10 +123,11 @@ class _Momentary:
 
 
 class _Peaks:
-    """Per-channel minimum and maximum of astats frames, one frame per bin."""
+    """Per-channel minimum and maximum of astats frames, ``frames_per_bin`` frames per bin."""
 
-    def __init__(self, bins: int) -> None:
+    def __init__(self, bins: int, frames_per_bin: int = 1) -> None:
         self.bins = bins
+        self.frames_per_bin = frames_per_bin
         self.minimum: list[npt.NDArray[np.float64]] = []
         self.maximum: list[npt.NDArray[np.float64]] = []
         self.frames: list[int] = []
@@ -140,7 +144,7 @@ class _Peaks:
             self.frames.append(0)
 
         value = finite(match.group(3)) or 0.0
-        index = min(self.frames[channel], self.bins - 1)
+        index = min(self.frames[channel] // self.frames_per_bin, self.bins - 1)
         if match.group(2) == b"Min":
             self.minimum[channel][index] = min(self.minimum[channel][index], value)
         else:
@@ -179,12 +183,14 @@ def waveform(
 
     rate = max(TRUE_PEAK_RATE, info.sample_rate)
     samples_per_bin = max(1, math.ceil(info.duration * rate / bins))
+    frames_per_bin = math.ceil(samples_per_bin / MAX_FRAME_SAMPLES)
+    frame_samples = math.ceil(samples_per_bin / frames_per_bin)
     graph = ";".join(
         [
             "[0:a:0]asplit=2[loudness][peaks]",
             f"[loudness]{','.join(EBUR128_FILTERS)}[loudness_out]",
             f"[peaks]aresample={rate},aformat=sample_fmts=fltp,"
-            f"asetnsamples=n={samples_per_bin}:p=0,"
+            f"asetnsamples=n={frame_samples}:p=0,"
             "astats=metadata=1:reset=1:measure_overall=none"
             ":measure_perchannel=Min_level+Max_level,"
             "ametadata=mode=print[peaks_out]",
@@ -214,7 +220,7 @@ def waveform(
     ]
     momentary = _Momentary(bins, info.duration / bins)
     report = Report(on_momentary=momentary.add)
-    peaks = _Peaks(bins)
+    peaks = _Peaks(bins, frames_per_bin)
     output = iter_output(
         command,
         pipe="stderr",

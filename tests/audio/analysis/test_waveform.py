@@ -215,3 +215,41 @@ def test_waveform_display_levels() -> None:
             result.peak_levels(floor_db=floor)
         with pytest.raises(InvalidInputError, match="Display floor"):
             result.loudness_levels(floor_lufs=floor)
+
+
+def test_waveform_splits_long_bins_into_bounded_frames(
+    make_tone: Callable[..., None],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "tone.wav"
+    make_tone(source, duration=1)
+    expected = waveform(source, bins=2)
+    commands: list[list[str]] = []
+    original = waveform_module.iter_output
+
+    def recording(command: list[str], **kwargs: object) -> Iterator[bytes]:
+        commands.append(command)
+        return original(command, **kwargs)  # type: ignore[no-any-return]
+
+    monkeypatch.setattr(waveform_module, "MAX_FRAME_SAMPLES", 10000)
+    monkeypatch.setattr(waveform_module, "iter_output", recording)
+
+    result = waveform(source, bins=2)
+
+    graph = commands[0][commands[0].index("-filter_complex") + 1]
+    assert "asetnsamples=n=9600:" in graph
+    assert result.momentary_lufs == expected.momentary_lufs
+    for channel, reference in zip(result.channels, expected.channels, strict=True):
+        assert channel.minimum == pytest.approx(reference.minimum, abs=1e-3)
+        assert channel.maximum == pytest.approx(reference.maximum, abs=1e-3)
+
+
+def test_peaks_combine_frames_of_one_bin() -> None:
+    peaks = waveform_module._Peaks(2, frames_per_bin=2)
+
+    for level in (0.1, 0.4, 0.3, 0.2, 0.9):
+        peaks.read_line(f"lavfi.astats.1.Min_level={-level}".encode())
+        peaks.read_line(f"lavfi.astats.1.Max_level={level}".encode())
+
+    assert peaks.channels() == (ChannelPeaks(minimum=(-0.4, -0.9), maximum=(0.4, 0.9)),)

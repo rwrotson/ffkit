@@ -11,6 +11,15 @@ def test_iter_lines_joins_chunks_and_bounds_unterminated_lines() -> None:
     assert list(ebur128.iter_lines([long_line[:10], long_line[10:]])) == [
         long_line[-ebur128.LINE_LIMIT :],
     ]
+    assert list(ebur128.iter_lines([b"a\nb\nc\n", b"\nd\ne"])) == [
+        b"a",
+        b"b",
+        b"c",
+        b"",
+        b"d",
+        b"e",
+    ]
+    assert list(ebur128.iter_lines([long_line + b"\nnext"])) == [long_line, b"next"]
 
 
 def test_report_passes_momentary_loudness_in_order() -> None:

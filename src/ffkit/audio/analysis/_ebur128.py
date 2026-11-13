@@ -31,12 +31,12 @@ def iter_lines(chunks: Iterable[bytes]) -> Iterator[bytes]:
     """Split output chunks into lines; the last, possibly empty, line has no terminator."""
     pending = b""
     for chunk in chunks:
-        pending += chunk
-        while b"\n" in pending:
-            line, pending = pending.split(b"\n", 1)
-            yield line
+        lines = (pending + chunk).split(b"\n")
+
         # Bound memory when FFmpeg writes a long line without a newline.
-        pending = pending[-LINE_LIMIT:]
+        pending = lines.pop()[-LINE_LIMIT:]
+
+        yield from lines
     yield pending
 
 
