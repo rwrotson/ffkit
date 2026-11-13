@@ -90,8 +90,9 @@ Parallel jobs:
 It runs CI first, then:
 
 - **`build`** — `uv build`; uploads `dist/` as an artifact.
-- **`docs`** — builds the site with `properdocs build --strict` and deploys it to **GitHub Pages** via
-  `actions/upload-pages-artifact` + `actions/deploy-pages` (the `github-pages` environment).
+- **`docs`** — on tags only (manual runs skip it); builds the site with `properdocs build --strict`
+  and deploys it to **GitHub Pages** via `actions/upload-pages-artifact` + `actions/deploy-pages`
+  (the `github-pages` environment).
 
 Tagged versions are installed directly from GitHub. The build job and its distribution artifacts
 remain available if package registry publishing is added later. Pages Source must be set to

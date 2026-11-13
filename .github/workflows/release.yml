@@ -33,8 +33,10 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  # The github-pages environment accepts only v* tags, so manual runs only build the package.
   docs:
     needs: ci
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: read

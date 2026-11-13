@@ -44,6 +44,6 @@ The `commit-msg` hook checks Conventional Commit format.
 
 ## Releases
 
-The release workflow runs CI, builds the distribution, and deploys documentation for version tags. Manual runs also build the package and deploy documentation. The build job remains available if package registry publishing is added later.
+The release workflow runs CI, builds the distribution, and deploys documentation for version tags. Manual runs (`workflow_dispatch`) run CI and build the package; documentation is deployed only for tags. The build job remains available if package registry publishing is added later.
 
 Install a tagged version from GitHub. GitHub Pages uses the `github-pages` environment and GitHub Actions as its source.

@@ -308,6 +308,7 @@ src/
     ├── audio/               # public ffkit.audio API
     │   ├── defaults.py      # default values
     │   ├── effects.py       # Effects model
+    │   ├── encoding.py      # output encoders: Mp3Encoding
     │   ├── _filters.py      # FFmpeg filter chain
     │   ├── library/         # ffkit.audio.library: input discovery, export names, tag merging
     │   ├── analysis/        # probe, loudness, silence, waveform, tempo, embedded cover
@@ -342,7 +343,7 @@ Dependabot opens weekly grouped PRs for uv dependencies, GitHub Actions, and pre
 | Job | What it does |
 |-----|-------------|
 | `build` | builds the sdist and wheel |
-| `docs` | builds the docs with ProperDocs and deploys it to GitHub Pages via GitHub Actions |
+| `docs` | on tags only: builds the docs with ProperDocs and deploys them to GitHub Pages via GitHub Actions |
 
 Release tags are installable directly from GitHub. The build job and distribution artifacts are retained so package registry publishing can be added later. Set Pages Source to **GitHub Actions** and allow `v*` tags in the `github-pages` environment.
 
