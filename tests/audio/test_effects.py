@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from ffkit import CancelledError, FFKitError, InvalidInputError
-from ffkit.audio import DEFAULT_SILENCE_THRESHOLD_DB, Effects
+from ffkit.audio import DEFAULT_SILENCE_THRESHOLD_DB, DEFAULT_TRIM_MIN_DURATION, Effects
 
 
 def test_audio_models_preserve_defaults_and_validation() -> None:
@@ -54,3 +54,10 @@ def test_effects_report_unconvertible_trim_as_field_error() -> None:
 def test_effects_reject_loudness_target_outside_loudnorm_range(lufs: float) -> None:
     with pytest.raises(ValidationError, match="normalize_lufs"):
         Effects(normalize_lufs=lufs)
+
+
+def test_effects_silence_min_duration_defaults_and_validation() -> None:
+    assert Effects().silence_min_duration == DEFAULT_TRIM_MIN_DURATION
+    assert Effects(silence_min_duration=0).silence_min_duration == 0
+    with pytest.raises(ValidationError, match="silence_min_duration"):
+        Effects(silence_min_duration=-1)

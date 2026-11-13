@@ -248,7 +248,7 @@ def resolve_silence_trim(
         end=effects.trim_end,
         threshold_db=effects.silence_threshold_db,
         reference=effects.silence_threshold_reference,
-        min_duration=DEFAULT_TRIM_MIN_DURATION,
+        min_duration=effects.silence_min_duration,
         padding=effects.silence_padding,
         cancelled=cancelled,
         runtime=runtime,
