@@ -1,3 +1,4 @@
+import errno
 import json
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -6,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from ffkit import FFmpegRuntime
+from ffkit import FFmpegRuntime, SourceNotFoundError
 
 
 class OutputFormat(StrEnum):
@@ -58,7 +59,7 @@ def input_file(path: Path) -> Path:
     """Resolve and validate an input file."""
     path = path.expanduser().resolve()
     if not path.is_file():
-        raise FileNotFoundError(path)
+        raise SourceNotFoundError(errno.ENOENT, "Input file not found", str(path))
     return path
 
 

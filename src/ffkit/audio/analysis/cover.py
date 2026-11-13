@@ -1,4 +1,4 @@
-from ffkit._ffmpeg.args import StrPath, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import run
 from ffkit.errors import FFmpegProcessError
 from ffkit.runtime import FFmpegRuntime
@@ -11,7 +11,7 @@ def embedded_cover(source: StrPath, *, runtime: FFmpegRuntime = FFmpegRuntime())
         "-v",
         "error",
         "-i",
-        media_path(source),
+        media_path(existing_file(source)),
         "-map",
         "0:v:0",
         "-frames:v",

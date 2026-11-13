@@ -10,7 +10,9 @@ def test_embedded_cover_without_image(make_tone: Callable[..., None], tmp_path: 
     make_tone(source)
 
     assert embedded_cover(source) is None
-    assert embedded_cover(tmp_path / "missing.mp3") is None
+    broken = tmp_path / "broken.mp3"
+    broken.write_bytes(b"invalid audio")
+    assert embedded_cover(broken) is None
 
 
 def test_embedded_cover_reads_jpeg_bytes(make_tone: Callable[..., None], tmp_path: Path) -> None:

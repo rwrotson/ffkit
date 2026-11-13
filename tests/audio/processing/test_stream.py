@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from ffkit import FFmpegProcessError, InvalidInputError
-from ffkit.audio import Effects, render, stream
+from ffkit.audio import Effects, probe, render, stream
 from ffkit.audio._filters import audio_filters
 
 stream_module = importlib.import_module("ffkit.audio.processing.stream")
@@ -76,9 +76,9 @@ def test_stream_resolves_silence_trim(
     make_tone(source)
     effects = Effects(trim_silence=True)
 
-    def check_filters(current: Effects) -> list[str]:
+    def check_filters(current: Effects, *, sample_rate: int | None = None) -> list[str]:
         assert not current.trim_silence
-        return audio_filters(current)
+        return audio_filters(current, sample_rate=sample_rate)
 
     monkeypatch.setattr(stream_module, "audio_filters", check_filters)
     assert b"".join(stream(source, effects=effects))
@@ -88,8 +88,10 @@ def test_stream_reports_failed_encoder_and_closes_early(
     make_tone: Callable[..., None],
     tmp_path: Path,
 ) -> None:
+    broken = tmp_path / "broken.wav"
+    broken.write_bytes(b"invalid audio")
     with pytest.raises(FFmpegProcessError):
-        b"".join(stream(tmp_path / "missing.wav"))
+        b"".join(stream(broken))
 
     source = tmp_path / "source.wav"
     make_tone(source)
@@ -170,3 +172,16 @@ def test_stream_seek_trims_silent_edges(tmp_path: Path) -> None:
 
     # The seek starts 0.5 s after the audible start and stops at the audible end.
     assert 0.45 * 44100 < samples < 0.6 * 44100
+
+
+def test_stream_keeps_source_sample_rate_after_normalization(
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source, duration=1)
+    target = tmp_path / "streamed.mp3"
+
+    target.write_bytes(b"".join(stream(source, effects=Effects(normalize_lufs=-14))))
+
+    assert probe(target).sample_rate == 44100

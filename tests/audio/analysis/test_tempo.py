@@ -88,6 +88,7 @@ def test_tempo_respects_cancellation(make_tone: Callable[..., None], tmp_path: P
 
 def test_tempo_of_source_without_decoded_audio(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tempo_module, "iter_output", lambda *args, **kwargs: iter(()))
+    Path("empty.wav").write_bytes(b"")
 
     assert estimate_tempo("empty.wav") == ()
 

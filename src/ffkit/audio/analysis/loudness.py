@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import StrPath, media_path, source_fingerprint
+from ffkit._ffmpeg.args import StrPath, existing_file, media_path, source_fingerprint
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis._ebur128 import EBUR128_FILTERS, Report, iter_lines
@@ -38,6 +38,7 @@ def measure_loudness(
 
     Mono audio is measured as dual-mono, as it plays on two speakers.
     """
+    source = existing_file(source)
     fingerprint = source_fingerprint(source)
     chain = [*filters, *EBUR128_FILTERS]
 
@@ -114,6 +115,7 @@ def measure_normalization_gain(  # noqa: PLR0913 - Gain options, cache, and FFmp
     ``known`` is used instead of measuring only when no filters apply and its fingerprint matches
     the source file's size, mtime, and ctime.
     """
+    source = existing_file(source)
     measured = (effects or Effects()).replace(
         gain_db=0,
         normalize_lufs=None,

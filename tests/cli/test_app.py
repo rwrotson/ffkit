@@ -39,7 +39,10 @@ def test_missing_input_reports_json_error() -> None:
     result = runner.invoke(app, ["--output-format", "json", "audio", "probe", "missing.mp3"])
     assert result.exit_code == 2
     assert result.stdout == ""
-    assert json.loads(result.stderr)["error"]["type"] == "FileNotFoundError"
+    error = json.loads(result.stderr)["error"]
+    assert error["type"] == "SourceNotFoundError"
+    assert "Input file not found" in error["message"]
+    assert "missing.mp3" in error["message"]
 
 
 def test_json_processing_failure_has_one_error_object(

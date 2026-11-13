@@ -22,6 +22,7 @@ def test_extract_cover_timeout_removes_partial_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "cover.jpg"
+    Path("source.mp3").write_bytes(b"")
 
     def time_out(command: list[str], **kwargs: object) -> None:
         timeout = kwargs["timeout"]
@@ -44,6 +45,7 @@ def test_extract_cover_write_failure_removes_partial_file(
 ) -> None:
     target = tmp_path / "cover.jpg"
     target.write_bytes(b"previous cover")
+    Path("source.mp3").write_bytes(b"")
 
     def fail_replace(source: Path, destination: Path) -> None:
         raise OSError("replace failed")

@@ -150,8 +150,10 @@ def test_trim_bounds_respect_cancellation_and_failures(
         detect_trim_bounds(source, cancelled=lambda: True)
 
     info = AudioInfo(duration=1, sample_rate=44100, channels=1, codec="pcm_s16le")
+    broken = tmp_path / "broken.wav"
+    broken.write_bytes(b"invalid audio")
     with pytest.raises(FFmpegProcessError):
-        detect_trim_bounds(tmp_path / "missing.wav", info=info)
+        detect_trim_bounds(broken, info=info)
 
 
 def test_level_meter_is_independent_of_chunk_boundaries() -> None:

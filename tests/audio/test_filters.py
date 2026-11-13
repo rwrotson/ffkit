@@ -34,6 +34,12 @@ def test_filters_keep_order() -> None:
         == "alimiter=limit=0.70794578:level=false:latency=true"
     )
 
+    assert audio_filters(effects, sample_rate=44100)[3:5] == [
+        "loudnorm=I=-14.0:TP=-1:LRA=11",
+        "aresample=44100",
+    ]
+    assert audio_filters(Effects(gain_db=1), sample_rate=44100) == ["volume=1.0dB"]
+
     assert audio_filters(Effects(trim_end=4))[:2] == [
         "atrim=start=0.0:end=4.0",
         "asetpts=PTS-STARTPTS",

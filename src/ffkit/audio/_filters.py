@@ -3,8 +3,11 @@ from ffkit.audio.defaults import LOUDNORM_RANGE, LOUDNORM_TRUE_PEAK_DB
 from ffkit.audio.effects import Effects
 
 
-def audio_filters(effects: Effects) -> list[str]:
-    """Build the FFmpeg audio filter chain for effects; ``trim_silence`` must be resolved first."""
+def audio_filters(effects: Effects, *, sample_rate: int | None = None) -> list[str]:
+    """Build the FFmpeg audio filter chain for effects; ``trim_silence`` must be resolved first.
+
+    ``sample_rate`` restores the source rate after loudness normalization, which outputs 192 kHz.
+    """
     filters: list[str] = []
 
     if effects.trim_start or effects.trim_end is not None:
@@ -21,6 +24,8 @@ def audio_filters(effects: Effects) -> list[str]:
             f"loudnorm=I={ffmpeg_number(effects.normalize_lufs)}"
             f":TP={LOUDNORM_TRUE_PEAK_DB}:LRA={LOUDNORM_RANGE}",
         )
+        if sample_rate is not None:
+            filters.append(f"aresample={sample_rate}")
 
     ceiling = effects.limiter_ceiling_db
     if ceiling is not None:

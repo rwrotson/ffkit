@@ -2,9 +2,10 @@ import logging
 from collections.abc import Generator
 from pathlib import Path
 
-from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import iter_output
 from ffkit.audio._filters import audio_filters
+from ffkit.audio.analysis.probe import probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
@@ -44,7 +45,7 @@ def stream(
     if start < 0:
         raise InvalidInputError("Stream start must not be negative")
     return _stream(
-        Path(source),
+        existing_file(source),
         effects or Effects(),
         start,
         encoding,
@@ -60,7 +61,12 @@ def _stream(
     *,
     runtime: FFmpegRuntime,
 ) -> Generator[bytes]:
-    effects = resolve_silence_trim(effects, source, runtime=runtime)
+    info = (
+        probe(source, runtime=runtime)
+        if effects.trim_silence or effects.normalize_lufs is not None
+        else None
+    )
+    effects = resolve_silence_trim(effects, source, info=info, runtime=runtime)
     seeked = _seeked_effects(effects, start)
     if seeked is None:
         return
@@ -80,7 +86,7 @@ def _stream(
         "0:a:0",
     ]
 
-    filters = audio_filters(seeked_effects)
+    filters = audio_filters(seeked_effects, sample_rate=None if info is None else info.sample_rate)
     if filters:
         command += ["-af", ",".join(filters)]
     command += [*encoding.codec_args(), "-f", encoding.muxer, "pipe:1"]

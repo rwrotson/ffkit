@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import StrPath, ffmpeg_number, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, ffmpeg_number, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio.analysis.probe import AudioInfo, probe
 from ffkit.audio.defaults import (
@@ -211,6 +211,7 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     if min_duration < 0 or padding < 0:
         raise InvalidInputError("Minimum duration and padding must not be negative")
 
+    source = existing_file(source)
     info = info or probe(source, runtime=runtime)
     start, end = _silence_edges(
         source,

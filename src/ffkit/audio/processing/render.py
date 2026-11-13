@@ -8,6 +8,7 @@ from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.audio._filters import audio_filters
 from ffkit.audio.analysis.loudness import measure_loudness
+from ffkit.audio.analysis.probe import probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
@@ -60,7 +61,16 @@ def _command_parts(
             ["-map", "0:a:0", "-map", "0:v:0?", "-c:v", "copy", "-disposition:v:0", "attached_pic"],
         )
 
-    outputs = [*encoding.codec_args(), "-map_metadata", "0", "-f", encoding.muxer]
+    # Ogg and Opus keep tags on the audio stream; the first mapping wins on conflicting keys.
+    outputs = [
+        *encoding.codec_args(),
+        "-map_metadata",
+        "0:s:a:0",
+        "-map_metadata",
+        "0",
+        "-f",
+        encoding.muxer,
+    ]
     for key, value in tags.items():
         outputs.extend(["-metadata", f"{key}={value}"])
     return inputs, outputs
@@ -140,12 +150,18 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
     temporary = destination.with_name(f".{destination.stem}.{uuid4().hex}.tmp{encoding.extension}")
 
     try:
-        effects = resolve_silence_trim(effects, source, cancelled, runtime=runtime)
+        info = (
+            probe(source, runtime=runtime)
+            if effects.trim_silence or effects.normalize_lufs is not None
+            else None
+        )
+        sample_rate = None if info is None else info.sample_rate
+        effects = resolve_silence_trim(effects, source, cancelled, info=info, runtime=runtime)
 
         effective_ceiling = ceiling
         for attempt in range(MAX_ATTEMPTS):
             attempt_effects = effects.replace(limiter_ceiling_db=effective_ceiling)
-            filters = audio_filters(attempt_effects)
+            filters = audio_filters(attempt_effects, sample_rate=sample_rate)
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             _encode(
                 source,

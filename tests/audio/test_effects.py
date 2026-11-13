@@ -48,3 +48,9 @@ def test_effects_report_unconvertible_trim_as_field_error() -> None:
     with pytest.raises(ValidationError, match="trim_end") as error:
         Effects.model_validate({"trim_start": 1, "trim_end": "later"})
     assert "Trim end must be later" not in str(error.value)
+
+
+@pytest.mark.parametrize("lufs", [-71, -4, 5])
+def test_effects_reject_loudness_target_outside_loudnorm_range(lufs: float) -> None:
+    with pytest.raises(ValidationError, match="normalize_lufs"):
+        Effects(normalize_lufs=lufs)

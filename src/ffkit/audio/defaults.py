@@ -11,4 +11,9 @@ DEFAULT_TARGET_LUFS = -14
 DEFAULT_PEAK_CEILING_DB = -1
 
 LOUDNORM_TRUE_PEAK_DB = -1
+
+# Integrated loudness targets accepted by the FFmpeg loudnorm filter.
+LOUDNORM_MIN_LUFS = -70
+LOUDNORM_MAX_LUFS = -5
+
 LOUDNORM_RANGE = 11

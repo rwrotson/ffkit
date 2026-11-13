@@ -2,7 +2,12 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ffkit.audio.defaults import DEFAULT_SILENCE_PADDING, DEFAULT_SILENCE_THRESHOLD_DB
+from ffkit.audio.defaults import (
+    DEFAULT_SILENCE_PADDING,
+    DEFAULT_SILENCE_THRESHOLD_DB,
+    LOUDNORM_MAX_LUFS,
+    LOUDNORM_MIN_LUFS,
+)
 
 # Level that a silence threshold is relative to: digital full scale or the loudest window.
 type SilenceReference = Literal["full_scale", "peak"]
@@ -24,7 +29,7 @@ class Effects(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     gain_db: float = 0
-    normalize_lufs: float | None = None
+    normalize_lufs: float | None = Field(default=None, ge=LOUDNORM_MIN_LUFS, le=LOUDNORM_MAX_LUFS)
     trim_start: float = Field(default=0, ge=0)
     trim_end: float | None = Field(default=None, gt=0)
     trim_silence: bool = False

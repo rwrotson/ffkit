@@ -130,9 +130,9 @@ def test_render_trims_edges_without_reversing_audio(
     )
     effects = Effects(trim_start=0.5, trim_end=4.5, trim_silence=True)
 
-    def checked_filters(current: Effects) -> list[str]:
+    def checked_filters(current: Effects, *, sample_rate: int | None = None) -> list[str]:
         assert not current.trim_silence
-        return audio_filters(current)
+        return audio_filters(current, sample_rate=sample_rate)
 
     monkeypatch.setattr(render_module, "audio_filters", checked_filters)
 
@@ -426,3 +426,61 @@ def test_render_and_stream_use_encoding(make_tone: Callable[..., None], tmp_path
 
     assert probe(target).bit_rate == 96000
     assert len(streamed) < len(b"".join(stream(source)))
+
+
+def test_render_keeps_source_sample_rate_after_normalization(
+    make_tone: Callable[..., None],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    make_tone(source, duration=1)
+    target = tmp_path / "out.mp3"
+
+    render(source, target, effects=Effects(normalize_lufs=-14))
+
+    assert probe(target).sample_rate == 44100
+
+
+@pytest.mark.parametrize(
+    ("name", "metadata", "expected"),
+    [
+        ("source.opus", ["-metadata", "title=Stream"], "Stream"),
+        ("source.flac", ["-metadata", "title=Container"], "Container"),
+        (
+            "source.mka",
+            ["-metadata", "title=Container", "-metadata:s:a:0", "title=Stream"],
+            "Stream",
+        ),
+    ],
+)
+def test_render_copies_stream_and_container_tags(
+    tmp_path: Path,
+    name: str,
+    metadata: list[str],
+    expected: str,
+) -> None:
+    source = tmp_path / name
+    subprocess.run(  # noqa: S603 - Fixed FFmpeg fixture command.
+        [  # noqa: S607 - FFmpeg is resolved from PATH.
+            "ffmpeg",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=1",
+            "-metadata",
+            "artist=Band",
+            *metadata,
+            "-y",
+            str(source),
+        ],
+        check=True,
+    )
+    target = tmp_path / "out.mp3"
+
+    render(source, target)
+
+    tags = probe(target).tags
+    assert tags["title"] == expected
+    assert tags["artist"] == "Band"

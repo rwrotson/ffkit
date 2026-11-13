@@ -5,7 +5,7 @@ from numpy.lib.stride_tricks import sliding_window_view
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field
 
-from ffkit._ffmpeg.args import StrPath, media_path
+from ffkit._ffmpeg.args import StrPath, existing_file, media_path
 from ffkit._ffmpeg.process import Cancelled, iter_output
 from ffkit.runtime import FFmpegRuntime
 
@@ -62,7 +62,7 @@ def estimate_tempo(
     Uses spectral flux, generalized autocorrelation, and pulse-train scoring after Percival and
     Tzanetakis (2014), with a log-normal tempo prior for the octave decision.
     """
-    onsets = _onset_strength(source, cancelled=cancelled, runtime=runtime)
+    onsets = _onset_strength(existing_file(source), cancelled=cancelled, runtime=runtime)
     windows = _window_tempi(onsets)
     if not windows:
         return ()
