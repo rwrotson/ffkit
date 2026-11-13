@@ -85,7 +85,8 @@ render("song.flac", "song-quiet.mp3", effects=effects.replace(gain_db=-3), runti
   original file, and `stream(start=...)` seeks from `trim_start`.
 - `render()` and `stream()` encode with `encoding=`, by default `Mp3Encoding()` at 320 kbit/s.
   `render()` replaces the destination only on success; its `cover` option is `True` (keep the source
-  cover), `False`, or an image path.
+  cover), `False`, or an image path. A source cover is an attached picture; other video streams are
+  dropped.
 - `measure_loudness()` records the file fingerprint for unfiltered measurements, and
   `measure_normalization_gain(known=...)` reuses that result while the file is unchanged.
   `waveform().loudness` is the same measurement and can be passed as `known=` too.

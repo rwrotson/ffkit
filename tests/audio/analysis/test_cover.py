@@ -42,3 +42,10 @@ def test_embedded_cover_reads_jpeg_bytes(make_tone: Callable[..., None], tmp_pat
 
     assert cover is not None
     assert cover.startswith(b"\xff\xd8")
+
+
+def test_video_track_is_not_a_cover(make_video: Callable[..., None], tmp_path: Path) -> None:
+    source = tmp_path / "video.mp4"
+    make_video(source)
+
+    assert embedded_cover(source) is None

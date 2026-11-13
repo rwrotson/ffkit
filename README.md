@@ -152,6 +152,9 @@ covers, and analysis results, in its own models.
   encoded file and retried with a lower ceiling when the true peak exceeds it.
 - `extract_cover()` likewise replaces the destination only after extracting an image; without an
   embedded image it returns `None`. `embedded_cover()` returns the image as JPEG bytes.
+- A cover is a stream with the `attached_pic` disposition, as reported by `probe().has_cover`.
+  Other video streams, such as the picture of a music video, are neither kept by `render()` nor
+  returned by `embedded_cover()`.
 
 #### Analysis
 
