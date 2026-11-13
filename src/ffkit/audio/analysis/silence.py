@@ -11,6 +11,8 @@ from ffkit.audio.defaults import (
     DEFAULT_SILENCE_PADDING,
     DEFAULT_SILENCE_THRESHOLD_DB,
     DEFAULT_TRIM_MIN_DURATION,
+    MAX_SILENCE_PADDING,
+    MIN_SILENCE_THRESHOLD_DB,
 )
 from ffkit.audio.effects import Effects, SilenceReference
 from ffkit.errors import InvalidInputError, SilentAudioError
@@ -206,10 +208,14 @@ def detect_trim_bounds(  # noqa: PLR0913 - Scan options plus the keyword-only FF
     loudest window. Edge silence shorter than ``min_duration`` is kept, and ``padding`` seconds of
     silence are kept at trimmed edges. The source is probed first unless ``info`` is given.
     """
-    if threshold_db > 0 or not math.isfinite(threshold_db):
-        raise InvalidInputError("Silence threshold must be a finite level at or below 0 dB")
-    if min_duration < 0 or padding < 0:
-        raise InvalidInputError("Minimum duration and padding must not be negative")
+    if not MIN_SILENCE_THRESHOLD_DB <= threshold_db <= 0:
+        raise InvalidInputError(
+            f"Silence threshold must be between {MIN_SILENCE_THRESHOLD_DB} and 0 dB",
+        )
+    if not 0 <= min_duration < math.inf:
+        raise InvalidInputError("Minimum duration must be a finite value of at least 0")
+    if not 0 <= padding <= MAX_SILENCE_PADDING:
+        raise InvalidInputError(f"Padding must be between 0 and {MAX_SILENCE_PADDING} s")
 
     source = existing_file(source)
     info = info or probe(source, runtime=runtime)

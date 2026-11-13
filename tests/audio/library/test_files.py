@@ -32,3 +32,21 @@ def test_audio_files_skip_hidden_files(tmp_path: Path) -> None:
     for path in (visible, *hidden):
         path.write_bytes(b"x")
     assert audio_files([tmp_path, *hidden]) == [visible]
+
+
+def test_audio_files_skip_hidden_directories(tmp_path: Path) -> None:
+    visible = tmp_path / "album" / "song.mp3"
+    hidden = [tmp_path / ".AppleDouble" / "song.mp3", tmp_path / "album" / ".Trashes" / "old.mp3"]
+    for path in (visible, *hidden):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+
+    assert audio_files([tmp_path]) == [visible]
+
+
+def test_audio_files_accept_root_inside_hidden_directory(tmp_path: Path) -> None:
+    song = tmp_path / ".music" / "song.mp3"
+    song.parent.mkdir()
+    song.write_bytes(b"x")
+
+    assert audio_files([song.parent]) == [song]
