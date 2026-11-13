@@ -30,6 +30,7 @@ Typed FFmpeg helpers for audio processing, with optional application logging and
 - Python 3.14+
 - Git for installation from the repository; uv for development
 - `ffmpeg` and `ffprobe` on `PATH`, or paths configured through `FFmpegRuntime`, for audio operations
+- Linux or macOS; process pipes are read with `selectors`, which Windows does not support for pipes
 
 ## Getting Started
 
@@ -39,7 +40,7 @@ Install a tagged version directly from GitHub (replace `vX.Y.Z` with a release t
 pip install "ffkit @ git+https://github.com/rwrotson/ffkit.git@vX.Y.Z"
 ```
 
-The base install provides the audio API and depends only on Pydantic. Extras add application layers:
+The base install provides the audio API and depends on Pydantic and NumPy. Extras add application layers:
 
 | Extra | Adds | Packages |
 | --- | --- | --- |
@@ -78,12 +79,13 @@ ffkit -f json audio tempo song.flac
 
 `render` and `extract-cover` require `--force` to replace an existing output file.
 `render` embeds the source cover unless `--cover PATH` replaces it or `--no-cover` drops it;
-`--tag KEY=VALUE` sets a tag and may be repeated. `normalization-gain` prints the fixed gain that
+`--tag KEY=VALUE` sets a tag and may be repeated. `--silence-min-duration` sets the shortest edge
+silence that `--trim-silence` removes. `normalization-gain` prints the fixed gain that
 reaches the target loudness without exceeding the true-peak ceiling. `render` encodes MP3 at
 `--bitrate-kbps` (320 by default) or LAME `--vbr-quality`. `waveform` prints loudness, true peak, and 400 (`--bins`)
 peak and momentary loudness levels scaled to 0..1, and `tempo` prints rough tempo segments. JSON output uses the field names of the
-library result models, such as `lufs` and `true_peak_db`. Exit code 2 marks invalid input and 1 a
-processing failure.
+library result models, such as `lufs` and `true_peak_db`. Exit code 2 marks invalid input, including a
+missing input file, and 1 a processing failure.
 The CLI runs `ffmpeg` and `ffprobe` from `PATH` unless `FFKIT_FFMPEG__FFMPEG_PATH` or
 `FFKIT_FFMPEG__FFPROBE_PATH` is set.
 
@@ -133,18 +135,20 @@ covers, and analysis results, in its own models.
   checked together. Trim bounds are positions in the original file.
 - `trim_silence` removes leading and trailing silence below `silence_threshold_db`, measured as
   20 ms RMS windows of the loudest channel. The threshold is relative to full scale or, with
-  `silence_threshold_reference="peak"`, to the loudest window. Edge silence shorter than 0.1 s is
-  kept, `silence_padding` seconds (0.05 by default) are kept at trimmed edges, and pauses inside the
+  `silence_threshold_reference="peak"`, to the loudest window. Edge silence shorter than
+  `silence_min_duration` (0.1 s by default) is kept, `silence_padding` seconds (0.05 by default) are kept at trimmed edges, and pauses inside the
   track stay. Rendering, normalization, and streaming find the bounds with a separate decode of the
   trimmed range, so long tracks are not buffered in memory.
 - `stream(start=...)` resolves silence bounds first and then seeks from the audible start;
   `trim_silence` scans the range before the first chunk, so a player that seeks often can pass
   bounds from `detect_trim_bounds()` as `trim_start` and `trim_end` instead.
 - `render()` and `stream()` encode with `encoding=`, which defaults to `Mp3Encoding()` (LAME,
-  320 kbit/s CBR; set `vbr_quality` for VBR).
+  320 kbit/s CBR; set `vbr_quality` for VBR). `normalize_lufs` applies FFmpeg `loudnorm` (-70 to
+  -5 LUFS) and keeps the source sample rate.
 - `render()` writes to a temporary file and replaces the destination only on success. It copies
   source metadata and writes `tags` over it; `cover` keeps the source cover (`True`, the default),
-  writes none (`False`), or embeds an image file. A `limiter_ceiling_db` effect is verified on the
+  writes none (`False`), or embeds an image file. Tags of the first audio stream, where Ogg and Opus
+  keep them, override container tags. A `limiter_ceiling_db` effect is verified on the
   encoded file and retried with a lower ceiling when the true peak exceeds it.
 - `extract_cover()` likewise replaces the destination only after extracting an image; without an
   embedded image it returns `None`. `embedded_cover()` returns the image as JPEG bytes.
@@ -183,7 +187,7 @@ Functions that run FFmpeg or FFprobe accept a keyword-only `runtime: FFmpegRunti
 executables and time limits. By default `ffmpeg` and `ffprobe` are resolved from `PATH`, and each
 run has a 15-minute deadline (`process_timeout=900`). `stream()` has no total deadline; it raises
 `FFmpegTimeoutError` when the encoder produces no output for `stream_idle_timeout` seconds (30 by
-default). Long-running analysis and rendering accept a `cancelled` callback; when it returns `True`,
+default). Long-running analysis, rendering, and streaming accept a `cancelled` callback; when it returns `True`,
 FFmpeg is stopped and `CancelledError` is raised.
 
 ```python
@@ -309,7 +313,9 @@ src/
     │   ├── settings.py      # LogSettings (ffkit[logs])
     │   └── setup.py         # opt-in setup_logging() for applications (ffkit[logs])
     ├── cli/
-    │   ├── app.py           # optional Typer commands (ffkit[cli])
+    │   ├── app.py           # optional Typer root command and error exits (ffkit[cli])
+    │   ├── audio.py         # audio commands
+    │   ├── _shared.py       # output, input, and tag helpers shared by commands
     │   └── settings.py      # FFKIT_* settings of the command
     └── main.py              # ffkit console script entry point
 tests/                       # mirrors the package; test_package.py checks import-time behaviour
