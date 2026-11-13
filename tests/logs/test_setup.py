@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ffkit.logs import LogSettings
+from ffkit.logs import FILE_ONLY, LogSettings
 from ffkit.logs.setup import _AppConsoleHandler, _AppFileHandler, _AppNullHandler, setup_logging
 
 _EXPECTED_HANDLER_COUNT = 2
@@ -32,6 +32,23 @@ def test_setup_logging_without_console_keeps_file_logs(
     assert capsys.readouterr().err == ""
     assert json.loads((tmp_path / "ffkit.log").read_text())["event"] == "file only"
     assert any(isinstance(handler, _AppNullHandler) for handler in clean_root_logger.handlers)
+
+
+def test_file_only_records_skip_the_console(
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    setup_logging(LogSettings(dir=tmp_path))
+
+    clean_root_logger.error("printed elsewhere", extra=FILE_ONLY)
+    clean_root_logger.error("everywhere")
+
+    assert "printed elsewhere" not in capsys.readouterr().err
+    events = [
+        json.loads(line)["event"] for line in (tmp_path / "ffkit.log").read_text().splitlines()
+    ]
+    assert events == ["printed elsewhere", "everywhere"]
 
 
 def test_setup_logging_without_console_or_file_is_silent(

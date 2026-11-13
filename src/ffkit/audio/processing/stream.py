@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Generator
 from pathlib import Path
 
@@ -9,10 +8,8 @@ from ffkit.audio.analysis.probe import audio_stream_required, probe
 from ffkit.audio.analysis.silence import resolve_silence_trim
 from ffkit.audio.effects import Effects
 from ffkit.audio.encoding import Encoding, Mp3Encoding
-from ffkit.errors import CancelledError, InvalidInputError
+from ffkit.errors import InvalidInputError
 from ffkit.runtime import FFmpegRuntime
-
-log = logging.getLogger(__name__)
 
 
 def _seeked_effects(effects: Effects, start: float) -> tuple[Effects, float] | None:
@@ -94,15 +91,9 @@ def _stream(  # noqa: PLR0913 - Arguments of stream() passed through.
         command += ["-af", ",".join(filters)]
     command += [*encoding.codec_args(), "-f", encoding.muxer, "pipe:1"]
 
-    try:
-        with audio_stream_required(source, runtime=runtime):
-            yield from iter_output(
-                command,
-                idle_timeout=runtime.stream_idle_timeout,
-                cancelled=cancelled,
-            )
-    except CancelledError:
-        raise
-    except Exception:
-        log.exception("audio_stream_failed source=%s", source)
-        raise
+    with audio_stream_required(source, runtime=runtime):
+        yield from iter_output(
+            command,
+            idle_timeout=runtime.stream_idle_timeout,
+            cancelled=cancelled,
+        )
