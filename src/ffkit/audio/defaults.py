@@ -7,6 +7,10 @@ DEFAULT_TRIM_MIN_DURATION = 0.1
 # Silence kept before the first and after the last audible window, in seconds.
 DEFAULT_SILENCE_PADDING = 0.05
 
+# Accepted range of silence thresholds and padding.
+MIN_SILENCE_THRESHOLD_DB = -100
+MAX_SILENCE_PADDING = 1
+
 DEFAULT_TARGET_LUFS = -14
 DEFAULT_PEAK_CEILING_DB = -1
 

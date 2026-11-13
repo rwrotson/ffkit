@@ -17,7 +17,12 @@ def audio_files(paths: Iterable[StrPath]) -> list[Path]:
     for raw in paths:
         path = Path(raw).expanduser().resolve()
         if path.is_dir():
-            files.update(item for item in path.rglob("*") if item.is_file() and _is_audio(item))
+            for directory, subdirectories, names in path.walk():
+                # Hidden directories hold AppleDouble data, trash, and tool state, not tracks.
+                subdirectories[:] = [name for name in subdirectories if not name.startswith(".")]
+
+                candidates = (directory / name for name in names)
+                files.update(item for item in candidates if _is_audio(item) and item.is_file())
         elif path.is_file() and _is_audio(path):
             files.add(path)
     return sorted(files)

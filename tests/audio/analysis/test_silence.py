@@ -135,9 +135,31 @@ def test_trim_rejects_all_silence(tmp_path: Path) -> None:
 
 
 def test_trim_bounds_reject_invalid_options(tmp_path: Path) -> None:
-    for options in [{"threshold_db": 1.0}, {"threshold_db": float("nan")}, {"padding": -1.0}]:
+    invalid = [
+        {"threshold_db": 1.0},
+        {"threshold_db": -101.0},
+        {"threshold_db": float("nan")},
+        {"padding": -1.0},
+        {"padding": 1.5},
+        {"min_duration": -1.0},
+        {"min_duration": float("inf")},
+    ]
+    for options in invalid:
         with pytest.raises(InvalidInputError):
             detect_trim_bounds(tmp_path / "source.wav", **options)  # type: ignore[arg-type]
+
+
+def test_trim_bounds_accept_effects_limits(tmp_path: Path) -> None:
+    source = make_audio(tmp_path / "tone.wav", SILENCE, TONE, SILENCE)
+
+    effects = Effects(silence_threshold_db=-100, silence_padding=1)
+    bounds = detect_trim_bounds(
+        source,
+        threshold_db=effects.silence_threshold_db,
+        padding=effects.silence_padding,
+    )
+
+    assert bounds.start >= 0
 
 
 def test_trim_bounds_respect_cancellation_and_failures(

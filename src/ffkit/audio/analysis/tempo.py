@@ -41,6 +41,9 @@ TEMPO_MIN_CONFIDENCE = 0.1
 # Lag-0 autocorrelation at or below this means a window has no variation to analyse.
 MIN_ACF_ENERGY = 1e-9
 
+# Window tempi added to the histogram at once, which bounds its temporary grid-by-tempi array.
+HISTOGRAM_CHUNK = 1024
+
 
 class TempoSegment(BaseModel):
     """A timed BPM estimate."""
@@ -132,7 +135,7 @@ def _lowpass() -> FloatArray:
 
 
 def _window_tempi(onsets: FloatArray) -> list[tuple[float, float, FloatArray]]:
-    """Return the center time, tempo, and normalized autocorrelation of each periodic window."""
+    """Return the center time, tempo, and short-lag normalized ACF of each periodic window."""
     size = min(WINDOW, len(onsets))
     if size < MIN_WINDOW:
         return []
@@ -143,7 +146,10 @@ def _window_tempi(onsets: FloatArray) -> list[tuple[float, float, FloatArray]]:
         result = _window_tempo(section)
         if result is not None:
             bpm, acf = result
-            windows.append(((start + size / 2) / ONSET_RATE, bpm, acf))
+
+            # Octave support reads lags up to the slowest candidate; a copy frees the full ACF.
+            support_acf = acf[: math.ceil(_lag(OCTAVE_MIN_BPM)) + 2].copy()
+            windows.append(((start + size / 2) / ONSET_RATE, bpm, support_acf))
     return windows
 
 
@@ -210,7 +216,11 @@ def _global_tempo(windows: list[tuple[float, float, FloatArray]]) -> float:
     """Pick the histogram peak of window tempi in the octave chosen by ``_octave``."""
     tempi = np.array([bpm for _, bpm, _ in windows])
     grid = np.arange(MIN_BPM, MAX_BPM + 0.05, 0.1)
-    histogram = np.exp(-0.5 * ((grid[:, np.newaxis] - tempi) / HISTOGRAM_WIDTH) ** 2).sum(axis=1)
+    histogram = np.zeros(len(grid))
+    for first in range(0, len(tempi), HISTOGRAM_CHUNK):
+        chunk = tempi[first : first + HISTOGRAM_CHUNK]
+        distances = (grid[:, np.newaxis] - chunk) / HISTOGRAM_WIDTH
+        histogram += np.exp(-0.5 * distances**2).sum(axis=1)
     peak = float(grid[np.argmax(histogram)])
     near = tempi[np.abs(tempi - peak) <= HISTOGRAM_WIDTH * 2]
     return _octave(windows, float(np.median(near)) if len(near) else peak)

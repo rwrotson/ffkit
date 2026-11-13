@@ -127,6 +127,19 @@ def test_window_tempo_needs_periodicity() -> None:
     assert tempo_module._window_tempo(np.tile([1.0, 0.0], 512)) is None
 
 
+def test_windows_keep_only_support_lags() -> None:
+    period = round(tempo_module.ONSET_RATE / 2)
+    onsets = (np.arange(4000) % period == 0).astype(float)
+
+    windows = tempo_module._window_tempi(onsets)
+
+    assert windows
+    longest_lag = tempo_module._lag(tempo_module.OCTAVE_MIN_BPM)
+    for _, _, acf in windows:
+        assert longest_lag < len(acf) < tempo_module.WINDOW
+        assert acf.base is None
+
+
 def test_low_confidence_segments_are_empty() -> None:
     acf = np.zeros(tempo_module.WINDOW)
     windows = [(float(index), 61.0 + 11 * index, acf) for index in range(20)]

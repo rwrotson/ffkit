@@ -1,6 +1,7 @@
 import html
 import json
 from collections.abc import Iterator
+from typing import TypeAliasType
 
 import mkdocs_gen_files
 from pydantic.fields import FieldInfo
@@ -12,7 +13,11 @@ PREFIX = "FFKIT_"
 
 def type_name(field: FieldInfo) -> str:
     """Format a field type for a Markdown table cell."""
-    name = str(field.annotation).replace("typing.", "").replace("pathlib.", "")
+    annotation = field.annotation
+    # Show the values of a ``type`` alias, such as the log level literals.
+    if isinstance(annotation, TypeAliasType):
+        annotation = annotation.__value__
+    name = str(annotation).replace("typing.", "").replace("pathlib.", "")
     name = name.replace("_local.", "").replace("<class '", "").replace("'>", "")
     # A backslash-escaped pipe stays visible inside a code span, so use an HTML entity.
     return f"<code>{html.escape(name).replace('|', '&#124;')}</code>"

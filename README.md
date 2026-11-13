@@ -178,8 +178,8 @@ covers, and analysis results, in its own models.
 
 #### Library helpers
 
-`ffkit.audio.library.audio_files()` finds supported audio files and skips hidden files, such as macOS
-`._*` files and in-progress render outputs. `safe_name()` builds a numbered export name from tags,
+`ffkit.audio.library.audio_files()` finds supported audio files and skips hidden files and
+directories, such as macOS `._*` files, `.AppleDouble`, and in-progress render outputs. `safe_name()` builds a numbered export name from tags,
 with the `extension` of the chosen encoding. `merge_tags()` refreshes source tags after a repeated
 probe while keeping tags the caller changed: pass the current tags, the new and previous source
 tags, and the overrides from the previous `MergedTags`.
