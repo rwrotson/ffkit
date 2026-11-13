@@ -36,7 +36,8 @@ def emit(ctx: typer.Context, data: dict[str, object], lines: list[str]) -> None:
     if cli_state(ctx).output_format == OutputFormat.json:
         typer.echo(json.dumps(data))
     else:
-        console = Console()
+        # Lines are data: wrapping or emoji codes would change paths and tag values.
+        console = Console(soft_wrap=True, emoji=False)
         for line in lines:
             console.print(line, markup=False)
 

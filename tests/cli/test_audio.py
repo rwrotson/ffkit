@@ -78,6 +78,33 @@ def test_probe_text(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert "[red]Example[/red]" in result.stdout
 
 
+def test_text_output_keeps_lines_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / ("long-directory-name-" * 6) / "source.mp3"
+    source.parent.mkdir()
+    source.touch()
+    title = "Fire :fire: " + "word " * 30
+
+    def fake_probe(path: Path, *, runtime: FFmpegRuntime) -> AudioInfo:
+        return AudioInfo(
+            duration=5,
+            sample_rate=44100,
+            channels=1,
+            codec="pcm_s16le",
+            tags={"title": title},
+        )
+
+    monkeypatch.setattr(cli_audio, "probe", fake_probe)
+    result = runner.invoke(app, ["audio", "probe", str(source)])
+
+    assert result.exit_code == 0
+    lines = result.stdout.splitlines()
+    assert f"Path: {source}" in lines
+    assert f"title: {title}" in lines
+
+
 def test_loudness_and_trim(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     source = tmp_path / "source.mp3"
     source.touch()
