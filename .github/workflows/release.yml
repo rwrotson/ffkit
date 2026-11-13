@@ -52,8 +52,12 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --all-groups
       - run: uv run --no-sync properdocs build --strict
+      # A rerun keeps earlier attempts' artifacts, and deploy-pages rejects duplicate names.
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
+          name: github-pages-${{ github.run_attempt }}
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
