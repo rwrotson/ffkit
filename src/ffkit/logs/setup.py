@@ -1,11 +1,15 @@
 import logging
 import logging.handlers
 import sys
+from types import MappingProxyType
 from typing import TextIO
 
 import structlog
 
 from ffkit.logs.settings import LogSettings
+
+# Pass as ``extra`` to keep a record out of the console when the application prints it itself.
+FILE_ONLY = MappingProxyType({"console": False})
 
 
 class _AppFileHandler(logging.handlers.RotatingFileHandler):
@@ -20,6 +24,10 @@ class _AppNullHandler(logging.NullHandler):
     """Prevent fallback stderr output when application console logging is disabled."""
 
 
+def _console_record(record: logging.LogRecord) -> bool:
+    return getattr(record, "console", True) is not False
+
+
 def _prepare_handlers(
     config: LogSettings,
     console: bool,
@@ -32,6 +40,7 @@ def _prepare_handlers(
             sh = _AppConsoleHandler(sys.stderr)
             sh.setLevel(config.console_level)
             sh.setFormatter(console_formatter)
+            sh.addFilter(_console_record)
             prepared.append(sh)
         else:
             prepared.append(_AppNullHandler())

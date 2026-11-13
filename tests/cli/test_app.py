@@ -61,7 +61,25 @@ def test_json_processing_failure_has_one_error_object(
     assert result.exit_code == 1
     assert result.stdout == ""
     assert json.loads(result.stderr)["error"]["type"] == "FFmpegProcessError"
-    assert "audio_render_failed" in (tmp_path / "logs" / "ffkit.log").read_text()
+    assert "command_failed" in (tmp_path / "logs" / "ffkit.log").read_text()
+
+
+def test_text_processing_failure_is_printed_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "broken.wav"
+    source.write_bytes(b"invalid audio")
+    monkeypatch.setenv("FFKIT_LOG__DIR", str(tmp_path / "logs"))
+
+    result = runner.invoke(app, ["audio", "render", str(source), str(tmp_path / "out.mp3")])
+
+    assert result.exit_code == 1
+    assert result.stderr.splitlines() == [result.stderr.strip()]
+    assert result.stderr.startswith("Error: ")
+    record = json.loads((tmp_path / "logs" / "ffkit.log").read_text())
+    assert record["level"] == "error"
+    assert "command_failed error_type=FFmpegProcessError" in record["event"]
 
 
 def test_filesystem_errors_use_json_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

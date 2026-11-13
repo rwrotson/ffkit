@@ -1,4 +1,3 @@
-import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -22,13 +21,9 @@ from ffkit.audio.encoding import Encoding, Mp3Encoding
 from ffkit.errors import (
     CancelledError,
     FFmpegError,
-    FFmpegProcessError,
-    FFmpegTimeoutError,
     PeakCeilingError,
 )
 from ffkit.runtime import FFmpegRuntime
-
-log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 5
 CEILING_MARGIN_DB = 0.2
@@ -108,19 +103,9 @@ def _next_ceiling(current: float, ceiling: float, peak: float, attempt: int) -> 
     return lowered
 
 
-def _encode(
-    source: Path,
-    command: list[str],
-    cancelled: Cancelled | None,
-    *,
-    timeout: float,
-) -> None:
-    try:
-        for _ in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
-            pass
-    except (FFmpegProcessError, FFmpegTimeoutError) as error:
-        log.error("audio_render_failed source=%s error=%s", source, error)
-        raise
+def _encode(command: list[str], cancelled: Cancelled | None, *, timeout: float) -> None:
+    for _ in iter_output(command, pipe="stderr", timeout=timeout, cancelled=cancelled):
+        pass
 
 
 def _check_paths(source: Path, destination: Path, cover: Path | bool) -> None:
@@ -184,7 +169,6 @@ def render(  # noqa: PLR0913 - Render options plus the keyword-only FFmpeg runti
             command = [*inputs, *(["-af", ",".join(filters)] if filters else [])]
             with audio_stream_required(source, runtime=runtime):
                 _encode(
-                    source,
                     [*command, *outputs, media_path(temporary)],
                     cancelled,
                     timeout=runtime.process_timeout,

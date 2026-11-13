@@ -1,3 +1,4 @@
+import logging
 from importlib.metadata import version
 from typing import Annotated, Any
 
@@ -9,7 +10,9 @@ from ffkit import FFKitError
 from ffkit.cli._shared import CLIState, OutputFormat, cli_state, report_error
 from ffkit.cli.audio import audio
 from ffkit.cli.settings import load_settings
-from ffkit.logs import setup_logging
+from ffkit.logs import FILE_ONLY, setup_logging
+
+log = logging.getLogger(__name__)
 
 
 class CLIGroup(TyperGroup):
@@ -25,6 +28,13 @@ class CLIGroup(TyperGroup):
             # Invalid input is a usage error; FFmpeg and other failures are processing errors.
             code = 2 if isinstance(error, (ValueError, FileNotFoundError)) else 1
 
+            # The error is printed below, so the console handler skips this record.
+            log.error(
+                "command_failed error_type=%s error=%s",
+                type(error).__name__,
+                error,
+                extra=FILE_ONLY,
+            )
             report_error(cli_state(ctx).output_format, type(error).__name__, str(error))
             raise typer.Exit(code) from error
 

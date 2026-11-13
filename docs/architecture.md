@@ -93,13 +93,14 @@ render as input. Effect trim positions are relative to the original file.
 
 ## Logging
 
-Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on `ffkit` keeps records silent until the application configures logging, and records then follow the application's levels and handlers.
+Library modules log through `logging.getLogger(__name__)` and do not log the errors they raise;
+the caller decides how to report them. The `NullHandler` on `ffkit` keeps records silent until the application configures logging, and records then follow the application's levels and handlers.
 
 `ffkit.logs.setup_logging()` is a helper for applications that do not have their own setup:
 
 1. Without arguments it uses the `LogSettings()` defaults; it never reads the environment.
 2. It replaces the handlers it created before only after new handlers are ready and keeps all others.
-3. It adds a stderr handler (console or JSON) unless `console=False`, and, when a log directory is set, a rotating JSON file handler.
+3. It adds a stderr handler (console or JSON) unless `console=False`, and, when a log directory is set, a rotating JSON file handler. Records logged with `extra=FILE_ONLY` skip the stderr handler.
 4. It configures structlog to render through the same stdlib handlers, so structlog and stdlib records share one format.
 
 ## Errors

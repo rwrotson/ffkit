@@ -218,6 +218,10 @@ setup_logging(LogSettings(level="DEBUG", format="json"))
 setup_logging()  # defaults: INFO to stderr, no log file
 ```
 
+The library raises errors without logging them. The CLI writes each command failure to the log
+file as `command_failed` and prints it once on stderr; `extra=ffkit.logs.FILE_ONLY` keeps such a
+record out of the console handler.
+
 ## Development
 
 Run development tasks with [poethepoet](https://poethepoet.natn.io/):

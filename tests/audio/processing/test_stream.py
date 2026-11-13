@@ -1,4 +1,5 @@
 import importlib
+import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -200,4 +201,4 @@ def test_stream_respects_cancellation_without_failure_log(
     with pytest.raises(CancelledError):
         b"".join(stream(source, effects=effects, cancelled=lambda: True))
 
-    assert "audio_stream_failed" not in caplog.text
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
