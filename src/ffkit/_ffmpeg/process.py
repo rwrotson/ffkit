@@ -1,3 +1,4 @@
+import errno
 import logging
 import os
 import selectors
@@ -18,6 +19,9 @@ CHUNK_SIZE = 65536
 CANCEL_POLL_INTERVAL = 0.1
 # Exit wait after EOF when the caller sets no total deadline.
 EXIT_GRACE = 5
+
+# Errors that mean the executable itself cannot be started.
+START_ERRNOS = frozenset({errno.ENOENT, errno.EACCES, errno.ENOEXEC, errno.ENOTDIR})
 
 
 def error_tail(errors: IO[bytes]) -> str:
@@ -64,8 +68,8 @@ def _spawn(
             stdout=stdout,
             stderr=stderr,
         )
-    except FileNotFoundError as error:
-        if error.filename not in {command[0], None}:
+    except OSError as error:
+        if error.errno not in START_ERRNOS or error.filename not in {command[0], None}:
             raise
         raise FFmpegNotFoundError(command[0], command=command) from error
 

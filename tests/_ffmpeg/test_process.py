@@ -1,3 +1,4 @@
+import errno
 import logging
 import subprocess
 import sys
@@ -70,6 +71,26 @@ def test_missing_executable(tmp_path: Path) -> None:
     with pytest.raises(FFmpegNotFoundError) as error:
         run([missing], timeout=30)
     assert error.value.executable == missing
+
+
+def test_non_executable_file(tmp_path: Path) -> None:
+    executable = tmp_path / "ffmpeg"
+    executable.write_text("not a program")
+
+    with pytest.raises(FFmpegNotFoundError) as error:
+        run([str(executable)], timeout=30)
+
+    assert error.value.executable == str(executable)
+
+
+def test_other_os_errors_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(*args: object, **kwargs: object) -> None:
+        raise OSError(errno.EMFILE, "Too many open files")
+
+    monkeypatch.setattr(subprocess, "Popen", fail)
+    with pytest.raises(OSError, match="Too many open files") as error:
+        run(["ffmpeg"], timeout=30)
+    assert not isinstance(error.value, FFmpegNotFoundError)
 
 
 def test_unrelated_spawn_errors_propagate(monkeypatch: pytest.MonkeyPatch) -> None:
